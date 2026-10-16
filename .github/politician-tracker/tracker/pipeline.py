@@ -175,6 +175,27 @@ def dedupe(batches: list[list[Trade]]) -> list[Trade]:
     return [t for _, t in best.values()]
 
 
+PHOTO_URL = "https://unitedstates.github.io/images/congress/225x275/{}.jpg"
+
+
+def fetch_photos(client: Client, vips: list[dict], out_dir: Path, url_prefix: str) -> None:
+    """Cache public-domain member portraits as static files; sets v["photo"] when available."""
+    img_dir = out_dir / "img"
+    for v in vips:
+        path = img_dir / f"{v['bioguide']}.jpg"
+        if not path.exists():
+            try:
+                blob = client.request(PHOTO_URL.format(v["bioguide"]))
+                if blob[:3] != b"\xff\xd8\xff":
+                    raise ValueError("not a JPEG")
+                img_dir.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(blob)
+            except Exception as e:
+                log.warning("photo for %s unavailable: %s", v["name"], e)
+                continue
+        v["photo"] = f"{url_prefix}/img/{path.name}"
+
+
 def load_previous(path: Path) -> list[Trade]:
     if not path.exists():
         return []
@@ -224,6 +245,7 @@ def run(cfg: dict, out_root: Path, client: Client | None = None, now: datetime |
     from .render import render_page
 
     out_dir.mkdir(parents=True, exist_ok=True)
+    fetch_photos(client or Client(), payload["vip"], out_dir, f"/{cfg['site']['path']}")
     data_path.write_text(json.dumps(payload, ensure_ascii=False, indent=1), "utf-8")
     (out_dir / "index.html").write_text(render_page(cfg, payload, now), "utf-8")
     return payload

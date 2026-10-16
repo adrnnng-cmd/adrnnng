@@ -136,26 +136,51 @@ a.badge.vip{text-decoration:none}a.badge.vip:hover{background:#333}
 .foot .row{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .foot .srcs{margin-top:6px;line-height:1.7}
 .foot .ok{color:var(--up)}.foot .bad{color:var(--dn)}
+.psel{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mut);font-weight:600;letter-spacing:.04em}
+.psel select{font-weight:600;max-width:240px}
+.more{display:block;margin:14px auto 0;font:600 13px var(--sans);background:#fff;color:var(--ink);border:1px solid var(--ink);border-radius:2px;padding:10px 18px;cursor:pointer}
+.more:hover{background:#000;color:#fff}
+.tkclear{font:600 12px var(--mono);background:var(--hold);border:1px solid var(--holdb);color:#3d2f00;border-radius:2px;padding:7px 10px;cursor:pointer}
+.vipc{display:grid;grid-template-columns:76px 1fr;gap:0 14px;align-items:start}
+.vipc .ph{width:76px;height:92px;object-fit:cover;border-radius:2px;background:var(--off);filter:grayscale(.15)}
+.vipc .ph.ini{display:flex;align-items:center;justify-content:center;font:700 22px var(--serif);color:var(--mut)}
+.vipc .go{display:inline-block;margin-top:6px;font-size:12px;color:var(--link);text-decoration:none;font-weight:600}
+.vipc .go:hover{text-decoration:underline}
+.tkg{display:flex;flex-wrap:wrap;gap:6px}
+button.chip{cursor:pointer;font-size:12.5px;padding:6px 8px}
+button.chip:hover{border-color:var(--ink)}
+button.chip .c{color:var(--mut);font-weight:500;margin-left:6px}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 """
 
 JS = r"""
 (function(){
+ var PAGE=10;
  var rows=[].slice.call(document.querySelectorAll('#rows tr[data-filed]'));
  var tbody=document.getElementById('rows'),empty=document.getElementById('empty'),count=document.getElementById('count');
+ var more=document.getElementById('more'),pol=document.getElementById('pol'),tkc=document.getElementById('tkclear');
  var ref=new Date(document.body.getAttribute('data-today')+'T00:00:00Z');
- var st={who:'all',days:'30',buys:false,sort:'filed'};
+ var st={who:'all',days:'30',buys:false,sort:'filed',p:'',tk:'',limit:PAGE};
  function age(d){return Math.round((ref-new Date(d+'T00:00:00Z'))/864e5)}
- function apply(){
-  var shown=0;
-  rows.forEach(function(r){
-   var ok=(st.who==='all'||(st.who==='vip'&&r.dataset.vip==='1')||(st.who==='wl'&&r.dataset.wl==='1'))
-    &&(!st.buys||r.dataset.tx==='Buy')&&(st.days==='all'||age(r.dataset.filed)<=+st.days);
-   r.hidden=!ok;if(ok)shown++;
-  });
+ function apply(keep){
+  if(!keep)st.limit=PAGE;
   var key={filed:function(r){return r.dataset.filed+r.dataset.traded},traded:function(r){return r.dataset.traded+r.dataset.filed},lag:function(r){return ('00000'+(r.dataset.lag||0)).slice(-5)},size:function(r){return ('000000000000'+(r.dataset.size||0)).slice(-12)}}[st.sort];
-  rows.slice().sort(function(a,b){var x=key(a),y=key(b);return x<y?1:x>y?-1:0}).forEach(function(r){tbody.appendChild(r)});
-  empty.hidden=shown>0;count.textContent=shown+' of '+rows.length+' disclosures shown';
+  var sorted=rows.slice().sort(function(a,b){var x=key(a),y=key(b);return x<y?1:x>y?-1:0});
+  var match=0;
+  sorted.forEach(function(r){
+   tbody.appendChild(r);
+   var ok=(st.who==='all'||(st.who==='vip'&&r.dataset.vip==='1')||(st.who==='wl'&&r.dataset.wl==='1'))
+    &&(!st.buys||r.dataset.tx==='Buy')&&(st.days==='all'||age(r.dataset.filed)<=+st.days)
+    &&(!st.p||r.dataset.p===st.p)&&(!st.tk||r.dataset.tk===st.tk);
+   if(ok)match++;
+   r.hidden=!(ok&&match<=st.limit);
+  });
+  var shown=Math.min(match,st.limit),left=match-shown;
+  empty.hidden=match>0;
+  count.textContent=match?('Showing '+shown+' of '+match+' disclosures · yellow rows hit the Watchlist'):'';
+  more.hidden=left<=0;
+  more.textContent='Show '+Math.min(PAGE,left)+' more · '+left+' remaining';
+  tkc.hidden=!st.tk;tkc.textContent='Ticker: '+st.tk+'  ✕';
  }
  document.querySelectorAll('[data-group]').forEach(function(g){
   g.addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;
@@ -164,6 +189,19 @@ JS = r"""
  });
  var tb=document.getElementById('buys');tb.addEventListener('click',function(){st.buys=!st.buys;tb.setAttribute('aria-pressed',st.buys);apply()});
  document.getElementById('sort').addEventListener('change',function(e){st.sort=e.target.value;apply()});
+ pol.addEventListener('change',function(e){st.p=e.target.value;if(st.p)allDays();apply()});
+ more.addEventListener('click',function(){st.limit+=PAGE;apply(true)});
+ tkc.addEventListener('click',function(){st.tk='';apply()});
+ function allDays(){
+  var d=document.querySelector('[data-group=days]');
+  if(st.days!=='all'){st.days='all';d.querySelectorAll('button').forEach(function(x){x.setAttribute('aria-pressed',x.dataset.v==='all')})}
+ }
+ function pickTicker(tk){
+  st.tk=tk;allDays();
+  apply();document.getElementById('disclosures').scrollIntoView({behavior:'smooth'});
+ }
+ document.querySelectorAll('[data-pick]').forEach(function(b){b.addEventListener('click',function(){pickTicker(b.dataset.pick)})});
+ document.querySelectorAll('.vipc[data-p]').forEach(function(c){c.querySelector('.go')&&c.querySelector('.go').addEventListener('click',function(e){e.preventDefault();pol.value=c.dataset.p;st.p=c.dataset.p;allDays();apply();document.getElementById('disclosures').scrollIntoView({behavior:'smooth'})})});
  apply();
 })();
 """
@@ -176,6 +214,10 @@ def _e(s) -> str:
 def _fmt_date(iso: str) -> str:
     d = parse_date(iso)
     return d.strftime("%Y-%m-%d") if d else "—"
+
+
+def person_id(t: dict) -> str:
+    return t.get("bioguide") or t.get("name") or ""
 
 
 def _chamber_line(t: dict) -> str:
@@ -216,6 +258,7 @@ def _row(t: dict, vips: dict | None = None) -> str:
     size_lo = band_min(t.get("amount", ""))
     return (
         f'<tr data-filed="{_e(t["filed_date"])}" data-traded="{_e(t["trade_date"])}" data-tx="{_e(tx)}" '
+        f'data-p="{_e(person_id(t))}" data-tk="{_e(display_ticker(ticker))}" '
         f'data-vip="{1 if t.get("vip") else 0}" data-wl="{1 if t.get("watchlist") else 0}" '
         f'data-lag="{lag if lag is not None else ""}" data-size="{size_lo}"'
         f'{" class=hit" if t.get("watchlist") else ""}>'
@@ -255,10 +298,9 @@ def render_page(cfg: dict, payload: dict, now: datetime) -> str:
     today = now.date()
     canonical = f"{site['base_url']}/{site['path']}/"
     stamp = f"{now:%Y-%m-%d %H:%M} HKT"
-    by_name: dict[str, list[dict]] = {}
+    by_id: dict[str, list[dict]] = {}
     for t in trades:
-        if t.get("vip"):
-            by_name.setdefault(t["name"], []).append(t)
+        by_id.setdefault(person_id(t), []).append(t)
 
     vips = {v["bioguide"]: v for v in payload["vip"]}
     rows = "".join(_row(t, vips) for t in trades)
@@ -269,7 +311,7 @@ def render_page(cfg: dict, payload: dict, now: datetime) -> str:
 
     vip_cards = []
     for v in payload["vip"]:
-        mine = by_name.get(v["name"], [])
+        mine = by_id.get(v["bioguide"], [])
         last = max((t["filed_date"] for t in mine), default="")
         fmr = '<span class="badge fmr">Former member</span>' if v.get("former") else ""
         last_html = (
@@ -277,13 +319,20 @@ def render_page(cfg: dict, payload: dict, now: datetime) -> str:
             if last
             else "No disclosures in window"
         )
+        initials = "".join(w[0] for w in v["name"].split()[:2])
+        photo = (
+            f'<img class="ph" src="{_e(v["photo"])}" alt="{_e(v["name"])}" loading="lazy" width="76" height="92">'
+            if v.get("photo")
+            else f'<div class="ph ini" aria-hidden="true">{_e(initials)}</div>'
+        )
+        go = f'<a class="go" href="#disclosures">See their disclosures →</a>' if mine else ""
         vip_cards.append(
-            f'<div class="vipc" id="vip-{_e(v["bioguide"])}"><div class="n">{_e(v["name"])}{fmr}</div>'
+            f'<div class="vipc" id="vip-{_e(v["bioguide"])}" data-p="{_e(v["bioguide"])}">{photo}<div>'
+            f'<div class="n">{_e(v["name"])}{fmr}</div>'
             f'<div class="m">{_e(v["chamber"])} · {_e(v["party"])}-{_e(v["state"])}</div>'
             + (f'<div class="st">{_e(v["stat"])}</div>' if v.get("stat") else "")
             + f'<div class="w"><b>Why VIP</b>{_e(v.get("why"))}</div>'
-            + (f'<div class="w wt"><b>Watch for</b>{_e(v["watch"])}</div>' if v.get("watch") else "")
-            + f'<div class="l">{last_html}</div></div>'
+            + f'<div class="l">{last_html}</div>{go}</div></div>'
         )
 
     crit = payload.get("vip_criteria") or {}
@@ -295,16 +344,30 @@ def render_page(cfg: dict, payload: dict, now: datetime) -> str:
             + "</ul></div>"
         )
 
-    wl = payload["watchlist"]
-    wl_us = "".join(f'<span class="chip">{_e(display_ticker(s))}</span>' for s in wl["us"])
-    wl_hk = "".join(f'<span class="chip">{_e(display_ticker(s))}</span>' for s in wl["hk"])
+    tick_count: dict[str, list] = {}
+    for t in trades:
+        if t.get("ticker"):
+            d = tick_count.setdefault(display_ticker(t["ticker"]), [0, False])
+            d[0] += 1
+            d[1] = d[1] or bool(t.get("watchlist"))
+    tickers_html = "".join(
+        f'<button class="chip{" h" if hit else ""}" data-pick="{_e(tk)}">{_e(tk)}<span class="c">{n}</span></button>'
+        for tk, (n, hit) in sorted(tick_count.items(), key=lambda kv: (-kv[1][0], kv[0]))
+    )
 
-    src_bits = []
-    for s in payload["sources"]:
-        cls = "ok" if s["ok"] and s["count"] else ("bad" if not s["ok"] else "")
-        mark = "✓" if s["ok"] else "✕"
-        detail = f" {s['count']}" if s["ok"] and s["count"] else (f" ({s['note']})" if s.get("note") else "")
-        src_bits.append(f'<span class="{cls}">{mark} {_e(s["name"])}{_e(detail)}</span>')
+    people: dict[str, tuple[str, bool, int]] = {}
+    for t in trades:
+        pid = person_id(t)
+        name, vip, n = people.get(pid, (t["name"], bool(t.get("vip")), 0))
+        people[pid] = (name, vip, n + 1)
+    def _opts(vip_flag: bool) -> str:
+        items = sorted(((n, pid, c) for pid, (n, v, c) in people.items() if v == vip_flag), key=lambda x: x[0])
+        return "".join(f'<option value="{_e(pid)}">{_e(n)} ({c})</option>' for n, pid, c in items)
+    pol_html = (
+        '<label class="psel" for="pol">Politician<select id="pol"><option value="">All politicians</option>'
+        f'<optgroup label="VIP">{_opts(True)}</optgroup><optgroup label="Other members (Watchlist hits)">{_opts(False)}</optgroup>'
+        "</select></label>"
+    )
 
     stale = '<span class="stale">Data may be stale — sources unavailable at last build</span>' if payload.get("stale") else ""
     robots = '<meta name="robots" content="noindex,nofollow,noarchive">' if site.get("noindex") else ""
@@ -334,28 +397,28 @@ def render_page(cfg: dict, payload: dict, now: datetime) -> str:
 </section>
 <section class="stats" aria-label="Summary">{stats}</section>
 
-<div class="sh"><h2><span class="zh">最新披露</span>Disclosures</h2><span class="aux">Rows highlighted yellow hit the Watchlist</span></div>
+<div class="sh" id="disclosures"><h2><span class="zh">最新披露</span>Disclosures</h2>{pol_html}</div>
 <div class="bar" role="toolbar" aria-label="Filters">
  <div class="seg" data-group="who" role="group" aria-label="Who"><button data-v="all" aria-pressed="true">All</button><button data-v="vip" aria-pressed="false">VIP only</button><button data-v="wl" aria-pressed="false">Watchlist only</button></div>
  <button class="tog" id="buys" aria-pressed="false"><i></i>Buys only</button>
  <div class="seg" data-group="days" role="group" aria-label="Disclosed within"><button data-v="7" aria-pressed="false">7d</button><button data-v="30" aria-pressed="true">30d</button><button data-v="90" aria-pressed="false">90d</button><button data-v="all" aria-pressed="false">All</button></div>
+ <button class="tkclear" id="tkclear" hidden></button>
  <label class="sortw" for="sort">Sort<select id="sort"><option value="filed">Newest disclosure</option><option value="traded">Newest trade</option><option value="lag">Longest lag</option><option value="size">Largest size</option></select></label>
 </div>
-<p class="count" id="count" aria-live="polite">{len(trades)} disclosures</p>
+<p class="count" id="count" aria-live="polite">{len(trades)} disclosures · rows highlighted yellow hit the Watchlist</p>
 <table class="tr"><thead><tr><th>Filed</th><th>Politician</th><th>Ticker / Company</th><th>Type</th><th>Size</th><th>Traded</th><th class="r">Lag</th><th>Source</th></tr></thead>
 <tbody id="rows">{rows}</tbody></table>
+<button class="more" id="more" hidden>Show more</button>
 <div class="empty" id="empty"{empty_hidden}><b>暫無 VIP／Watchlist 新披露</b>No new VIP or Watchlist disclosures for this filter.</div>
 
 <div class="sh" id="vip"><h2><span class="zh">追蹤名單</span>Why these VIPs</h2><span class="aux">Track record and signal quality, not trade count · reviewed quarterly</span></div>
 {crit_html}<div class="vipg">{''.join(vip_cards)}</div>
 
-<div class="sh"><h2><span class="zh">觀察名單</span>Watchlist</h2><span class="aux">Any member's disclosure on these tickers is surfaced, VIP or not</span></div>
-<div class="wlg"><div class="k">US</div><div class="chips">{wl_us}</div><div class="k">HK</div><div class="chips">{wl_hk}</div>
-<p class="note">HK names rarely appear in congressional filings; US listings of the same company (e.g. BABA US → 9988 HK) are matched.</p></div>
+<div class="sh"><h2><span class="zh">涉及股票</span>Tickers in disclosures</h2><span class="aux">Number = disclosures in window · yellow = on your Watchlist · tap a ticker to filter</span></div>
+<div class="tkg">{tickers_html or '<span class="note">No tickers yet.</span>'}</div>
 
 <p class="disc">Disclosures are not investment advice. The STOCK Act allows members up to ~45 days to report a trade, so every row is delayed; <b>lag</b> = filing date − trade date, and rows over 45 days are marked late. Sizes are the statutory reporting bands, so any leaderboard returns cited here are estimates derived from those bands.</p>
-<footer class="foot"><div class="row"><span>非投資建議。 Not investment advice.</span><span><a href="{_e(site['archive_url'])}">Morning Report archive</a> · <a href="/{_e(site['path'])}/data.json">data.json</a></span></div>
-<div class="srcs">Sources: Senate eFD and House Clerk (official filings), Quiver Quantitative public pages, QuantEngines API. {' · '.join(src_bits)}</div></footer>
+<footer class="foot"><div class="row"><span>非投資建議。 Not investment advice.</span><span><a href="{_e(site['archive_url'])}">Morning Report archive</a> · <a href="/{_e(site['path'])}/data.json">data.json</a></span></div></footer>
 </main>
 <script>{JS}</script>
 </body></html>

@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-10-16T16:33:52+08:00",
+ "generated_at": "2026-10-16T20:42:58+08:00",
  "window_start": "2026-06-18",
  "stale": false,
  "sources": [
@@ -56,7 +56,8 @@
    "why": "The original \"follow her trades\" name for retail investors, with a multi-year record of beating the market. Trades are few but large and concentrated, typically tech and AI-adjacent names, often via call options.",
    "stat": "Multi-year outperformance",
    "watch": "Most filings are made for her husband Paul Pelosi and listed under her name. Big option positions are the signal to watch.",
-   "former": false
+   "former": false,
+   "photo": "/politician-tracker/img/P000197.jpg"
   },
   {
    "bioguide": "T000278",
@@ -67,7 +68,8 @@
    "why": "Repeatedly ranked among Congress's most profitable and market-beating traders in Capitol Trades-style year-end reviews.",
    "stat": "Top profitable trader, multiple years",
    "watch": "Senate filings, often in batches. Amended reports can surface trades that are months old, marked \"amended\" here.",
-   "former": false
+   "former": false,
+   "photo": "/politician-tracker/img/T000278.jpg"
   },
   {
    "bioguide": "G000583",
@@ -78,7 +80,8 @@
    "why": "One of the most active House traders that also scores well on volume-weighted return rankings, so the activity comes with results rather than noise.",
    "stat": "Strong recent return rankings",
    "watch": "Frequent small trades. Larger bands ($100K+) carry more signal.",
-   "former": false
+   "former": false,
+   "photo": "/politician-tracker/img/G000583.jpg"
   },
   {
    "bioguide": "M001236",
@@ -89,7 +92,8 @@
    "why": "Quiver Quantitative ranked his disclosed portfolio the best-performing in Congress for 2025 (reported by the NY Post), at roughly +52%.",
    "stat": "#1 in Congress, 2025 · ~+52%",
    "watch": "Few but sizeable trades, so each new filing is worth reading.",
-   "former": false
+   "former": false,
+   "photo": "/politician-tracker/img/M001236.jpg"
   },
   {
    "bioguide": "C001098",
@@ -100,7 +104,8 @@
    "why": "Quiver's 2025 ranking put him second in Congress at roughly +50%.",
    "stat": "#2 in Congress, 2025 · ~+50%",
    "watch": "Trades rarely, so any new disclosure stands out.",
-   "former": false
+   "former": false,
+   "photo": "/politician-tracker/img/C001098.jpg"
   },
   {
    "bioguide": "M001136",
@@ -111,7 +116,8 @@
    "why": "Ranked in Quiver's 2025 top tier at roughly +37% while trading actively across sectors.",
    "stat": "Top tier, 2025 · ~+37%",
    "watch": "Files frequently. Watchlist overlaps (e.g. MSFT) show up here first.",
-   "former": false
+   "former": false,
+   "photo": "/politician-tracker/img/M001136.jpg"
   },
   {
    "bioguide": "F000110",
@@ -122,7 +128,8 @@
    "why": "Ranks highly in 2026 Capitol Markets-style tables for dollar outperformance against the S&P 500 (SPY).",
    "stat": "Beat the S&P 500 in 2026",
    "watch": "Mostly mega-cap tech buys in the $1K–$15K band, so the direction matters more than the size.",
-   "former": false
+   "former": false,
+   "photo": "/politician-tracker/img/F000110.jpg"
   },
   {
    "bioguide": "M001157",
@@ -133,7 +140,8 @@
    "why": "Discloses large technology trades and is closely followed, partly because of committee-related conflict-of-interest debates.",
    "stat": "Large tech flow, widely watched",
    "watch": "Large household and trust positions. Filings can be paper scans with longer lags.",
-   "former": false
+   "former": false,
+   "photo": "/politician-tracker/img/M001157.jpg"
   },
   {
    "bioguide": "M000355",
@@ -144,7 +152,8 @@
    "why": "In Quiver's 2025 top-10 return group.",
    "stat": "Top 10 by return, 2025",
    "watch": "Mostly spouse accounts and dividend reinvestments. Discretionary buys and sells are the signal.",
-   "former": false
+   "former": false,
+   "photo": "/politician-tracker/img/M000355.jpg"
   },
   {
    "bioguide": "M001190",
@@ -155,7 +164,8 @@
    "why": "Historically cited for large winning trades, e.g. Nvidia before the AI rally. Kept on the list for continuity.",
    "stat": "Past big winners (Nvidia era)",
    "watch": "No longer a sitting senator. His last filing was March 2026, so expect no new disclosures; a candidate for the next quarterly review.",
-   "former": true
+   "former": true,
+   "photo": "/politician-tracker/img/M001190.jpg"
   }
  ],
  "vip_criteria": {
