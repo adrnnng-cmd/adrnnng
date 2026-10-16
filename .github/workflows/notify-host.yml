@@ -42,12 +42,10 @@ jobs:
               -H "Content-Type: application/json" \
               --data "$body" || echo 000
           }
-          code=$(ping "$WEBHOOK_KEY")
+          # The host expects "Authorization: Bearer <key>". Tolerate a stored value that
+          # carries whitespace/newlines or an "Authorization:" / "Bearer" prefix.
+          key=$(printf '%s' "$WEBHOOK_KEY" | tr -d '\r\n' | sed -E 's/^[[:space:]]*([Aa]uthorization:)?[[:space:]]*([Bb]earer[[:space:]]+)?//; s/[[:space:]]+$//')
+          echo "::add-mask::$key"
+          code=$(ping "Bearer $key")
           echo "host replied HTTP $code: $(head -c 300 /tmp/resp)"
-          case "$WEBHOOK_KEY" in Bearer\ *) ;; *)
-            if [ "$code" = 401 ] || [ "$code" = 403 ]; then
-              code=$(ping "Bearer $WEBHOOK_KEY")
-              echo "retry with Bearer scheme: HTTP $code: $(head -c 300 /tmp/resp)"
-            fi ;;
-          esac
           case "$code" in 2??) echo "pinged host for $SHA" ;; *) echo "::error::publish ping failed (HTTP $code)"; exit 1 ;; esac
