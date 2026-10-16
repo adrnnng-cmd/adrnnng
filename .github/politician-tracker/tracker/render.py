@@ -332,6 +332,7 @@ def render_page(cfg: dict, payload: dict, now: datetime) -> str:
             f'<div class="m">{_e(v["chamber"])} · {_e(v["party"])}-{_e(v["state"])}</div>'
             + (f'<div class="st">{_e(v["stat"])}</div>' if v.get("stat") else "")
             + f'<div class="w"><b>Why VIP</b>{_e(v.get("why"))}</div>'
+            + (f'<div class="w wt"><b>Watch for</b>{_e(v["watch"])}</div>' if v.get("watch") else "")
             + f'<div class="l">{last_html}</div>{go}</div></div>'
         )
 
@@ -344,15 +345,14 @@ def render_page(cfg: dict, payload: dict, now: datetime) -> str:
             + "</ul></div>"
         )
 
-    tick_count: dict[str, list] = {}
+    tick_count: dict[str, int] = {}
     for t in trades:
         if t.get("ticker"):
-            d = tick_count.setdefault(display_ticker(t["ticker"]), [0, False])
-            d[0] += 1
-            d[1] = d[1] or bool(t.get("watchlist"))
+            tk = display_ticker(t["ticker"])
+            tick_count[tk] = tick_count.get(tk, 0) + 1
     tickers_html = "".join(
-        f'<button class="chip{" h" if hit else ""}" data-pick="{_e(tk)}">{_e(tk)}<span class="c">{n}</span></button>'
-        for tk, (n, hit) in sorted(tick_count.items(), key=lambda kv: (-kv[1][0], kv[0]))
+        f'<button class="chip" data-pick="{_e(tk)}">{_e(tk)}<span class="c">{n}</span></button>'
+        for tk, n in sorted(tick_count.items(), key=lambda kv: (-kv[1], kv[0]))
     )
 
     people: dict[str, tuple[str, bool, int]] = {}
@@ -414,7 +414,7 @@ def render_page(cfg: dict, payload: dict, now: datetime) -> str:
 <div class="sh" id="vip"><h2><span class="zh">追蹤名單</span>Why these VIPs</h2><span class="aux">Track record and signal quality, not trade count · reviewed quarterly</span></div>
 {crit_html}<div class="vipg">{''.join(vip_cards)}</div>
 
-<div class="sh"><h2><span class="zh">涉及股票</span>Tickers in disclosures</h2><span class="aux">Number = disclosures in window · yellow = on your Watchlist · tap a ticker to filter</span></div>
+<div class="sh"><h2><span class="zh">涉及股票</span>Tickers in disclosures</h2><span class="aux">Every ticker in the disclosures above · number = disclosures · tap to filter</span></div>
 <div class="tkg">{tickers_html or '<span class="note">No tickers yet.</span>'}</div>
 
 <p class="disc">Disclosures are not investment advice. The STOCK Act allows members up to ~45 days to report a trade, so every row is delayed; <b>lag</b> = filing date − trade date, and rows over 45 days are marked late. Sizes are the statutory reporting bands, so any leaderboard returns cited here are estimates derived from those bands.</p>
