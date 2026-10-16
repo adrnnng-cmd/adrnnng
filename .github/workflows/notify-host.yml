@@ -1,0 +1,44 @@
+name: Notify host
+
+# Tells the host to redeploy https://adrnnng.com after every push to main.
+# Also callable from other workflows, because pushes made with GITHUB_TOKEN
+# (e.g. the scheduled data refresh) do not trigger `on: push`.
+on:
+  push:
+    branches: [main]
+  workflow_call:
+    inputs:
+      sha:
+        type: string
+        required: true
+    secrets:
+      GROKBOT_WEBHOOK_URL:
+        required: true
+      GROKBOT_WEBHOOK_KEY:
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: POST publish ping
+        env:
+          WEBHOOK_URL: ${{ secrets.GROKBOT_WEBHOOK_URL }}
+          WEBHOOK_KEY: ${{ secrets.GROKBOT_WEBHOOK_KEY }}
+          SHA: ${{ inputs.sha || github.sha }}
+        run: |
+          if [ -z "$WEBHOOK_URL" ] || [ -z "$WEBHOOK_KEY" ]; then
+            echo "::error::GROKBOT_WEBHOOK_URL / GROKBOT_WEBHOOK_KEY secrets are not set"
+            exit 1
+          fi
+          body=$(printf '{"repo":"adrnnng","sha":"%s"}' "$SHA")
+          curl -fsS --retry 3 --retry-all-errors --max-time 30 \
+            -X POST "$WEBHOOK_URL" \
+            -H "Authorization: $WEBHOOK_KEY" \
+            -H "Content-Type: application/json" \
+            --data "$body"
+          echo
+          echo "pinged host for $SHA"

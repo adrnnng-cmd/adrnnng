@@ -1,0 +1,158 @@
+{
+  "site": {
+    "base_url": "https://adrnnng.com",
+    "path": "politician-tracker",
+    "home_url": "/",
+    "archive_url": "/news/",
+    "timezone": "Asia/Hong_Kong",
+    "retention_days": 120,
+    "noindex": true
+  },
+  "vip": [
+    {
+      "bioguide": "P000197",
+      "name": "Nancy Pelosi",
+      "chamber": "House",
+      "party": "D",
+      "state": "CA",
+      "why": "The original \"follow her trades\" name for retail investors, with a multi-year record of beating the market. Trades are few but large and concentrated, typically tech and AI-adjacent names, often via call options.",
+      "stat": "Multi-year outperformance",
+      "watch": "Most filings are made for her husband Paul Pelosi and listed under her name. Big option positions are the signal to watch."
+    },
+    {
+      "bioguide": "T000278",
+      "name": "Tommy Tuberville",
+      "chamber": "Senate",
+      "party": "R",
+      "state": "AL",
+      "why": "Repeatedly ranked among Congress's most profitable and market-beating traders in Capitol Trades-style year-end reviews.",
+      "stat": "Top profitable trader, multiple years",
+      "watch": "Senate filings, often in batches. Amended reports can surface trades that are months old, marked \"amended\" here."
+    },
+    {
+      "bioguide": "G000583",
+      "name": "Josh Gottheimer",
+      "chamber": "House",
+      "party": "D",
+      "state": "NJ",
+      "why": "One of the most active House traders that also scores well on volume-weighted return rankings, so the activity comes with results rather than noise.",
+      "stat": "Strong recent return rankings",
+      "watch": "Frequent small trades. Larger bands ($100K+) carry more signal."
+    },
+    {
+      "bioguide": "M001236",
+      "name": "Tim Moore",
+      "chamber": "House",
+      "party": "R",
+      "state": "NC",
+      "why": "Quiver Quantitative ranked his disclosed portfolio the best-performing in Congress for 2025 (reported by the NY Post), at roughly +52%.",
+      "stat": "#1 in Congress, 2025 · ~+52%",
+      "watch": "Few but sizeable trades, so each new filing is worth reading."
+    },
+    {
+      "bioguide": "C001098",
+      "name": "Ted Cruz",
+      "chamber": "Senate",
+      "party": "R",
+      "state": "TX",
+      "why": "Quiver's 2025 ranking put him second in Congress at roughly +50%.",
+      "stat": "#2 in Congress, 2025 · ~+50%",
+      "watch": "Trades rarely, so any new disclosure stands out."
+    },
+    {
+      "bioguide": "M001136",
+      "name": "Lisa McClain",
+      "chamber": "House",
+      "party": "R",
+      "state": "MI",
+      "why": "Ranked in Quiver's 2025 top tier at roughly +37% while trading actively across sectors.",
+      "stat": "Top tier, 2025 · ~+37%",
+      "watch": "Files frequently. Watchlist overlaps (e.g. MSFT) show up here first."
+    },
+    {
+      "bioguide": "F000110",
+      "name": "Cleo Fields",
+      "chamber": "House",
+      "party": "D",
+      "state": "LA",
+      "why": "Ranks highly in 2026 Capitol Markets-style tables for dollar outperformance against the S&P 500 (SPY).",
+      "stat": "Beat the S&P 500 in 2026",
+      "watch": "Mostly mega-cap tech buys in the $1K–$15K band, so the direction matters more than the size."
+    },
+    {
+      "bioguide": "M001157",
+      "name": "Michael McCaul",
+      "chamber": "House",
+      "party": "R",
+      "state": "TX",
+      "why": "Discloses large technology trades and is closely followed, partly because of committee-related conflict-of-interest debates.",
+      "stat": "Large tech flow, widely watched",
+      "watch": "Large household and trust positions. Filings can be paper scans with longer lags."
+    },
+    {
+      "bioguide": "M000355",
+      "name": "Mitch McConnell",
+      "chamber": "Senate",
+      "party": "R",
+      "state": "KY",
+      "why": "In Quiver's 2025 top-10 return group.",
+      "stat": "Top 10 by return, 2025",
+      "watch": "Mostly spouse accounts and dividend reinvestments. Discretionary buys and sells are the signal."
+    },
+    {
+      "bioguide": "M001190",
+      "name": "Markwayne Mullin",
+      "chamber": "Senate",
+      "party": "R",
+      "state": "OK",
+      "why": "Historically cited for large winning trades, e.g. Nvidia before the AI rally. Kept on the list for continuity.",
+      "stat": "Past big winners (Nvidia era)",
+      "watch": "No longer a sitting senator. His last filing was March 2026, so expect no new disclosures; a candidate for the next quarterly review."
+    }
+  ],
+  "watchlist": {
+    "us": [
+      "AAPL",
+      "TSLA",
+      "ORCL",
+      "GOOGL",
+      "RKLB",
+      "DELL",
+      "CRCL",
+      "USAR",
+      "LLY",
+      "BUG",
+      "GLD",
+      "MSFT",
+      "IWM",
+      "LVMUY"
+    ],
+    "hk": [
+      "9926",
+      "9988",
+      "0585",
+      "2451",
+      "2583",
+      "1682",
+      "0147",
+      "2668",
+      "0700"
+    ],
+    "aliases": {
+      "GOOG": "GOOGL",
+      "LVMHF": "LVMUY",
+      "BABA": "9988",
+      "TCEHY": "0700",
+      "TCTZF": "0700"
+    }
+  },
+  "vip_criteria": {
+    "summary": "VIPs are picked for track record and signal quality, not trade count: members whose disclosed portfolios have beaten the market, or whose concentrated trades are widely followed.",
+    "rules": [
+      "Ranked near the top of public Congress performance leaderboards (Quiver Quantitative, Capitol Trades, Capitol Markets) for the latest full year.",
+      "Concentrated positions or large size bands, where one trade means something.",
+      "Excluded: high-volume \"spray\" traders (e.g. Ro Khanna, Gilbert Cisneros) who report hundreds of tickers and often lag the index. Their filings still appear here if they hit the Watchlist.",
+      "Reviewed quarterly against the leaderboards. Returns are estimates from the statutory size bands, not exact P&L."
+    ]
+  }
+}
