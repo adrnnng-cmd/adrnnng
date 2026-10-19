@@ -74,6 +74,7 @@ def main(argv: list[str] | None = None) -> int:
 
     start = date.fromisoformat(uni["start"])
     entries, ok = [], 0
+    recent: dict[str, list] = {}
     for group in uni["groups"]:
         for symbol in group["symbols"]:
             if args.only and symbol not in args.only:
@@ -105,6 +106,9 @@ def main(argv: list[str] | None = None) -> int:
                     "stale": False,
                 })
                 ok += 1
+                if symbol in uni.get("featured", []):
+                    recent[symbol] = [[b.date, float(num(b.open)), float(num(b.high)), float(num(b.low)), float(num(b.close))]
+                                      for b in s.bars[-uni.get("recent_bars", 160):]]
                 logging.info("%-9s %5d bars %s → %s  adj-check %s", symbol, len(s.bars), s.bars[0].date, last.date, gap)
             except Exception as e:
                 logging.warning("%-9s failed: %s", symbol, e)
@@ -119,6 +123,15 @@ def main(argv: list[str] | None = None) -> int:
         "symbols": entries,
     }
     manifest_path.write_text(json.dumps(manifest, indent=1, ensure_ascii=False) + "\n", "utf-8")
+    recent_path = out_dir / "recent.json"
+    if recent:
+        old = json.loads(recent_path.read_text("utf-8")).get("symbols", {}) if recent_path.exists() else {}
+        recent = {k: recent.get(k) or old.get(k) for k in uni.get("featured", []) if recent.get(k) or old.get(k)}
+        recent_path.write_text(json.dumps({
+            "generated_at": manifest["generated_at"],
+            "note": "Latest daily bars (split-adjusted, not dividend-adjusted) [date, open, high, low, close] for the landing page. Source: Yahoo Finance.",
+            "symbols": recent,
+        }, separators=(",", ":")) + "\n", "utf-8")
     logging.info("wrote %s: %d symbols (%d fetched now)", manifest_path, len(entries), ok)
     return 0 if ok else 1
 

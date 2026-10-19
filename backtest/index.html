@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Backtest · TD Sequential & indicator strategies on real data · ADRRR</title>
+  <meta name="description" content="Backtest TD Sequential Setup 9 / Countdown 13, moving-average, RSI, MACD, Bollinger and Donchian strategies on real daily price history. Equity vs buy-and-hold, drawdowns, trades, Sharpe, Sortino, CAGR.">
+  <meta name="theme-color" content="#05070b">
+  <meta property="og:title" content="Backtest · ADRRR">
+  <meta property="og:description" content="Test trading rules against real history: equity vs buy & hold, drawdowns, every trade on the chart.">
+  <meta property="og:url" content="https://adrnnng.com/backtest/">
+  <link rel="icon" href="/assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Instrument+Serif:ital@1&display=swap">
+  <link rel="stylesheet" href="/assets/css/theme.css">
+  <link rel="stylesheet" href="/backtest/backtest.css">
+  <link rel="modulepreload" href="/assets/vendor/lightweight-charts.mjs">
+  <link rel="preload" href="/backtest/data/prices/manifest.json" as="fetch" crossorigin>
+</head>
+<body>
+  <header class="site-header" data-site-header>
+    <div class="container"><a class="brand" href="/"><span class="brand-name">ADRRR</span></a></div>
+  </header>
+
+  <main class="container">
+    <section class="page-head">
+      <span class="kicker">Research · Backtest</span>
+      <h1>Backtest<span class="zh">策略回測</span></h1>
+      <p class="lede">Pick a ticker, a rule and a period. Every test runs in your browser on real daily prices, trades at the next open after a signal, and is compared with simply buying and holding.</p>
+    </section>
+
+    <div class="bt-layout">
+      <form class="bt-controls panel" id="controls" autocomplete="off" onsubmit="return false">
+        <fieldset>
+          <legend>Data</legend>
+          <label class="field"><span>Source</span><select class="select" id="provider"></select></label>
+          <label class="field" id="symbol-field"><span>Ticker</span><select class="select" id="symbol"></select></label>
+          <label class="field" id="file-field" hidden><span>CSV file</span><input class="input" type="file" id="file" accept=".csv,text/csv"><small>Columns: date, open, high, low, close (volume, dividend optional). Read locally; nothing is uploaded.</small></label>
+          <label class="check"><input type="checkbox" id="adjust" checked> Reinvest dividends (total return)</label>
+        </fieldset>
+
+        <fieldset>
+          <legend>Strategy</legend>
+          <label class="field"><span>Rule</span><select class="select" id="strategy"></select></label>
+          <p class="strat-summary" id="strategy-summary"></p>
+          <div class="params" id="params"></div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Period</legend>
+          <div class="field"><span class="field-label">Timeframe</span><div class="seg" id="timeframe" role="group" aria-label="Timeframe"></div></div>
+          <div class="field"><span class="field-label">Range</span><div class="seg seg-wrap" id="presets" role="group" aria-label="Range presets"></div></div>
+          <div class="two">
+            <label class="field"><span>From</span><input class="input" type="date" id="from"></label>
+            <label class="field"><span>To</span><input class="input" type="date" id="to"></label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Execution &amp; risk</legend>
+          <div class="two">
+            <label class="field"><span>Capital</span><input class="input num" type="number" id="capital" min="100" step="100" value="10000"></label>
+            <label class="field"><span>Risk-free %</span><input class="input num" type="number" id="rf" min="0" max="20" step="0.25" value="0"></label>
+            <label class="field"><span>Commission bps</span><input class="input num" type="number" id="commission" min="0" max="200" step="1" value="5"></label>
+            <label class="field"><span>Slippage bps</span><input class="input num" type="number" id="slippage" min="0" max="200" step="1" value="5"></label>
+            <label class="field"><span>Stop loss %</span><input class="input num" type="number" id="stop" min="0" max="90" step="0.5" value="0" placeholder="off"></label>
+            <label class="field"><span>Take profit %</span><input class="input num" type="number" id="take" min="0" max="1000" step="1" value="0" placeholder="off"></label>
+            <label class="field"><span>Max bars held</span><input class="input num" type="number" id="maxbars" min="0" max="5000" step="1" value="0" placeholder="off"></label>
+          </div>
+          <label class="check"><input type="checkbox" id="short"> Allow short selling</label>
+          <small class="hint">0 turns a risk rule off. Costs are charged on each side.</small>
+        </fieldset>
+
+        <div class="actions">
+          <button type="button" class="btn btn-primary" id="run">Run backtest</button>
+          <button type="button" class="btn" id="share" title="Copy a link to this exact backtest">Copy link</button>
+        </div>
+      </form>
+
+      <section class="bt-results" id="results" aria-live="polite">
+        <div class="run-head">
+          <div>
+            <h2 id="run-title">Loading prices…</h2>
+            <p class="run-sub" id="run-sub"></p>
+          </div>
+          <div class="run-badges" id="run-badges"></div>
+        </div>
+        <div id="notices"></div>
+
+        <div class="tiles" id="tiles"></div>
+
+        <div class="panel chart-panel">
+          <div class="panel-head">
+            <div><h3 class="panel-title">Price &amp; trades</h3><p class="panel-sub" id="price-sub">Entries ▲▼ at the next open after a signal; exit squares show the trade return.</p></div>
+            <div class="chart-tools">
+              <label class="check sm"><input type="checkbox" id="show-overlays" checked> Indicators</label>
+              <label class="check sm" id="tdcounts-wrap"><input type="checkbox" id="show-tdcounts"> TD counts 1–8</label>
+            </div>
+          </div>
+          <div class="chart chart-price" id="chart-price"></div>
+        </div>
+
+        <div class="panel chart-panel">
+          <div class="panel-head">
+            <div><h3 class="panel-title">Equity curve</h3><p class="panel-sub"><i class="sw sw-strat"></i>Strategy <i class="sw sw-bh"></i>Buy &amp; hold <i class="sw sw-pos"></i>In market</p></div>
+            <div class="chart-tools"><label class="check sm"><input type="checkbox" id="log-equity" checked> Log scale</label></div>
+          </div>
+          <div class="chart chart-equity" id="chart-equity"></div>
+        </div>
+
+        <div class="panel chart-panel">
+          <div class="panel-head">
+            <div><h3 class="panel-title">Drawdown</h3><p class="panel-sub">Distance below the running peak. <i class="sw sw-dd"></i>Strategy <i class="sw sw-bh"></i>Buy &amp; hold</p></div>
+          </div>
+          <div class="chart chart-dd" id="chart-dd"></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><div><h3 class="panel-title">Statistics</h3><p class="panel-sub">Strategy against buy &amp; hold on the same bars.</p></div></div>
+          <div class="panel-body grid-2">
+            <div class="table-wrap"><table class="table stats" id="stats"></table></div>
+            <div class="table-wrap"><table class="table stats" id="stats-trades"></table></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div><h3 class="panel-title">Monthly returns</h3><p class="panel-sub">Calendar months in %, compounded into the year column. Grey months were spent in cash.</p></div>
+            <div class="seg" id="heat-which" role="group" aria-label="Series"><button type="button" data-v="strategy" aria-pressed="true">Strategy</button><button type="button" data-v="bh" aria-pressed="false">Buy &amp; hold</button></div>
+          </div>
+          <div class="panel-body"><div class="heat-wrap" id="heatmap"></div></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div><h3 class="panel-title">Trade returns</h3><p class="panel-sub">Each closed trade in order. Bar height is the trade's return after costs.</p></div>
+          </div>
+          <div class="panel-body"><div class="trade-bars" id="trade-bars"></div></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div><h3 class="panel-title">Trades</h3><p class="panel-sub" id="trades-sub">Click a row to zoom the charts to it.</p></div>
+            <button type="button" class="btn btn-sm" id="csv-export">Download CSV</button>
+          </div>
+          <div class="panel-body"><div class="table-wrap trades-wrap"><table class="table trades" id="trades"></table></div></div>
+        </div>
+
+        <details class="panel method" id="method">
+          <summary><h3 class="panel-title">Methodology &amp; data</h3><span class="panel-sub">How fills, costs and every metric are computed</span></summary>
+          <div class="panel-body method-body">
+            <div>
+              <h4>Execution</h4>
+              <ul>
+                <li>Signals are evaluated on each bar's close. Orders fill at the <b>next bar's open</b>, so a rule can never trade on information it did not have.</li>
+                <li>Each entry invests 100% of current equity (fractional units). Commission and slippage are charged in basis points on every entry and exit.</li>
+                <li>Indicators are warmed up on the history before the start date; trades only happen inside the selected range.</li>
+                <li>Stop loss, take profit and max bars are checked on the close and exit at the next open. After a risk exit, the same direction is not re-entered until the rule's signal changes.</li>
+                <li>Buy &amp; hold buys at the close of the first bar with the same costs. A position still open on the last bar is marked to market and shown separately; it is not counted in trade statistics.</li>
+              </ul>
+              <h4>Data</h4>
+              <ul id="data-notes">
+                <li>Daily OHLCV, dividends and splits from Yahoo Finance, refreshed every weekday by a scheduled job and served from this site. Weekly and monthly bars are built from the daily bars.</li>
+                <li>Prices are split-adjusted. With "Reinvest dividends" on, earlier prices are scaled down on each ex-dividend date by (1 − dividend ÷ previous close), the convention behind Yahoo's adjusted close. TD counts and indicators then run on those total-return prices.</li>
+                <li>Index symbols (^GSPC, ^NDX, ^HSI) are not directly tradable and carry no dividends.</li>
+              </ul>
+            </div>
+            <div>
+              <h4>Metrics</h4>
+              <dl class="defs">
+                <dt>CAGR</dt><dd>(final ÷ initial equity)<sup>1/years</sup> − 1, years = calendar days ÷ 365.25.</dd>
+                <dt>Sharpe</dt><dd>mean(bar return − risk-free) ÷ stdev(bar return) × √(bars per year). Bars per year are measured from the data (≈252 for stocks, ≈365 for crypto, 52 weekly, 12 monthly).</dd>
+                <dt>Sortino</dt><dd>Same numerator, divided by downside deviation √(mean(min(0, excess return)²)).</dd>
+                <dt>Max drawdown</dt><dd>Largest fall from a running equity peak. Calmar = CAGR ÷ |max drawdown|.</dd>
+                <dt>Volatility</dt><dd>stdev(bar return) × √(bars per year).</dd>
+                <dt>Win rate</dt><dd>Closed trades with positive P&amp;L after costs ÷ closed trades.</dd>
+                <dt>Profit factor</dt><dd>Gross profit ÷ gross loss of closed trades.</dd>
+                <dt>Exposure</dt><dd>Share of bars with an open position.</dd>
+                <dt>Beta / correlation</dt><dd>Of strategy bar returns against buy &amp; hold bar returns.</dd>
+              </dl>
+            </div>
+          </div>
+        </details>
+      </section>
+    </div>
+  </main>
+
+  <footer data-site-footer></footer>
+  <script type="module" src="/assets/js/site.js"></script>
+  <script type="module" src="/backtest/app.js"></script>
+</body>
+</html>

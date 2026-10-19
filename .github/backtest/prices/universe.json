@@ -1,6 +1,8 @@
 {
   "start": "1990-01-01",
   "path": "backtest/data/prices",
+  "featured": ["SPY", "QQQ", "NVDA", "0700.HK", "^HSI", "BTC-USD"],
+  "recent_bars": 160,
   "groups": [
     {
       "name": "Indices & ETFs",

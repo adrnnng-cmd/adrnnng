@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-10-19T06:59:03+00:00",
+ "generated_at": "2026-10-19T07:15:21+00:00",
  "source": {
   "name": "Yahoo Finance",
   "url": "https://finance.yahoo.com",
@@ -189,7 +189,7 @@
    "bars": 4630,
    "last_close": 24.82,
    "change_pct": 0.405,
-   "adj_check": 0.0,
+   "adj_check": 1e-06,
    "stale": false
   },
   {
@@ -477,7 +477,7 @@
    "bars": 9266,
    "last_close": 339.720001,
    "change_pct": 1.249,
-   "adj_check": 2e-06,
+   "adj_check": 1e-06,
    "stale": false
   },
   {
@@ -541,7 +541,7 @@
    "bars": 5516,
    "last_close": 417.799988,
    "change_pct": 0.0,
-   "adj_check": 1e-06,
+   "adj_check": 0.0,
    "stale": false
   },
   {
@@ -557,7 +557,7 @@
    "bars": 1695,
    "last_close": 108.800003,
    "change_pct": 2.256,
-   "adj_check": 0.051727,
+   "adj_check": 0.051728,
    "stale": false
   },
   {
@@ -605,7 +605,7 @@
    "bars": 6678,
    "last_close": 149.699997,
    "change_pct": 1.217,
-   "adj_check": 0.30012,
+   "adj_check": 0.300125,
    "stale": false
   },
   {
@@ -745,10 +745,10 @@
    "currency": "USD",
    "type": "CRYPTOCURRENCY",
    "first": "2014-09-17",
-   "last": "2026-10-17",
-   "bars": 4414,
-   "last_close": 81382.148438,
-   "change_pct": -0.146,
+   "last": "2026-10-18",
+   "bars": 4415,
+   "last_close": 82017.601562,
+   "change_pct": 0.781,
    "adj_check": 0.0,
    "stale": false
   },
@@ -761,10 +761,10 @@
    "currency": "USD",
    "type": "CRYPTOCURRENCY",
    "first": "2017-11-09",
-   "last": "2026-10-17",
-   "bars": 3265,
-   "last_close": 2399.799072,
-   "change_pct": -0.825,
+   "last": "2026-10-18",
+   "bars": 3266,
+   "last_close": 2408.741455,
+   "change_pct": 0.373,
    "adj_check": 0.0,
    "stale": false
   }

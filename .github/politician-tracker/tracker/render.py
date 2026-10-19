@@ -4,6 +4,7 @@ import json
 import statistics
 from datetime import date, datetime, timedelta
 from html import escape
+from pathlib import Path
 
 from .model import band_min, display_ticker, parse_date
 
@@ -32,7 +33,8 @@ a{color:inherit}
 .mast-r .d{font-family:var(--mono);letter-spacing:.04em}
 .mast-r a{color:#fff;text-decoration:none;font-weight:600;border:1px solid #555;padding:4px 10px;border-radius:2px}
 .mast-r a:hover{border-color:#fff}
-@media(max-width:560px){.mast-r .d{display:none}.logo .zh{display:none}}
+.mast-r a.nv{border:0;padding:4px 0;font-weight:500;color:#cfcfcf}.mast-r a.nv:hover{color:#fff;text-decoration:underline}
+@media(max-width:560px){.mast-r .d{display:none}.logo .zh{display:none}.mast-r{gap:12px}}
 .edition{padding:26px 0 18px;border-bottom:1px solid var(--rule)}
 .kicker{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase}
 .kicker .sep{color:var(--mut2);margin:0 6px}
@@ -292,6 +294,21 @@ def _stats(trades: list[dict], today: date) -> list[tuple[str, str, str, str]]:
     ]
 
 
+TOOLS_REGISTRY = Path(__file__).resolve().parents[3] / "assets" / "tools.json"
+
+
+def _site_nav(site: dict) -> str:
+    """Links to the other tools in the site registry (assets/tools.json), when this builder runs
+    inside the site repo. Outside it the masthead keeps only the Morning Report link."""
+    try:
+        tools = json.loads(TOOLS_REGISTRY.read_text("utf-8"))["tools"]
+    except (OSError, ValueError, KeyError):
+        return ""
+    skip = {f"/{site['path']}/", site.get("archive_url")}
+    links = [t for t in tools if t.get("nav") and t.get("href") and t["href"] not in skip]
+    return "".join(f'<a class="nv" href="{_e(t["href"])}">{_e(t["title"])}</a>' for t in links)
+
+
 def render_page(cfg: dict, payload: dict, now: datetime) -> str:
     site = cfg["site"]
     trades = payload["trades"]
@@ -386,7 +403,7 @@ def render_page(cfg: dict, payload: dict, now: datetime) -> str:
 <body data-today="{today.isoformat()}">
 <header class="mast"><div class="wrap mast-in">
 <a class="logo" href="{_e(site.get('home_url', '/'))}"><span class="en">ADRRR</span><span class="zh">政治人物持股動向</span></a>
-<div class="mast-r"><span class="d">{today:%Y-%m-%d} · {weekday}</span><a href="{_e(site['archive_url'])}">Morning Report →</a></div>
+<div class="mast-r"><span class="d">{today:%Y-%m-%d} · {weekday}</span>{_site_nav(site)}<a href="{_e(site['archive_url'])}">Morning Report →</a></div>
 </div></header>
 <main class="wrap">
 <section class="edition">
