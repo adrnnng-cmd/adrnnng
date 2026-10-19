@@ -2,37 +2,66 @@
   {
     "name": "TD Setup 9, long-only, daily, 2010-2025, 5+5 bps",
     "strategy": "td-sequential",
-    "params": { "entry": "setup9" },
+    "params": {
+      "entry": "setup9"
+    },
     "timeframe": "1d",
     "from": "2010-01-01",
     "to": "2025-12-31",
-    "options": { "capital": 10000, "commissionBps": 5, "slippageBps": 5, "allowShort": false }
+    "options": {
+      "capital": 10000,
+      "commissionBps": 5,
+      "slippageBps": 5,
+      "allowShort": false
+    }
   },
   {
     "name": "TD Setup 9 or Countdown 13, long/short, daily, 2005-2025, no costs",
     "strategy": "td-sequential",
-    "params": { "entry": "either" },
+    "params": {
+      "entry": "either"
+    },
     "timeframe": "1d",
     "from": "2005-01-01",
     "to": "2025-12-31",
-    "options": { "capital": 10000, "commissionBps": 0, "slippageBps": 0, "allowShort": true }
+    "options": {
+      "capital": 10000,
+      "commissionBps": 0,
+      "slippageBps": 0,
+      "allowShort": true
+    }
   },
   {
     "name": "TD Countdown 13, long-only, weekly, 2000-2025",
     "strategy": "td-sequential",
-    "params": { "entry": "countdown13" },
+    "params": {
+      "entry": "countdown13"
+    },
     "timeframe": "1w",
     "from": "2000-01-01",
     "to": "2025-12-31",
-    "options": { "capital": 10000, "commissionBps": 5, "slippageBps": 5, "allowShort": false }
+    "options": {
+      "capital": 10000,
+      "commissionBps": 5,
+      "slippageBps": 5,
+      "allowShort": false
+    }
   },
   {
-    "name": "SMA 50/200 golden cross, long-only, daily, 2000-2025, 10% stop",
-    "strategy": "ma-cross",
-    "params": { "kind": "sma", "fast": 50, "slow": 200 },
+    "name": "TD Setup 9, long-only, daily, 2000-2025, 10% stop",
+    "strategy": "td-sequential",
+    "params": {
+      "entry": "setup9"
+    },
     "timeframe": "1d",
     "from": "2000-01-01",
     "to": "2025-12-31",
-    "options": { "capital": 10000, "commissionBps": 5, "slippageBps": 5, "allowShort": false, "stopLossPct": 10 }
+    "options": {
+      "capital": 10000,
+      "commissionBps": 5,
+      "slippageBps": 5,
+      "allowShort": false,
+      "stopLossPct": 10
+    }
   }
 ]

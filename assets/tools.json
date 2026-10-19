@@ -16,7 +16,7 @@
       "category": "Research",
       "icon": "backtest",
       "accent": "#38bdf8",
-      "summary": "Test TD Sequential 9/13, moving-average, RSI, MACD, Bollinger and Donchian rules on real daily history. Equity vs buy-and-hold, drawdowns, every trade on the chart.",
+      "summary": "Test TD Sequential Setup 9 / Countdown 13 on real daily history. Equity vs buy-and-hold, drawdowns, every trade on the chart.",
       "highlights": [
         "TD Sequential 9 / 13",
         "Sharpe · Sortino · CAGR",

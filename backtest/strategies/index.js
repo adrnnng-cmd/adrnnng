@@ -16,9 +16,8 @@
 // `run` must only use bars[0..i] to decide target[i]; the engine fills at bar i+1's open.
 
 import tdSequential from './td-sequential.js';
-import { maCross, rsiReversion, macdCross, bollingerReversion, donchianBreakout } from './classic.js';
 
-export const STRATEGIES = [tdSequential, maCross, rsiReversion, macdCross, bollingerReversion, donchianBreakout];
+export const STRATEGIES = [tdSequential];
 
 export function getStrategy(id) {
   return STRATEGIES.find((s) => s.id === id) || STRATEGIES[0];

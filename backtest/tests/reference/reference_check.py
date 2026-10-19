@@ -3,8 +3,8 @@
     node backtest/tests/reference/run-engine.mjs SPY > /tmp/engine-SPY.json
     python3 backtest/tests/reference/reference_check.py SPY /tmp/engine-SPY.json
 
-This file re-implements dividend adjustment, resampling, TD Sequential, the SMA cross, order
-execution and every metric from the written rules in backtest/README.md, using only the Python
+This file re-implements dividend adjustment, resampling, TD Sequential, order
+execution and every metric from the written rules in README.md (Backtest section), using only the Python
 standard library and without sharing code with the JavaScript engine. It then compares trade
 lists and metrics case by case and prints a hand-checkable walk-through of the first TD trade.
 Exit status 1 on any mismatch.
@@ -122,16 +122,6 @@ def td_target(rows, entry):
     return {i: (1 if i in buys else -1) for i in buys ^ sells}  # bars with both signals are ignored
 
 
-def sma_target(rows, fast, slow):
-    c = [r["c"] for r in rows]
-    out = {}
-    for i in range(slow - 1, len(rows)):
-        f = sum(c[i - fast + 1:i + 1]) / fast
-        s = sum(c[i - slow + 1:i + 1]) / slow
-        out[i] = 1 if f > s else -1
-    return out
-
-
 # ---------------------------------------------------------------- execution
 def simulate(rows, target: dict, start, end, capital, comm_bps, slip_bps, allow_short, stop_pct=0.0):
     cm, sl = comm_bps / 1e4, slip_bps / 1e4
@@ -246,7 +236,7 @@ def main() -> int:
     for case, got in zip(cases, engine["cases"]):
         rows = weekly(daily) if case["timeframe"] == "1w" else daily
         p, o = case["params"], case["options"]
-        target = td_target(rows, p["entry"]) if case["strategy"] == "td-sequential" else sma_target(rows, p["fast"], p["slow"])
+        target = td_target(rows, p["entry"])
         start = next(i for i, r in enumerate(rows) if r["t"] >= case["from"])
         end = max(i for i, r in enumerate(rows) if r["t"] <= case["to"])
         eq, trades, _ = simulate(rows, target, start, end, o["capital"], o["commissionBps"], o["slippageBps"], o["allowShort"], o.get("stopLossPct", 0))

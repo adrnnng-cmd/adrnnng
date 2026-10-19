@@ -117,16 +117,13 @@ charts.js / app.js  →  UI
   **Profit factor** = gross profit / gross loss. Also: volatility, longest drawdown, exposure,
   average/best/worst trade, average bars held, beta and correlation to buy & hold.
 
-### Strategies included
+### Strategy included
+
+For now the page ships with TD Sequential only; other rules plug in through the interface in the next section.
 
 | id | Rule |
 | --- | --- |
 | `td-sequential` | DeMark TD Sequential. Setup: 9 consecutive closes below (above) the close 4 bars earlier, started by a price flip; optional perfection filter. Countdown: 13 closes ≤ low (≥ high) 2 bars earlier, bar 13 must reach the close of countdown bar 8 (else deferred "+"), cancelled by an opposite setup or a close through TDST; optional recycling. Trade on Setup 9, Countdown 13, or either; the opposite signal exits (or reverses). |
-| `ma-cross` | SMA/EMA fast/slow crossover (50/200 golden/death cross by default). |
-| `rsi-reversion` | Wilder RSI: buy below oversold, exit crossing the exit level; short above overbought. |
-| `macd-cross` | MACD line vs signal line, optional zero-line filter. |
-| `bollinger-reversion` | Buy below the lower band, exit at the middle band; short above the upper band. |
-| `donchian-breakout` | Turtle-style N-bar breakout with M-bar exit channel. |
 
 ### Add a strategy
 
@@ -193,7 +190,7 @@ Yahoo's adjusted close skips some of the dividends it reports, and this site app
   exits with exact expected equity; metrics against values computed in Python; compounding of trade
   returns equals the equity change.
 - `backtest/tests/reference/reference_check.py`: an independent stdlib-Python implementation of
-  the data adjustment, TD Sequential, SMA cross, execution and metrics, compared trade by trade with
+  the data adjustment, TD Sequential, execution and metrics, compared trade by trade with
   the engine on real SPY data for four configurations (daily/weekly, long-only/long-short, costs,
   stop loss), plus a printed walk-through of the first TD trade for checking by hand.
 
