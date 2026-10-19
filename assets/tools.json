@@ -17,7 +17,11 @@
       "icon": "backtest",
       "accent": "#38bdf8",
       "summary": "Test TD Sequential 9/13, moving-average, RSI, MACD, Bollinger and Donchian rules on real daily history. Equity vs buy-and-hold, drawdowns, every trade on the chart.",
-      "highlights": ["TD Sequential 9 / 13", "Sharpe · Sortino · CAGR", "47 US, HK & crypto tickers"],
+      "highlights": [
+        "TD Sequential 9 / 13",
+        "Sharpe · Sortino · CAGR",
+        "47 US, HK & crypto tickers"
+      ],
       "nav": true,
       "owner": "repo",
       "chrome": "shared"
@@ -32,7 +36,11 @@
       "icon": "capitol",
       "accent": "#f59e0b",
       "summary": "New STOCK Act disclosures from a VIP list of market-beating members of Congress, plus any member's trade in a Watchlist ticker. Refreshed every morning.",
-      "highlights": ["Daily 07:05 HKT", "Official filings linked", "Filing lag in days"],
+      "highlights": [
+        "Daily 07:05 HKT",
+        "Official filings linked",
+        "Filing lag in days"
+      ],
       "nav": true,
       "owner": "repo",
       "chrome": "own"
@@ -47,7 +55,10 @@
       "icon": "news",
       "accent": "#34d399",
       "summary": "The daily market briefing and its archive, published every morning before the Hong Kong open.",
-      "highlights": ["Daily ~08:15 HKT", "Full archive"],
+      "highlights": [
+        "Daily ~08:15 HKT",
+        "Full archive"
+      ],
       "nav": true,
       "owner": "news-analyst",
       "chrome": "own"
