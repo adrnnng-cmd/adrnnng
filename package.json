@@ -1,0 +1,16 @@
+{
+  "name": "adrnnng-site",
+  "private": true,
+  "description": "adrnnng.com: static site, no build step. These scripts are for tests and checks only.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test "backtest/tests/*.test.mjs" && python3 -m unittest discover -s .github/backtest/tests -t .github/backtest",
+    "check": "node scripts/check-site.mjs",
+    "serve": "python3 -m http.server 8788",
+    "new-tool": "node scripts/new-tool.mjs",
+    "verify:backtest": "node backtest/tests/reference/run-engine.mjs SPY > /tmp/engine-SPY.json && python3 backtest/tests/reference/reference_check.py SPY /tmp/engine-SPY.json"
+  }
+}
