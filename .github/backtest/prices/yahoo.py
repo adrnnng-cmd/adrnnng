@@ -111,6 +111,12 @@ def parse(payload: dict, now: datetime | None = None) -> Series:
         )
 
     out = [bars[k] for k in sorted(bars)]
+    # A dividend whose ex-date has no usable quote row moves to the next trading day.
+    for k, amount in divs.items():
+        if k not in bars:
+            nxt = next((b for b in out if b.date > k), None)
+            if nxt:
+                nxt.dividend += amount
     now = now or datetime.now(timezone.utc)
     period = (meta.get("currentTradingPeriod") or {}).get("regular") or {}
     if out and period.get("end"):

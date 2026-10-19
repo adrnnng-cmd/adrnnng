@@ -7,7 +7,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "test": "node --test "backtest/tests/*.test.mjs" && python3 -m unittest discover -s .github/backtest/tests -t .github/backtest",
+    "test": "node --test \"backtest/tests/*.test.mjs\" && PYTHONPATH=.github/backtest python3 -m unittest discover -s .github/backtest/tests",
     "check": "node scripts/check-site.mjs",
     "serve": "python3 -m http.server 8788",
     "new-tool": "node scripts/new-tool.mjs",
