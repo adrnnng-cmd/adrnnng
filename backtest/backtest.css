@@ -55,6 +55,8 @@
 .bt-desk.side-closed .bt-side { display: none; }
 
 .bt-analysis { min-width: 0; display: grid; gap: 12px; }
+.bt-sheets { display: grid; gap: 12px; min-width: 0; }
+.bt-sheets .panel { min-width: 0; }
 .run-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
 .run-fn { font: 700 11px/1 var(--font-sans); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
 .run-head h1 { font-size: clamp(22px, 3vw, 30px); margin-top: 6px; }

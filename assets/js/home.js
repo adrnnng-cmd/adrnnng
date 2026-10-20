@@ -1,8 +1,7 @@
-import { loadRegistry, esc, revealOnScroll, mastDate } from './site.js';
+import { loadRegistry, esc } from './site.js';
 import { tdSequential } from '/backtest/strategies/td-sequential.js';
 
 const PRICES = '/backtest/data/prices/';
-const STATUS_LABEL = { live: 'Live', new: 'New', beta: 'Beta', soon: 'In the lab' };
 const TAPE = ['^GSPC', '^NDX', '^HSI', '2800.HK', '0700.HK', 'AAPL', 'NVDA', 'MSFT', 'TSLA', 'GLD', 'BTC-USD'];
 const LABEL = { '^GSPC': 'S&P 500', '^NDX': 'Nasdaq 100', '^HSI': 'Hang Seng', 'BTC-USD': 'BTC', 'ETH-USD': 'ETH' };
 
@@ -10,25 +9,79 @@ const fmtPrice = (v) => v.toLocaleString('en-US', { minimumFractionDigits: v >= 
 const fmtPct = (v) => `${v > 0 ? '+' : ''}${v.toFixed(2)}%`;
 const getJson = (u) => fetch(u).then((r) => (r.ok ? r.json() : Promise.reject(new Error(`${u} HTTP ${r.status}`))));
 
-async function renderTools() {
+function tidy(s) {
+  return String(s || '').replace(/\s+/g, ' ').trim();
+}
+
+function parseReport(html, href) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const lead = tidy(doc.querySelector('.lead h2')?.textContent);
+  const dek = tidy(doc.querySelector('.mw-intro')?.textContent) || tidy(doc.querySelector('.lead .body')?.textContent);
+  const stories = [...doc.querySelectorAll('h3')]
+    .map((el) => tidy(el.textContent))
+    .filter((t) => t.length > 16 && !/Sector|Performance|板塊表現|強弱|Indicators/.test(t))
+    .slice(0, 3);
+  const markets = [...doc.querySelectorAll('table.mkt tr')].slice(0, 6).map((tr) => {
+    const raw = tidy(tr.querySelector('td.n')?.childNodes?.[0]?.textContent);
+    const changeEl = tr.querySelector('td.c');
+    const dir = changeEl?.classList.contains('down') ? 'down' : changeEl?.classList.contains('up') ? 'up' : 'flat';
+    return { name: raw.split(/\s+/)[0], value: tidy(tr.querySelector('td.v')?.textContent), change: tidy(changeEl?.textContent), dir };
+  }).filter((m) => m.value);
+  return { href, kicker: tidy(doc.querySelector('.edition .kicker')?.textContent), lead, dek: dek.slice(0, 320), stories, markets };
+}
+
+async function loadReport() {
+  try {
+    const index = await fetch('/news/').then((r) => (r.ok ? r.text() : Promise.reject()));
+    const latest = [...index.matchAll(/href="(\d{8})\//g)].map((m) => m[1]).sort().at(-1);
+    if (!latest) throw new Error('no edition');
+    const html = await fetch(`/news/${latest}/`).then((r) => (r.ok ? r.text() : Promise.reject()));
+    const parsed = parseReport(html, `/news/${latest}/`);
+    if (!parsed.lead) throw new Error('unparsed');
+    return parsed;
+  } catch {
+    return getJson('/assets/news-preview.json');
+  }
+}
+
+function paintReport(r) {
+  const kicker = document.getElementById('report-kicker');
+  if (r.kicker) kicker.innerHTML = r.kicker.split(/\s*\/\s*/).filter(Boolean).map(esc).join('<span class="sep">/</span>');
+  document.getElementById('report-lead').innerHTML = `<a href="${esc(r.href || '/news/')}">${esc(r.lead || "Today's Morning Report")}</a>`;
+  document.getElementById('report-dek').textContent = r.dek || '';
+  document.getElementById('report-link').href = r.href || '/news/';
+  document.getElementById('report-stories').innerHTML = (r.stories || [])
+    .map((s, i) => `<li><span class="n">${String(i + 1).padStart(2, '0')}</span><span>${esc(s)}</span></li>`)
+    .join('');
+  document.getElementById('report-markets').innerHTML = (r.markets || [])
+    .map((m) => `<tr><td class="n">${esc(m.name)}</td><td class="v">${esc(m.value)}</td><td class="c ${esc(m.dir || '')}">${esc(m.change)}</td></tr>`)
+    .join('');
+}
+
+async function renderDoors() {
   const reg = await loadRegistry();
-  const grid = document.getElementById('tool-grid');
-  const withHref = reg.tools.filter((t) => t.href);
-  const ordered = [...withHref, ...reg.tools.filter((t) => !t.href)];
-  grid.innerHTML = ordered
+  const tools = ['backtest', 'politician-tracker', 'news'].map((id) => reg.tools.find((t) => t.id === id)).filter(Boolean);
+  let filing = null;
+  try {
+    const data = await getJson('/politician-tracker/data.json');
+    const trade = data.trades?.[0];
+    const vip = (data.vip || []).find((v) => v.bioguide === trade?.bioguide);
+    if (trade) filing = { ...trade, photo: vip?.photo };
+  } catch { /* tracker data is optional on the cover */ }
+  document.getElementById('tools').innerHTML = tools
     .map((t) => {
-      const tag = t.href ? 'a' : 'div';
-      const cls = ['story', t.href ? '' : 'soon'].join(' ');
-      return `<${tag} class="${cls}" ${t.href ? `href="${esc(t.href)}"` : 'aria-disabled="true"'} data-tool="${esc(t.id)}">
-        <div class="meta"><span class="tag">${esc(t.category || '')}</span><span class="badge badge-${esc(t.status)}">${STATUS_LABEL[t.status] || esc(t.status)}</span></div>
-        <h3>${esc(t.title)}${t.zh ? `<span class="zh">${esc(t.zh)}</span>` : ''}</h3>
-        <p class="body">${esc(t.summary)}</p>
-        ${t.highlights?.length ? `<ul class="chips">${t.highlights.map((h) => `<li class="chip">${esc(h)}</li>`).join('')}</ul>` : ''}
-      </${tag}>`;
+      let body = `<p>${esc(t.summary)}</p>`;
+      if (t.id === 'politician-tracker' && filing) {
+        body = `<div class="door-photo">${filing.photo ? `<img src="${esc(filing.photo)}" alt="">` : ''}<div><b>${esc(filing.name)}</b><span class="${filing.tx === 'Buy' ? 'up' : 'down'}">${esc(filing.tx)} ${esc(filing.ticker)} · ${esc(filing.amount)}</span></div></div>`;
+      }
+      return `<a class="door" href="${esc(t.href)}">
+        <span class="ey">${esc(t.category || '')}</span>
+        <h2>${esc(t.title)}${t.zh ? `<span class="zh">${esc(t.zh)}</span>` : ''}</h2>
+        ${body}
+        <span class="go">Open →</span>
+      </a>`;
     })
     .join('');
-  document.querySelector('[data-stat="tools"]').textContent = withHref.length;
-  revealOnScroll();
 }
 
 async function renderTape() {
@@ -149,18 +202,8 @@ function drawSignal() {
   el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${parts.join('')}</svg>`;
 }
 
-function editionZh(d = new Date()) {
-  const fmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Hong_Kong', year: 'numeric', month: 'numeric', day: 'numeric', weekday: 'short' });
-  const map = Object.fromEntries(fmt.formatToParts(d).map((p) => [p.type, p.value]));
-  const wd = { Sun: '日', Mon: '一', Tue: '二', Wed: '三', Thu: '四', Fri: '五', Sat: '六' }[map.weekday] || map.weekday;
-  return `${map.year}年${map.month}月${map.day}日（${wd}）`;
-}
-const edition = document.getElementById('edition-date');
-if (edition) edition.textContent = editionZh();
-const dow = document.getElementById('edition-dow');
-if (dow) dow.textContent = mastDate();
-
-renderTools().catch((e) => console.warn(e));
+renderDoors().catch((e) => console.warn(e));
+loadReport().then(paintReport).catch((e) => console.warn(e));
 renderTape().catch((e) => console.warn(e));
 renderSignalCard().catch((e) => {
   console.warn(e);

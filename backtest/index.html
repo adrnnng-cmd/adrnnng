@@ -108,6 +108,29 @@
           <div class="chart chart-dd" id="chart-dd"></div>
         </div>
       </div>
+
+      <div class="bt-sheets">
+        <div class="panel">
+          <div class="panel-head">
+            <div><h2 class="panel-title">Monthly returns</h2><p class="panel-sub">Calendar months in %. Grey months were spent in cash.</p></div>
+            <div class="seg" id="heat-which" role="group" aria-label="Series"><button type="button" data-v="strategy" aria-pressed="true">Strategy</button><button type="button" data-v="bh" aria-pressed="false">Buy &amp; hold</button></div>
+          </div>
+          <div class="panel-body"><div class="heat-wrap" id="heatmap"></div></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head">
+            <div><h2 class="panel-title">Trade returns</h2><p class="panel-sub">Each closed trade in order. Height is the return after costs.</p></div>
+          </div>
+          <div class="panel-body"><div class="trade-bars" id="trade-bars"></div></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head">
+            <div><h2 class="panel-title">Trades</h2><p class="panel-sub" id="trades-sub">Click a row to zoom the charts to it.</p></div>
+            <button type="button" class="btn btn-sm" id="csv-export">Export</button>
+          </div>
+          <div class="panel-body"><div class="table-wrap trades-wrap"><table class="table trades" id="trades"></table></div></div>
+        </div>
+      </div>
     </section>
 
     <button type="button" class="btn btn-sm side-reopen" id="side-reopen">Statistics</button>
@@ -137,29 +160,6 @@
   </div>
 
   <section class="bt-below">
-    <div class="panel">
-      <div class="panel-head">
-        <div><h2 class="panel-title">Monthly returns</h2><p class="panel-sub">Calendar months in %. Grey months were spent in cash.</p></div>
-        <div class="seg" id="heat-which" role="group" aria-label="Series"><button type="button" data-v="strategy" aria-pressed="true">Strategy</button><button type="button" data-v="bh" aria-pressed="false">Buy &amp; hold</button></div>
-      </div>
-      <div class="panel-body"><div class="heat-wrap" id="heatmap"></div></div>
-    </div>
-
-    <div class="panel">
-      <div class="panel-head">
-        <div><h2 class="panel-title">Trade returns</h2><p class="panel-sub">Each closed trade in order. Height is the return after costs.</p></div>
-      </div>
-      <div class="panel-body"><div class="trade-bars" id="trade-bars"></div></div>
-    </div>
-
-    <div class="panel">
-      <div class="panel-head">
-        <div><h2 class="panel-title">Trades</h2><p class="panel-sub" id="trades-sub">Click a row to zoom the charts to it.</p></div>
-        <button type="button" class="btn btn-sm" id="csv-export">Export</button>
-      </div>
-      <div class="panel-body"><div class="table-wrap trades-wrap"><table class="table trades" id="trades"></table></div></div>
-    </div>
-
     <details class="panel method" id="method">
       <summary><h2 class="panel-title">Methodology &amp; data</h2><span class="panel-sub">Fills, costs and every metric</span></summary>
       <div class="panel-body method-body">

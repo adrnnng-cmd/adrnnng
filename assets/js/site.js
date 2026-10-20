@@ -51,7 +51,6 @@ function renderHeader(el, reg) {
   el.innerHTML = `<div class="wrap mast-in">
     <a class="logo" href="/" aria-label="${esc(reg.site.name)} home">
       <span class="en">${esc(reg.site.name)}</span>
-      ${reg.site.zh ? `<span class="zh">${esc(reg.site.zh)}</span>` : ''}
     </a>
     <button class="nav-toggle" aria-label="Menu" aria-expanded="false"><span></span></button>
     <div class="mast-r">

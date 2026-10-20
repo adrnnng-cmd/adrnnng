@@ -4,10 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>ADRRR · Adrian Ng</title>
-  <meta name="description" content="Adrian Ng's market research from Hong Kong: Politician Tracker, a TD Sequential backtester on real price history, and the daily Morning Report.">
+  <meta name="description" content="Adrian Ng. Morning Report, Politician Tracker, and a TD Sequential backtest.">
   <meta name="theme-color" content="#000000">
-  <meta property="og:title" content="ADRRR · Adrian Ng">
-  <meta property="og:description" content="Systematic markets research from Hong Kong.">
+  <meta property="og:title" content="ADRRR">
+  <meta property="og:description" content="Morning Report, Politician Tracker, Backtest.">
   <meta property="og:url" content="https://adrnnng.com/">
   <meta property="og:type" content="website">
   <link rel="icon" href="/assets/img/favicon.svg" type="image/svg+xml">
@@ -17,7 +17,7 @@
   <link rel="stylesheet" href="/assets/css/theme.css">
   <link rel="stylesheet" href="/assets/css/home.css">
   <link rel="preload" href="/assets/tools.json" as="fetch" crossorigin>
-  <link rel="preload" href="/backtest/data/prices/recent.json" as="fetch" crossorigin>
+  <link rel="preload" href="/assets/news-preview.json" as="fetch" crossorigin>
 </head>
 <body class="home">
   <div class="tape" aria-label="Last close">
@@ -25,76 +25,36 @@
   </div>
 
   <header class="mast" data-site-header data-mast="home">
-    <div class="wrap mast-in"><a class="logo" href="/"><span class="en">ADRRR</span><span class="zh">系統化市場研究</span></a></div>
+    <div class="wrap mast-in"><a class="logo" href="/"><span class="en">ADRRR</span></a></div>
   </header>
 
-  <nav class="secnav" aria-label="Sections">
-    <ul>
-      <li><a href="#about">簡介<span class="e">About</span></a></li>
-      <li><a href="#tools">目錄<span class="e">Index</span></a></li>
-      <li><a href="/backtest/">回測<span class="e">Backtest</span></a></li>
-      <li><a href="/politician-tracker/">持股<span class="e">Tracker</span></a></li>
-      <li><a href="/news/">晨報<span class="e">Report</span></a></li>
-    </ul>
-  </nav>
-
-  <main class="wrap">
-    <section class="edition">
-      <div class="kicker">工作台<span class="sep">/</span>Workbench<span class="sep">/</span><span id="edition-date"></span></div>
-      <h1>工作台｜ADRRR</h1>
-      <div class="byl">
-        <span class="num" id="edition-dow"></span>
-        <span><span class="num" data-stat="tools">3</span> 則工具</span>
-        <span><span class="num" data-stat="tickers">47</span> 個代碼</span>
-        <span>Hong Kong</span>
+  <main>
+    <section class="cover wrap">
+      <div class="cover-copy">
+        <p class="kicker" id="report-kicker">晨報摘要 <span class="sep">/</span> Morning Report</p>
+        <h1 id="report-lead"><a href="/news/">Today's Morning Report</a></h1>
+        <p class="dek" id="report-dek"></p>
+        <ol class="front-list" id="report-stories"></ol>
+        <p class="read"><a id="report-link" href="/news/">Read the report <span class="arrow">→</span></a></p>
       </div>
-    </section>
-
-    <div class="top-grid">
-      <div class="maincol">
-        <section id="about" class="wrapsec">
-          <div class="sh"><h2><span class="zh">簡介</span> About</h2></div>
-          <p class="mw-intro">Adrian Ng. Follow the money, test trading rules against real price history, and brief the market every morning. Rules over opinions; every claim backed by data.</p>
-          <p class="mw-src">Hong Kong · Systematic markets research · <a href="/news/">Today's Morning Report ↗</a></p>
-        </section>
-
-        <section id="tools">
-          <div class="sh">
-            <h2><span class="zh">目錄</span> Index</h2>
-            <span class="aux">Each tool is a page with its own data. New ones appear here.</span>
-          </div>
-          <div id="tool-grid">
-            <noscript>
-              <a class="story" href="/backtest/"><h3>Backtest</h3></a>
-              <a class="story" href="/politician-tracker/"><h3>Politician Tracker</h3></a>
-              <a class="story" href="/news/"><h3>Morning Report</h3></a>
-            </noscript>
-          </div>
-        </section>
-      </div>
-
-      <aside class="rail">
-        <div class="sh"><h2><span class="zh">序列</span> TD Sequential</h2></div>
+      <aside class="cover-rail">
         <figure class="signal-card" id="signal-card">
           <div class="sc-head">
-            <div>
-              <div class="sc-title"><span class="num" id="sc-symbol">SPY</span> <span class="sc-name" id="sc-name"></span></div>
-            </div>
+            <div class="sc-title"><span class="num" id="sc-symbol">SPY</span> <span class="sc-name" id="sc-name"></span></div>
             <div class="sc-price">
               <span class="num" id="sc-last">—</span>
               <span class="num sc-chg" id="sc-chg"></span>
             </div>
           </div>
           <div class="sc-chips seg" id="sc-chips" role="group" aria-label="Symbol"></div>
-          <div class="sc-chart" id="sc-chart" role="img" aria-label="Candlestick chart with TD Sequential counts"></div>
-          <figcaption class="sc-foot">
-            <span><i class="lg lg-buy"></i>Buy 9</span>
-            <span><i class="lg lg-sell"></i>Sell 9</span>
-            <span class="sc-src" id="sc-src">Yahoo Finance</span>
-          </figcaption>
+          <div class="sc-chart" id="sc-chart" role="img" aria-label="Candlestick chart"></div>
+          <figcaption class="sc-foot"><span class="sc-src" id="sc-src">Yahoo Finance</span></figcaption>
         </figure>
+        <table class="mkt" id="report-markets"></table>
       </aside>
-    </div>
+    </section>
+
+    <nav class="doors wrap" id="tools" aria-label="Sections"></nav>
   </main>
 
   <footer data-site-footer></footer>
