@@ -46,6 +46,11 @@ if [ -n "$news" ]; then
   cp -a "$news"/. "$out/news/"
 fi
 
+if [ ! -f "$out/404.html" ]; then
+  echo "error: 404.html is missing from the upload; Pages would serve index.html with status 200" >&2
+  exit 1
+fi
+
 files=$(find "$out" -type f | wc -l | tr -d ' ')
 size=$(du -sh "$out" | cut -f1)
 echo "assembled $out: $files files, $size${news:+ (news/ from $news)}"
