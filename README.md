@@ -54,6 +54,16 @@ npm run verify:backtest   # engine vs an independent Python implementation on re
 npm run check        # registry, page wiring, local links/imports, reserved paths, price manifest
 ```
 
+The landing asks for `/news/latest.json` when the page loads. That file is published with the
+Morning Report and is not part of this repo. To preview the lead photo, copy the sample over
+that path and do not commit it (`npm run check` fails while `news/` exists):
+
+```bash
+mkdir -p news && cp scripts/preview/latest.json news/latest.json
+```
+
+Remove `news/` before `npm run check`. A missing file, or `"image_url": null`, leaves the SPY chart cover.
+
 Node ≥ 20 and Python ≥ 3.10. There are no dependencies to install. CI (`site-check.yml`) runs the
 same three commands on every PR and push.
 
@@ -212,6 +222,11 @@ then the News Analyst's folder into `news/`. `news/` is reserved: it is register
 `tools.json` with `owner: "news-analyst"`, and `npm run check` fails if the repo ever contains
 it. Uploading the raw repo checkout plus `news/` (the current flow) also keeps working, since
 there is still no build step.
+
+The landing reads `news/latest.json` after load (`date`, `headline`, `summary`, `image_url`,
+`image_credit`, `source_name`, `source_url`, `report_url`). The News Analyst publishes that file
+with the daily report. The only copy in this repo is `scripts/preview/latest.json`, and
+`assemble-deploy.sh` does not upload `scripts/`.
 
 ## Disclaimer
 

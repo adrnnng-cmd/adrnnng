@@ -1,4 +1,35 @@
-/* Front page. A cover, then three doors. */
+/* Front page. A lead photo when /news/latest.json has one, otherwise the chart cover, then three doors. */
+
+.story-hero { margin: 0; }
+.story-hero img {
+  display: block;
+  width: 100%;
+  height: min(62vh, 560px);
+  min-height: 280px;
+  object-fit: cover;
+  object-position: center;
+  background: #111;
+}
+.story-hero .hero-credit {
+  max-width: var(--container);
+  margin: 0 auto;
+  padding: 10px 20px 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #222;
+}
+.story-hero .hero-credit a {
+  color: #222;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+body.has-story-hero .cover {
+  grid-template-columns: minmax(0, 1fr);
+  padding-top: 18px;
+}
+body.has-story-hero .cover-rail { display: none; }
+body.has-story-hero .dek a { color: inherit; text-decoration: none; }
+body.has-story-hero .dek a:hover { text-decoration: underline; text-underline-offset: 3px; }
 
 .tape { background: var(--bg-2); border-bottom: 1px solid var(--line); font-size: 12.5px; position: relative; }
 .tape-in {
@@ -117,6 +148,8 @@
 @media (max-width: 600px) {
   .tape-in { padding: 0 16px; }
   .cover { padding-left: 16px; padding-right: 16px; }
+  .story-hero img { height: 240px; min-height: 200px; }
+  .story-hero .hero-credit { padding-left: 16px; padding-right: 16px; }
   .cover h1 { font-size: 30px; }
   .dek, .front-list li { font-size: 16px; }
   .sc-chart { height: 200px; }

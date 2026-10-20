@@ -44,6 +44,83 @@ async function loadReport() {
   }
 }
 
+function safeUrl(u) {
+  if (typeof u !== 'string') return '';
+  const t = u.trim();
+  if (t.startsWith('/') && !t.startsWith('//')) return t;
+  try {
+    const url = new URL(t);
+    if (url.protocol === 'https:' || url.protocol === 'http:') return url.href;
+  } catch { /* not a url */ }
+  return '';
+}
+
+function parseLatest(data) {
+  if (!data || typeof data !== 'object' || data.image_url == null) return null;
+  const imageUrl = safeUrl(data.image_url);
+  const reportUrl = safeUrl(data.report_url);
+  const headline = tidy(data.headline);
+  if (!imageUrl || !reportUrl || !headline) return null;
+  return {
+    date: tidy(data.date),
+    headline,
+    summary: tidy(data.summary),
+    imageUrl,
+    credit: tidy(data.image_credit),
+    sourceName: tidy(data.source_name),
+    sourceUrl: safeUrl(data.source_url),
+    reportUrl,
+  };
+}
+
+function loadLatest() {
+  return fetch('/news/latest.json', { cache: 'no-store' })
+    .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`/news/latest.json HTTP ${r.status}`))))
+    .then(parseLatest)
+    .catch(() => null);
+}
+
+function mountHero(story) {
+  const img = document.getElementById('story-hero-img');
+  img.alt = story.headline;
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (ok) => {
+      if (settled) return;
+      settled = true;
+      resolve(ok);
+    };
+    img.onload = () => finish(img.naturalWidth > 0);
+    img.onerror = () => finish(false);
+    img.referrerPolicy = 'no-referrer';
+    img.src = story.imageUrl;
+    if (img.complete) finish(img.naturalWidth > 0);
+  });
+}
+
+function applyHero(story) {
+  const label = [story.credit, story.sourceName].filter(Boolean).join(' / ') || 'Source';
+  const cap = document.getElementById('story-hero-credit');
+  cap.innerHTML = story.sourceUrl
+    ? `<a href="${esc(story.sourceUrl)}" rel="noopener noreferrer">Photo: ${esc(label)}</a>`
+    : `Photo: ${esc(label)}`;
+  document.getElementById('story-hero').hidden = false;
+  document.body.classList.add('has-story-hero');
+  document.getElementById('report-lead').innerHTML = `<a href="${esc(story.reportUrl)}">${esc(story.headline)}</a>`;
+  document.getElementById('report-dek').innerHTML = `<a href="${esc(story.reportUrl)}">${esc(story.summary)}</a>`;
+  document.getElementById('report-link').href = story.reportUrl;
+  const kicker = document.getElementById('report-kicker');
+  if (story.date && kicker && !/\d{4}/.test(kicker.textContent)) {
+    kicker.insertAdjacentHTML('beforeend', `<span class="sep">/</span>${esc(story.date)}`);
+  }
+}
+
+async function bootCover() {
+  const [report, story] = await Promise.all([loadReport(), loadLatest()]);
+  paintReport(report);
+  if (story && (await mountHero(story))) applyHero(story);
+}
+
 function paintReport(r) {
   const kicker = document.getElementById('report-kicker');
   if (r.kicker) kicker.innerHTML = r.kicker.split(/\s*\/\s*/).filter(Boolean).map(esc).join('<span class="sep">/</span>');
@@ -203,7 +280,7 @@ function drawSignal() {
 }
 
 renderDoors().catch((e) => console.warn(e));
-loadReport().then(paintReport).catch((e) => console.warn(e));
+bootCover().catch((e) => console.warn(e));
 renderTape().catch((e) => console.warn(e));
 renderSignalCard().catch((e) => {
   console.warn(e);
