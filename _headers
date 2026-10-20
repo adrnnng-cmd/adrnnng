@@ -1,0 +1,8 @@
+/backtest/data/*
+  Cache-Control: public, max-age=1800, must-revalidate
+
+/assets/tools.json
+  Cache-Control: public, max-age=300
+
+/assets/vendor/*
+  Cache-Control: public, max-age=604800

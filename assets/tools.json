@@ -1,0 +1,95 @@
+{
+  "site": {
+    "name": "ADRRR",
+    "owner": "Adrian Ng",
+    "url": "https://adrnnng.com",
+    "tagline": "Systematic markets research from Hong Kong",
+    "description": "Adrian Ng's open trading workbench: follow the flow, test ideas against real history, read the tape every morning."
+  },
+  "tools": [
+    {
+      "id": "backtest",
+      "title": "Backtest",
+      "zh": "策略回測",
+      "href": "/backtest/",
+      "status": "new",
+      "category": "Research",
+      "icon": "backtest",
+      "accent": "#38bdf8",
+      "summary": "Test a rule on real daily history. Price with trade signals, a profit curve against buy-and-hold, and a statistics side panel.",
+      "highlights": [
+        "TD Sequential 9 / 13",
+        "Sharpe · Sortino · CAGR",
+        "47 US, HK & crypto tickers"
+      ],
+      "nav": true,
+      "owner": "repo",
+      "chrome": "shared"
+    },
+    {
+      "id": "politician-tracker",
+      "title": "Politician Tracker",
+      "zh": "政治人物持股動向",
+      "href": "/politician-tracker/",
+      "status": "live",
+      "category": "Flow",
+      "icon": "capitol",
+      "accent": "#f59e0b",
+      "summary": "New STOCK Act disclosures from a VIP list of market-beating members of Congress, plus any member's trade in a Watchlist ticker. Refreshed every morning.",
+      "highlights": [
+        "Daily 07:05 HKT",
+        "Official filings linked",
+        "Filing lag in days"
+      ],
+      "nav": true,
+      "owner": "repo",
+      "chrome": "own"
+    },
+    {
+      "id": "news",
+      "title": "Morning Report",
+      "zh": "晨報",
+      "href": "/news/",
+      "status": "live",
+      "category": "News",
+      "icon": "news",
+      "accent": "#34d399",
+      "summary": "The daily market briefing and its archive, published every morning before the Hong Kong open.",
+      "highlights": [
+        "Daily ~08:15 HKT",
+        "Full archive"
+      ],
+      "nav": true,
+      "owner": "news-analyst",
+      "chrome": "own"
+    },
+    {
+      "id": "td-scanner",
+      "title": "TD Sequential Scanner",
+      "zh": "TD 序列掃描",
+      "href": null,
+      "status": "soon",
+      "category": "Signals",
+      "icon": "scanner",
+      "accent": "#a78bfa",
+      "summary": "Which tickers on the Watchlist printed a Setup 9 or Countdown 13 at yesterday's close, with each signal's historical hit rate.",
+      "nav": false,
+      "owner": "repo",
+      "chrome": "shared"
+    },
+    {
+      "id": "options-lab",
+      "title": "Options Greeks Lab",
+      "zh": "期權希臘值",
+      "href": null,
+      "status": "soon",
+      "category": "Derivatives",
+      "icon": "greeks",
+      "accent": "#f472b6",
+      "summary": "Interactive Black-Scholes: see how Delta, Gamma, Vega and Theta move with price, time and volatility.",
+      "nav": false,
+      "owner": "repo",
+      "chrome": "shared"
+    }
+  ]
+}

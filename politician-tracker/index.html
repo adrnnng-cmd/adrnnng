@@ -29,7 +29,8 @@ a{color:inherit}
 .mast-r .d{font-family:var(--mono);letter-spacing:.04em}
 .mast-r a{color:#fff;text-decoration:none;font-weight:600;border:1px solid #555;padding:4px 10px;border-radius:2px}
 .mast-r a:hover{border-color:#fff}
-@media(max-width:560px){.mast-r .d{display:none}.logo .zh{display:none}}
+.mast-r a.nv{border:0;padding:4px 0;font-weight:500;color:#cfcfcf}.mast-r a.nv:hover{color:#fff;text-decoration:underline}
+@media(max-width:560px){.mast-r .d{display:none}.logo .zh{display:none}.mast-r{gap:12px}}
 .edition{padding:26px 0 18px;border-bottom:1px solid var(--rule)}
 .kicker{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase}
 .kicker .sep{color:var(--mut2);margin:0 6px}
@@ -152,7 +153,7 @@ button.chip .c{color:var(--mut);font-weight:500;margin-left:6px}
 <body data-today="2026-10-20">
 <header class="mast"><div class="wrap mast-in">
 <a class="logo" href="/"><span class="en">ADRRR</span><span class="zh">政治人物持股動向</span></a>
-<div class="mast-r"><span class="d">2026-10-20 · TUE</span><a href="/news/">Morning Report →</a></div>
+<div class="mast-r"><span class="d">2026-10-20 · TUE</span><a class="nv" href="/backtest/">Backtest</a><a href="/news/">Morning Report →</a></div>
 </div></header>
 <main class="wrap">
 <section class="edition">

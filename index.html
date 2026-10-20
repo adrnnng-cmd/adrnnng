@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>ADRRR · Adrian Ng</title>
+  <meta name="description" content="Adrian Ng. Morning Report, Politician Tracker, and a TD Sequential backtest.">
+  <meta name="theme-color" content="#000000">
+  <meta property="og:title" content="ADRRR">
+  <meta property="og:description" content="Morning Report, Politician Tracker, Backtest.">
+  <meta property="og:url" content="https://adrnnng.com/">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="/assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;700;900&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap">
+  <link rel="stylesheet" href="/assets/css/theme.css">
+  <link rel="stylesheet" href="/assets/css/home.css">
+  <link rel="preload" href="/assets/tools.json" as="fetch" crossorigin>
+  <link rel="preload" href="/assets/news-preview.json" as="fetch" crossorigin>
+</head>
+<body class="home">
+  <div class="tape" aria-label="Last close">
+    <div class="tape-in" id="tape"></div>
+  </div>
+
+  <header class="mast" data-site-header data-mast="home">
+    <div class="wrap mast-in"><a class="logo" href="/"><span class="en">ADRRR</span></a></div>
+  </header>
+
+  <main>
+    <figure class="story-hero" id="story-hero" hidden>
+      <img id="story-hero-img" alt="" referrerpolicy="no-referrer">
+      <figcaption class="hero-credit" id="story-hero-credit"></figcaption>
+    </figure>
+    <section class="cover wrap">
+      <div class="cover-copy">
+        <p class="kicker" id="report-kicker">晨報摘要 <span class="sep">/</span> Morning Report</p>
+        <h1 id="report-lead"><a href="/news/">Today's Morning Report</a></h1>
+        <p class="dek" id="report-dek"></p>
+        <ol class="front-list" id="report-stories"></ol>
+        <p class="read"><a id="report-link" href="/news/">Read the report <span class="arrow">→</span></a></p>
+      </div>
+      <aside class="cover-rail">
+        <figure class="signal-card" id="signal-card">
+          <div class="sc-head">
+            <div class="sc-title"><span class="num" id="sc-symbol">SPY</span> <span class="sc-name" id="sc-name"></span></div>
+            <div class="sc-price">
+              <span class="num" id="sc-last">—</span>
+              <span class="num sc-chg" id="sc-chg"></span>
+            </div>
+          </div>
+          <div class="sc-chips seg" id="sc-chips" role="group" aria-label="Symbol"></div>
+          <div class="sc-chart" id="sc-chart" role="img" aria-label="Candlestick chart"></div>
+          <figcaption class="sc-foot"><span class="sc-src" id="sc-src">Yahoo Finance</span></figcaption>
+        </figure>
+        <table class="mkt" id="report-markets"></table>
+      </aside>
+    </section>
+
+    <nav class="doors wrap" id="tools" aria-label="Sections"></nav>
+  </main>
+
+  <footer data-site-footer></footer>
+  <script type="module" src="/assets/js/site.js"></script>
+  <script type="module" src="/assets/js/home.js"></script>
+</body>
+</html>

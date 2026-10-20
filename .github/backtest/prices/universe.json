@@ -1,0 +1,28 @@
+{
+  "start": "1990-01-01",
+  "path": "backtest/data/prices",
+  "featured": ["SPY", "QQQ", "NVDA", "0700.HK", "^HSI", "BTC-USD"],
+  "recent_bars": 160,
+  "groups": [
+    {
+      "name": "Indices & ETFs",
+      "symbols": ["SPY", "QQQ", "DIA", "IWM", "GLD", "TLT", "BUG", "^GSPC", "^NDX", "^HSI", "2800.HK"]
+    },
+    {
+      "name": "US Watchlist",
+      "symbols": ["AAPL", "TSLA", "ORCL", "GOOGL", "MSFT", "LLY", "DELL", "RKLB", "CRCL", "USAR", "LVMUY"]
+    },
+    {
+      "name": "US Large Caps",
+      "symbols": ["NVDA", "AMZN", "META", "AVGO", "AMD", "NFLX", "JPM", "BRK-B", "XOM", "COST"]
+    },
+    {
+      "name": "Hong Kong",
+      "symbols": ["0700.HK", "9988.HK", "3690.HK", "1810.HK", "0005.HK", "0388.HK", "9926.HK", "0585.HK", "2451.HK", "2583.HK", "1682.HK", "0147.HK", "2668.HK"]
+    },
+    {
+      "name": "Crypto",
+      "symbols": ["BTC-USD", "ETH-USD"]
+    }
+  ]
+}
