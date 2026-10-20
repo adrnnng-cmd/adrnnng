@@ -1,5 +1,5 @@
 import { loadRegistry, esc } from './site.js';
-import { parseLatest } from './latest.js';
+import { newsDoorCaption, parseLatest } from './latest.js';
 import { tdSequential } from '/backtest/strategies/td-sequential.js';
 
 const PRICES = '/backtest/data/prices/';
@@ -45,11 +45,18 @@ async function loadReport() {
   }
 }
 
+let latestRawPromise;
+function loadLatestRaw() {
+  if (!latestRawPromise) {
+    latestRawPromise = fetch('/news/latest.json', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`/news/latest.json HTTP ${r.status}`))))
+      .catch(() => null);
+  }
+  return latestRawPromise;
+}
+
 function loadLatest() {
-  return fetch('/news/latest.json', { cache: 'no-store' })
-    .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`/news/latest.json HTTP ${r.status}`))))
-    .then(parseLatest)
-    .catch(() => null);
+  return loadLatestRaw().then((data) => (data ? parseLatest(data) : null));
 }
 
 function mountHero(story) {
@@ -107,21 +114,51 @@ function paintReport(r) {
     .join('');
 }
 
+function doorPhoto({ webp, jpg, src, title, sub, subClass = '' }) {
+  const img = webp
+    ? `<picture><source srcset="${esc(webp)} 2x" type="image/webp"><img src="${esc(jpg)}" srcset="${esc(jpg)} 2x" alt="" width="56" height="70"></picture>`
+    : src
+      ? `<img src="${esc(src)}" alt="" width="56" height="70">`
+      : '';
+  return `<div class="door-photo">${img}<div><b>${esc(title)}</b><span class="${esc(subClass)}">${esc(sub)}</span></div></div>`;
+}
+
 async function renderDoors() {
   const reg = await loadRegistry();
   const tools = ['backtest', 'politician-tracker', 'news'].map((id) => reg.tools.find((t) => t.id === id)).filter(Boolean);
   let filing = null;
+  const latestRaw = await loadLatestRaw();
   try {
     const data = await getJson('/politician-tracker/data.json');
     const trade = data.trades?.[0];
     const vip = (data.vip || []).find((v) => v.bioguide === trade?.bioguide);
     if (trade) filing = { ...trade, photo: vip?.photo };
   } catch { /* tracker data is optional on the cover */ }
+  const newsCap = newsDoorCaption(latestRaw);
   document.getElementById('tools').innerHTML = tools
     .map((t) => {
       let body = `<p>${esc(t.summary)}</p>`;
-      if (t.id === 'politician-tracker' && filing) {
-        body = `<div class="door-photo">${filing.photo ? `<img src="${esc(filing.photo)}" alt="">` : ''}<div><b>${esc(filing.name)}</b><span class="${filing.tx === 'Buy' ? 'up' : 'down'}">${esc(filing.tx)} ${esc(filing.ticker)} · ${esc(filing.amount)}</span></div></div>`;
+      if (t.id === 'backtest') {
+        body = doorPhoto({
+          webp: '/assets/img/doors/backtest.webp',
+          jpg: '/assets/img/doors/backtest.jpg',
+          title: 'TD Sequential 9 / 13',
+          sub: 'Sharpe · CAGR · Max DD',
+        });
+      } else if (t.id === 'politician-tracker' && filing) {
+        body = doorPhoto({
+          src: filing.photo,
+          title: filing.name,
+          sub: `${filing.tx} ${filing.ticker} · ${filing.amount}`,
+          subClass: filing.tx === 'Buy' ? 'up' : 'down',
+        });
+      } else if (t.id === 'news') {
+        body = doorPhoto({
+          webp: '/assets/img/doors/news.webp',
+          jpg: '/assets/img/doors/news.jpg',
+          title: newsCap.title,
+          sub: newsCap.sub,
+        });
       }
       return `<a class="door" href="${esc(t.href)}">
         <span class="ey">${esc(t.category || '')}</span>

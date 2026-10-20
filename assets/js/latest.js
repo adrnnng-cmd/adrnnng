@@ -13,6 +13,22 @@ export function safeUrl(u) {
   return '';
 }
 
+// Morning Report door line. Keeps a headline even when image_url is missing
+// (parseLatest returns null in that case) and clips it to one line.
+export function newsDoorCaption(data, max = 52) {
+  const headline = data && typeof data === 'object' && !Array.isArray(data) ? tidy(data.headline) : '';
+  if (!headline) return { title: 'Morning Report', sub: 'Daily ~08:15 HKT' };
+  return { title: clipLine(headline, max), sub: 'Daily ~08:15 HKT' };
+}
+
+function clipLine(s, max) {
+  if (s.length <= max) return s;
+  const cut = s.slice(0, max - 1);
+  const sp = cut.lastIndexOf(' ');
+  const base = (sp >= 24 ? cut.slice(0, sp) : cut).replace(/[\s.,;:–—-]+$/u, '');
+  return `${base}…`;
+}
+
 // Fields read from /news/latest.json. image_url is the photo to show; in production that is a
 // same-origin WebP under /news/img/YYYYMMDD/. Any other key, including image_url_original, is ignored.
 export function parseLatest(data) {

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseLatest } from '../../assets/js/latest.js';
+import { newsDoorCaption, parseLatest } from '../../assets/js/latest.js';
 
 const lead = {
   date: '2026-10-20',
@@ -25,6 +25,20 @@ test('parseLatest uses image_url and ignores unknown fields', () => {
   assert.equal(story.credit, 'Wire');
   assert.equal('image_url_original' in story, false);
   assert.equal('extra' in story, false);
+});
+
+test('newsDoorCaption uses a truncated headline and falls back without one', () => {
+  assert.deepEqual(newsDoorCaption(null), { title: 'Morning Report', sub: 'Daily ~08:15 HKT' });
+  assert.deepEqual(newsDoorCaption({ headline: '   ', image_url: null }), { title: 'Morning Report', sub: 'Daily ~08:15 HKT' });
+  assert.deepEqual(newsDoorCaption({ headline: 'Nscale signs Anthropic', image_url: null }), {
+    title: 'Nscale signs Anthropic',
+    sub: 'Daily ~08:15 HKT',
+  });
+  const long = 'Markets reopen after a long weekend with rates, chips, and a weaker dollar in focus today';
+  const cap = newsDoorCaption({ headline: long });
+  assert.ok(cap.title.length <= 52, cap.title);
+  assert.ok(cap.title.endsWith('…'));
+  assert.equal(cap.sub, 'Daily ~08:15 HKT');
 });
 
 test('parseLatest falls back when image_url is null, empty, or not a url', () => {
