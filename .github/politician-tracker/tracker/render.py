@@ -28,6 +28,7 @@ a{color:inherit}
 .mast-in{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:60px;padding-top:10px;padding-bottom:10px}
 .logo{text-decoration:none;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;min-width:0}
 .logo .en{font-family:var(--serif);font-weight:700;font-size:26px;letter-spacing:.02em;line-height:1}
+.logo img{height:17px;width:auto;display:block}
 .logo .zh{font-size:13px;font-weight:500;color:#bdbdbd;letter-spacing:.08em}
 .mast-r{display:flex;align-items:center;gap:16px;font-size:12px;color:#cfcfcf;white-space:nowrap}
 .mast-r .d{font-family:var(--mono);letter-spacing:.04em}
@@ -402,7 +403,7 @@ def render_page(cfg: dict, payload: dict, now: datetime) -> str:
 <style>{CSS}</style></head>
 <body data-today="{today.isoformat()}">
 <header class="mast"><div class="wrap mast-in">
-<a class="logo" href="{_e(site.get('home_url', '/'))}"><span class="en">ADRRR</span><span class="zh">政治人物持股動向</span></a>
+<a class="logo" href="{_e(site.get('home_url', '/'))}"><img src="/assets/brand/adrrr-wordmark-white.svg" alt="ADRRR" height="17"><span class="zh">政治人物持股動向</span></a>
 <div class="mast-r"><span class="d">{today:%Y-%m-%d} · {weekday}</span>{_site_nav(site)}<a href="{_e(site['archive_url'])}">Morning Report →</a></div>
 </div></header>
 <main class="wrap">

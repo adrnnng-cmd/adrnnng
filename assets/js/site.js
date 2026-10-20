@@ -50,7 +50,7 @@ function renderHeader(el, reg) {
   el.classList.add('mast');
   el.innerHTML = `<div class="wrap mast-in">
     <a class="logo" href="/" aria-label="${esc(reg.site.name)} home">
-      <span class="en">${esc(reg.site.name)}</span>
+      <img class="mark" src="/assets/brand/adrrr-wordmark-white.svg" alt="${esc(reg.site.name)}" height="17">
     </a>
     <button class="nav-toggle" aria-label="Menu" aria-expanded="false"><span></span></button>
     <div class="mast-r">

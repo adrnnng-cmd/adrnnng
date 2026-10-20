@@ -96,6 +96,11 @@ p { margin: 0; }
   font-family: var(--font-display); font-weight: 700; font-size: 26px;
   letter-spacing: -0.01em; line-height: 1; color: inherit;
 }
+.logo img {
+  display: block;
+  height: 17px;
+  width: auto;
+}
 .logo .zh, .brand-zh { font-size: 13px; font-weight: 500; color: #bdbdbd; letter-spacing: 0.08em; }
 .mast-r {
   display: flex; align-items: center; gap: 16px; font-size: 12px; color: #cfcfcf; white-space: nowrap;
