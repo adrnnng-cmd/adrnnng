@@ -63,6 +63,9 @@ mkdir -p news && cp scripts/preview/latest.json news/latest.json
 ```
 
 Remove `news/` before `npm run check`. A missing file, or `"image_url": null`, leaves the SPY chart cover.
+The page displays `image_url` only. Production publishes that as a WebP under `/news/img/YYYYMMDD/`.
+Extra keys, including `image_url_original`, are ignored. The sample's `image_url` is a Commons
+photo so the preview loads without a `news/` tree.
 
 Node ≥ 20 and Python ≥ 3.10. There are no dependencies to install. CI (`site-check.yml`) runs the
 same three commands on every PR and push.
@@ -223,10 +226,17 @@ then the News Analyst's folder into `news/`. `news/` is reserved: it is register
 it. Uploading the raw repo checkout plus `news/` (the current flow) also keeps working, since
 there is still no build step.
 
-The landing reads `news/latest.json` after load (`date`, `headline`, `summary`, `image_url`,
-`image_credit`, `source_name`, `source_url`, `report_url`). The News Analyst publishes that file
-with the daily report. The only copy in this repo is `scripts/preview/latest.json`, and
-`assemble-deploy.sh` does not upload `scripts/`.
+The landing reads `news/latest.json` after load and uses `date`, `headline`, `summary`,
+`image_url`, `image_credit`, `source_name`, `source_url`, and `report_url`. `image_url` is the
+photo on the page; the daily file points it at a WebP under `/news/img/YYYYMMDD/`. Other keys,
+including `image_url_original`, are ignored. The News Analyst publishes that file with the daily
+report. The only copy in this repo is `scripts/preview/latest.json`, and `assemble-deploy.sh`
+does not upload `scripts/`.
+
+This repo owns the site root outside `news/`: `index.html`, `_headers`, `_redirects`, `assets/`,
+`backtest/` (without `backtest/tests/`), and `politician-tracker/`. `_redirects` only aliases
+`/backtesting` to `/backtest/`. The News Analyst merges the `/latest` redirect rules at upload
+time and does not write a root `index.html`.
 
 ## Disclaimer
 

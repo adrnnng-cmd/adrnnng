@@ -1,4 +1,5 @@
 import { loadRegistry, esc } from './site.js';
+import { parseLatest } from './latest.js';
 import { tdSequential } from '/backtest/strategies/td-sequential.js';
 
 const PRICES = '/backtest/data/prices/';
@@ -42,35 +43,6 @@ async function loadReport() {
   } catch {
     return getJson('/assets/news-preview.json');
   }
-}
-
-function safeUrl(u) {
-  if (typeof u !== 'string') return '';
-  const t = u.trim();
-  if (t.startsWith('/') && !t.startsWith('//')) return t;
-  try {
-    const url = new URL(t);
-    if (url.protocol === 'https:' || url.protocol === 'http:') return url.href;
-  } catch { /* not a url */ }
-  return '';
-}
-
-function parseLatest(data) {
-  if (!data || typeof data !== 'object' || data.image_url == null) return null;
-  const imageUrl = safeUrl(data.image_url);
-  const reportUrl = safeUrl(data.report_url);
-  const headline = tidy(data.headline);
-  if (!imageUrl || !reportUrl || !headline) return null;
-  return {
-    date: tidy(data.date),
-    headline,
-    summary: tidy(data.summary),
-    imageUrl,
-    credit: tidy(data.image_credit),
-    sourceName: tidy(data.source_name),
-    sourceUrl: safeUrl(data.source_url),
-    reportUrl,
-  };
 }
 
 function loadLatest() {
