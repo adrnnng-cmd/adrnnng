@@ -18,14 +18,7 @@ export function loadRegistry() {
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 export { esc };
 
-export const BRAND_MARK = `<svg class="brand-mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
-  <defs><linearGradient id="bm-g" x1="0" y1="0" x2="32" y2="32"><stop stop-color="#38bdf8"/><stop offset="1" stop-color="#818cf8"/></linearGradient></defs>
-  <rect x="0.75" y="0.75" width="30.5" height="30.5" rx="9" stroke="url(#bm-g)" stroke-width="1.5" fill="#0c1018"/>
-  <path d="M9 13v9M16 9v10M23 7v9" stroke="#566074" stroke-width="1.5" stroke-linecap="round"/>
-  <rect x="7" y="15" width="4" height="5" rx="1" fill="#fb7185"/>
-  <rect x="14" y="11" width="4" height="6" rx="1" fill="#34d399"/>
-  <rect x="21" y="9" width="4" height="5" rx="1" fill="#34d399"/>
-</svg>`;
+export const BRAND_MARK = '';
 
 const ICONS = {
   backtest: '<path d="M3 20h18M5 16l4-5 4 3 6-8" /><circle cx="19" cy="6" r="1.6" fill="currentColor"/>',
@@ -49,8 +42,9 @@ function renderHeader(el, reg) {
   const path = location.pathname;
   const items = reg.tools.filter((t) => t.nav && t.href);
   el.innerHTML = `<div class="container">
-    <a class="brand" href="/" aria-label="${esc(reg.site.name)} home">${BRAND_MARK}
-      <span class="brand-name">${esc(reg.site.name)}<small>${esc(reg.site.owner)}</small></span></a>
+    <a class="brand" href="/" aria-label="${esc(reg.site.name)} home">
+      <span class="brand-en">${esc(reg.site.name)}</span>
+    </a>
     <button class="nav-toggle" aria-label="Menu" aria-expanded="false"><span></span></button>
     <nav class="site-nav" aria-label="Tools">
       ${items
@@ -70,12 +64,18 @@ function renderFooter(el, reg) {
   const soon = reg.tools.filter((t) => !t.href);
   el.classList.add('site-footer');
   el.innerHTML = `<div class="container">
-    <div><a class="brand" href="/">${BRAND_MARK}<span class="brand-name">${esc(reg.site.name)}<small>${esc(reg.site.owner)}</small></span></a>
-      <p class="about" style="margin-top:14px">${esc(reg.site.description)}</p></div>
-    <div><h4>Tools</h4><ul>${live.map((t) => `<li><a href="${esc(t.href)}">${esc(t.title)}</a></li>`).join('')}</ul></div>
-    <div><h4>In the lab</h4><ul>${soon.map((t) => `<li><span class="muted" style="font-size:14px">${esc(t.title)}</span></li>`).join('') || '<li class="muted">More soon</li>'}</ul></div>
-    <div class="fine"><span>© ${new Date().getFullYear()} ${esc(reg.site.owner)} · Hong Kong</span>
-      <span>Research and education only. Not investment advice. Backtests are hypothetical and do not predict future results.</span></div>
+    <div class="colophon">
+      <a class="brand" href="/"><span class="brand-en">${esc(reg.site.name)}</span></a>
+      <span>${esc(reg.site.owner)} · Hong Kong</span>
+    </div>
+    <nav aria-label="Footer">
+      ${live.map((t) => `<a href="${esc(t.href)}">${esc(t.title)}</a>`).join('')}
+      ${soon.map((t) => `<span class="muted">${esc(t.title)}</span>`).join('')}
+    </nav>
+    <div class="fine">
+      <span>© ${new Date().getFullYear()} ${esc(reg.site.owner)}</span>
+      <span>Research and education only. Not investment advice. Backtests are hypothetical and do not predict future results.</span>
+    </div>
   </div>`;
 }
 

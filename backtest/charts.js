@@ -15,16 +15,16 @@ import {
 } from '/assets/vendor/lightweight-charts.mjs';
 
 const C = {
-  text: '#7d889c',
-  grid: 'rgba(148,163,184,0.07)',
-  border: 'rgba(148,163,184,0.14)',
-  up: '#34d399',
-  down: '#fb7185',
-  accent: '#38bdf8',
-  bh: '#94a3b8',
-  long: '#22d3ee',
-  short: '#f472b6',
-  exit: '#e2e8f0',
+  text: '#666666',
+  grid: 'rgba(17,17,17,0.06)',
+  border: 'rgba(17,17,17,0.14)',
+  up: '#0b8a3e',
+  down: '#d0182a',
+  accent: '#111111',
+  bh: '#8a8a8a',
+  long: '#1a3fd1',
+  short: '#d0182a',
+  exit: '#111111',
 };
 
 function baseOptions() {
@@ -36,15 +36,15 @@ function baseOptions() {
       fontFamily: "'JetBrains Mono', ui-monospace, monospace",
       fontSize: 11,
       attributionLogo: true,
-      panes: { separatorColor: C.border, separatorHoverColor: 'rgba(56,189,248,0.2)' },
+      panes: { separatorColor: C.border, separatorHoverColor: 'rgba(17,17,17,0.2)' },
     },
     grid: { vertLines: { color: C.grid }, horzLines: { color: C.grid } },
     rightPriceScale: { borderColor: C.border, scaleMargins: { top: 0.12, bottom: 0.08 } },
     timeScale: { borderColor: C.border, rightOffset: 4, minBarSpacing: 0.2 },
     crosshair: {
       mode: CrosshairMode.Normal,
-      vertLine: { color: 'rgba(148,163,184,0.35)', labelBackgroundColor: '#161c2b' },
-      horzLine: { color: 'rgba(148,163,184,0.35)', labelBackgroundColor: '#161c2b' },
+      vertLine: { color: 'rgba(17,17,17,0.28)', labelBackgroundColor: '#111111' },
+      horzLine: { color: 'rgba(17,17,17,0.28)', labelBackgroundColor: '#111111' },
     },
     localization: { priceFormatter: (p) => fmtAxis(p) },
   };
@@ -116,8 +116,8 @@ export class BacktestCharts {
       upColor: C.up,
       downColor: C.down,
       borderVisible: false,
-      wickUpColor: 'rgba(52,211,153,0.7)',
-      wickDownColor: 'rgba(251,113,133,0.7)',
+      wickUpColor: 'rgba(11,138,62,0.75)',
+      wickDownColor: 'rgba(208,24,42,0.75)',
       priceLineColor: C.accent,
     });
     candles.setData(view.map((b) => ({ time: b.time, open: b.open, high: b.high, low: b.low, close: b.close })));
@@ -147,7 +147,7 @@ export class BacktestCharts {
             ? this.price.addSeries(HistogramSeries, { color: ser.color, priceLineVisible: false, lastValueVisible: false }, idx)
             : this.price.addSeries(LineSeries, { color: ser.color, lineWidth: 1.5, priceLineVisible: false, lastValueVisible: true, crosshairMarkerVisible: false }, idx);
         const data = line(times, ser.values, start);
-        s.setData(ser.type === 'histogram' ? data.map((d) => (d.value == null ? d : { ...d, color: d.value >= 0 ? 'rgba(52,211,153,0.45)' : 'rgba(251,113,133,0.45)' })) : data);
+        s.setData(ser.type === 'histogram' ? data.map((d) => (d.value == null ? d : { ...d, color: d.value >= 0 ? 'rgba(11,138,62,0.45)' : 'rgba(208,24,42,0.45)' })) : data);
         this.series.price.push(s);
         if (ser === pane.series[0]) {
           for (const lv of pane.levels || []) s.createPriceLine({ price: lv, color: 'rgba(148,163,184,0.35)', lineStyle: LineStyle.Dotted, lineWidth: 1, axisLabelVisible: false });
@@ -204,15 +204,15 @@ export class BacktestCharts {
     const eq = this.equity.addSeries(AreaSeries, {
       lineColor: C.accent,
       lineWidth: 2,
-      topColor: 'rgba(56,189,248,0.28)',
-      bottomColor: 'rgba(56,189,248,0.0)',
+      topColor: 'rgba(17,17,17,0.12)',
+      bottomColor: 'rgba(17,17,17,0.0)',
       priceLineVisible: false,
       title: 'Strategy',
     });
     eq.setData(times.map((t, i) => ({ time: t, value: result.equity[i] })));
     const exposure = this.equity.addSeries(HistogramSeries, { priceScaleId: 'pos', priceLineVisible: false, lastValueVisible: false });
     this.equity.priceScale('pos').applyOptions({ scaleMargins: { top: 0.94, bottom: 0 }, visible: false });
-    exposure.setData(times.map((t, i) => ({ time: t, value: result.positions[i] === 0 ? 0 : 1, color: result.positions[i] > 0 ? 'rgba(34,211,238,0.5)' : 'rgba(244,114,182,0.5)' })));
+    exposure.setData(times.map((t, i) => ({ time: t, value: result.positions[i] === 0 ? 0 : 1, color: result.positions[i] > 0 ? 'rgba(26,63,209,0.45)' : 'rgba(208,24,42,0.45)' })));
     this.series.equity.push(bh, eq, exposure);
 
     // ---- Drawdown
@@ -222,8 +222,8 @@ export class BacktestCharts {
     const dd = this.drawdown.addSeries(BaselineSeries, {
       baseValue: { type: 'price', price: 0 },
       bottomLineColor: C.down,
-      bottomFillColor1: 'rgba(251,113,133,0.05)',
-      bottomFillColor2: 'rgba(251,113,133,0.35)',
+      bottomFillColor1: 'rgba(208,24,42,0.04)',
+      bottomFillColor2: 'rgba(208,24,42,0.28)',
       topLineColor: C.down,
       lineWidth: 1.5,
       priceLineVisible: false,

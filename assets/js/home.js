@@ -1,4 +1,4 @@
-import { loadRegistry, icon, esc, revealOnScroll } from './site.js';
+import { loadRegistry, esc, revealOnScroll } from './site.js';
 import { tdSequential } from '/backtest/strategies/td-sequential.js';
 
 const PRICES = '/backtest/data/prices/';
@@ -14,29 +14,25 @@ async function renderTools() {
   const reg = await loadRegistry();
   const grid = document.getElementById('tool-grid');
   const withHref = reg.tools.filter((t) => t.href);
-  const featured = new Set(withHref.slice(0, 2).map((t) => t.id));
   const ordered = [...withHref, ...reg.tools.filter((t) => !t.href)];
   grid.innerHTML = ordered
     .map((t) => {
       const tag = t.href ? 'a' : 'div';
-      const cls = ['tool-card', 'reveal', featured.has(t.id) ? 'featured' : '', t.href ? '' : 'soon'].join(' ');
-      return `<${tag} class="${cls}" ${t.href ? `href="${esc(t.href)}"` : 'aria-disabled="true"'} style="--acc:${esc(t.accent || 'var(--accent)')}" data-tool="${esc(t.id)}">
-        <div class="tc-top"><span class="tc-icon">${icon(t.icon, 22)}</span><span class="badge badge-${esc(t.status)}">${STATUS_LABEL[t.status] || esc(t.status)}</span></div>
+      const cls = ['tool-row', 'reveal', t.href ? '' : 'soon'].join(' ');
+      return `<${tag} class="${cls}" ${t.href ? `href="${esc(t.href)}"` : 'aria-disabled="true"'} data-tool="${esc(t.id)}">
         <div class="tc-cat">${esc(t.category || '')}</div>
-        <h3>${esc(t.title)}${t.zh ? `<span class="zh">${esc(t.zh)}</span>` : ''}</h3>
-        <p>${esc(t.summary)}</p>
-        ${t.highlights?.length ? `<ul class="tc-hl">${t.highlights.map((h) => `<li>${esc(h)}</li>`).join('')}</ul>` : ''}
-        ${t.href ? `<span class="tc-go">Open ${esc(t.title)} <span class="arrow">→</span></span>` : ''}
+        <div>
+          <h3>${esc(t.title)}${t.zh ? `<span class="zh">${esc(t.zh)}</span>` : ''}</h3>
+          <p>${esc(t.summary)}</p>
+          ${t.highlights?.length ? `<ul class="tc-hl">${t.highlights.map((h) => `<li>${esc(h)}</li>`).join('')}</ul>` : ''}
+        </div>
+        <div class="tc-meta">
+          <span class="badge badge-${esc(t.status)}">${STATUS_LABEL[t.status] || esc(t.status)}</span>
+          ${t.href ? `<span class="tc-go">Open <span class="arrow">→</span></span>` : ''}
+        </div>
       </${tag}>`;
     })
     .join('');
-  grid.addEventListener('pointermove', (e) => {
-    const card = e.target.closest('.tool-card');
-    if (!card) return;
-    const r = card.getBoundingClientRect();
-    card.style.setProperty('--mx', `${e.clientX - r.left}px`);
-    card.style.setProperty('--my', `${e.clientY - r.top}px`);
-  });
   document.querySelector('[data-stat="tools"]').textContent = withHref.length;
   revealOnScroll();
 }
@@ -114,8 +110,8 @@ function drawSignal() {
   const step = (W - padR) / view.length;
   const bw = Math.max(1.5, step * 0.62);
   const x = (i) => i * step + step / 2;
-  const UP = '#34d399';
-  const DN = '#fb7185';
+  const UP = '#0b8a3e';
+  const DN = '#d0182a';
   const parts = [];
 
   parts.push('<g class="grid axis">');
@@ -149,14 +145,20 @@ function drawSignal() {
       const big = ss === 9;
       parts.push(`<text class="mk ${big ? '' : 'mk-count'}" x="${x(i)}" y="${y(b.high) - (big ? 6 : 4)}" fill="${DN}">${ss}</text>`);
     }
-    if (td.buy13[j]) parts.push(`<text class="mk" x="${x(i)}" y="${y(b.low) + 26}" fill="#22d3ee">13</text>`);
-    if (td.sell13[j]) parts.push(`<text class="mk" x="${x(i)}" y="${y(b.high) - 18}" fill="#f472b6">13</text>`);
+    if (td.buy13[j]) parts.push(`<text class="mk" x="${x(i)}" y="${y(b.low) + 26}" fill="#1a3fd1">13</text>`);
+    if (td.sell13[j]) parts.push(`<text class="mk" x="${x(i)}" y="${y(b.high) - 18}" fill="#b06a00">13</text>`);
   });
 
   const ly = y(last.close);
-  parts.push(`<line class="last-line" x1="0" x2="${W - padR}" y1="${ly}" y2="${ly}" stroke="#38bdf8" stroke-opacity=".6"/>`);
-  parts.push(`<rect x="${W - padR + 2}" y="${ly - 9}" width="${padR - 4}" height="18" rx="4" fill="#38bdf8"/><text x="${W - padR + 8}" y="${ly + 3.5}" fill="#05070b" style="font:600 10px var(--font-mono)">${fmtPrice(last.close)}</text>`);
+  parts.push(`<line class="last-line" x1="0" x2="${W - padR}" y1="${ly}" y2="${ly}" stroke="#111" stroke-opacity=".45"/>`);
+  parts.push(`<rect x="${W - padR + 2}" y="${ly - 9}" width="${padR - 4}" height="18" fill="#111"/><text x="${W - padR + 8}" y="${ly + 3.5}" fill="#fff" style="font:600 10px var(--font-mono)">${fmtPrice(last.close)}</text>`);
   el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${parts.join('')}</svg>`;
+}
+
+const edition = document.getElementById('edition-date');
+if (edition) {
+  const d = new Date();
+  edition.textContent = d.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase();
 }
 
 renderTools().catch((e) => console.warn(e));

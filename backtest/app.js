@@ -151,6 +151,20 @@ function buildStaticControls() {
   }
   $('short').addEventListener('change', (e) => { state.short = e.target.checked; schedule(); });
   $('adjust').addEventListener('change', (e) => { state.adjust = e.target.checked; schedule(); });
+  $('settings-toggle').addEventListener('click', () => {
+    const extra = $('cmd-extra');
+    extra.hidden = !extra.hidden;
+    $('settings-toggle').setAttribute('aria-expanded', String(!extra.hidden));
+  });
+  $('side-toggle').addEventListener('click', () => $('results').classList.add('side-closed'));
+  $('side-reopen').addEventListener('click', () => $('results').classList.remove('side-closed'));
+  $('side-tabs').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-tab]');
+    if (!b) return;
+    const tab = b.dataset.tab;
+    $('side-tabs').querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    document.querySelectorAll('.side-pane').forEach((p) => { p.hidden = p.dataset.pane !== tab; });
+  });
   $('run').addEventListener('click', () => run());
   $('share').addEventListener('click', async () => {
     writeHash();
@@ -308,7 +322,7 @@ function showError(e) {
 // ---------------------------------------------------------------- render
 function render() {
   renderHead();
-  renderTiles();
+  renderSummary();
   renderCharts();
   renderHeatmap();
   renderStats();
@@ -351,27 +365,40 @@ function renderHead() {
   $('notices').innerHTML = notes.map(([k, t]) => `<div class="notice ${k ? 'notice-' + k : ''}">${t}</div>`).join('');
 }
 
-function tile(label, value, bhValue, better, accent, extra) {
-  const delta = better == null ? '' : `<span class="delta ${better ? 'better' : 'worse'}">${better ? 'beats' : 'trails'} B&amp;H</span>`;
-  return `<div class="tile" style="--tile-accent:${accent}"><div class="k">${label}</div><div class="v num ${tone(value.n)}">${value.s}</div>
-    <div class="b">${extra ?? `<span>B&amp;H <span class="num">${bhValue}</span></span>`}${delta}</div></div>`;
+function splitSides(trades, capital) {
+  const pack = (arr) => {
+    const pnl = arr.reduce((s, t) => s + t.pnl, 0);
+    return {
+      n: arr.length,
+      pnl,
+      pct: capital ? pnl / capital : null,
+      avg: arr.length ? pnl / arr.length : null,
+    };
+  };
+  return {
+    long: pack(trades.filter((t) => t.side === 'long')),
+    short: pack(trades.filter((t) => t.side === 'short')),
+    total: pack(trades),
+  };
 }
 
-function renderTiles() {
-  const m = lastRun.result.metrics;
-  const b = lastRun.result.benchmarkMetrics;
-  const cmp = (x, y, higher = true) => (isNum(x) && isNum(y) ? (higher ? x > y : x < y) : null);
-  const ddCmp = isNum(m.maxDrawdown) && isNum(b.maxDrawdown) ? m.maxDrawdown > b.maxDrawdown : null;
-  $('tiles').innerHTML = [
-    tile('CAGR', { s: pct(m.cagr, 2), n: m.cagr }, pct(b.cagr, 2), cmp(m.cagr, b.cagr), 'var(--accent)'),
-    tile('Total return', { s: pct(m.totalReturn, 1), n: m.totalReturn }, pct(b.totalReturn, 1), cmp(m.totalReturn, b.totalReturn), 'var(--accent)'),
-    tile('Sharpe', { s: ratio(m.sharpe), n: null }, ratio(b.sharpe), cmp(m.sharpe, b.sharpe), 'var(--accent-2)'),
-    tile('Sortino', { s: ratio(m.sortino), n: null }, ratio(b.sortino), cmp(m.sortino, b.sortino), 'var(--accent-2)'),
-    tile('Max drawdown', { s: pct(m.maxDrawdown, 1), n: m.maxDrawdown < 0 ? -1 : 0 }, pct(b.maxDrawdown, 1), ddCmp, 'var(--down)'),
-    tile('Win rate', { s: pct(m.winRate, 1, false), n: null }, '', null, 'var(--up)', `<span>avg win <span class="num up">${pctRaw(m.avgWinPct, 1)}</span> · loss <span class="num down">${pctRaw(m.avgLossPct, 1)}</span></span>`),
-    tile('Profit factor', { s: ratio(m.profitFactor), n: null }, '', null, 'var(--up)', `<span>avg trade <span class="num ${tone(m.avgTradePct)}">${pctRaw(m.avgTradePct, 2)}</span></span>`),
-    tile('Trades', { s: int(m.trades), n: null }, '', null, 'var(--warn)', `<span>in market <span class="num">${pct(m.exposure, 0, false)}</span> · avg <span class="num">${ratio(m.avgBarsHeld, 0)}</span> bars</span>`),
-  ].join('');
+function renderSummary() {
+  const trades = lastRun.result.trades;
+  const cap = lastRun.result.metrics.startEquity || state.capital;
+  const s = splitSides(trades, cap);
+  const cell = (v, cls = '') => `<td class="r ${cls}">${v}</td>`;
+  const row = (label, pick, fmt) => {
+    const L = pick(s.long);
+    const S = pick(s.short);
+    const T = pick(s.total);
+    return `<tr><td>${label}</td>${cell(fmt(L), tone(typeof L === 'number' ? L : null))}${cell(fmt(S), tone(typeof S === 'number' ? S : null))}${cell(fmt(T), tone(typeof T === 'number' ? T : null))}</tr>`;
+  };
+  $('summary').innerHTML = `<thead><tr><th></th><th class="r">Long</th><th class="r">Short</th><th class="r">Total</th></tr></thead><tbody>
+    ${row('Trades', (x) => x.n, int)}
+    ${row('P&amp;L', (x) => x.pnl, (v) => money(v, dataset.currency))}
+    ${row('% P&amp;L', (x) => x.pct, (v) => pct(v, 2))}
+    ${row('Avg. P&amp;L', (x) => x.avg, (v) => money(v, dataset.currency))}
+  </tbody>`;
 }
 
 function renderCharts() {
@@ -385,8 +412,8 @@ function renderCharts() {
 
 function heatColor(r) {
   if (!isNum(r)) return 'transparent';
-  const a = Math.min(1, Math.abs(r) / 0.12) * 0.75 + 0.06;
-  return r >= 0 ? `rgba(52,211,153,${a.toFixed(3)})` : `rgba(251,113,133,${a.toFixed(3)})`;
+  const a = Math.min(1, Math.abs(r) / 0.12) * 0.55 + 0.08;
+  return r >= 0 ? `rgba(11,138,62,${a.toFixed(3)})` : `rgba(208,24,42,${a.toFixed(3)})`;
 }
 
 function renderHeatmap() {
@@ -477,13 +504,13 @@ function renderTradeBars() {
   const bw = Math.max(1, Math.min(18, step * 0.7));
   const ticks = [hi, 0, lo].filter((v, i, a) => a.indexOf(v) === i);
   el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><g class="axis">${ticks
-    .map((t) => `<line x1="${padL}" x2="${W}" y1="${y(t)}" y2="${y(t)}" stroke="rgba(148,163,184,${t === 0 ? 0.35 : 0.08})"/><text x="0" y="${y(t) + 3}">${t > 0 ? '+' : ''}${t.toFixed(0)}%</text>`)
+    .map((t) => `<line x1="${padL}" x2="${W}" y1="${y(t)}" y2="${y(t)}" stroke="rgba(17,17,17,${t === 0 ? 0.28 : 0.06})"/><text x="0" y="${y(t) + 3}">${t > 0 ? '+' : ''}${t.toFixed(0)}%</text>`)
     .join('')}</g>${trades
     .map((t, i) => {
       const x = padL + i * step + (step - bw) / 2;
       const top = y(Math.max(0, t.returnPct));
       const h = Math.max(1, Math.abs(y(t.returnPct) - y(0)));
-      return `<rect data-i="${i}" x="${x}" y="${top}" width="${bw}" height="${h}" rx="1.5" fill="${t.returnPct >= 0 ? '#34d399' : '#fb7185'}"><title>#${i + 1} ${t.side} ${t.entryTime} → ${t.exitTime}: ${pctRaw(t.returnPct)}</title></rect>`;
+      return `<rect data-i="${i}" x="${x}" y="${top}" width="${bw}" height="${h}" fill="${t.returnPct >= 0 ? '#0b8a3e' : '#d0182a'}"><title>#${i + 1} ${t.side} ${t.entryTime} → ${t.exitTime}: ${pctRaw(t.returnPct)}</title></rect>`;
     })
     .join('')}</svg>`;
   el.querySelectorAll('rect').forEach((r) => r.addEventListener('click', () => focusTrade(trades[+r.dataset.i])));

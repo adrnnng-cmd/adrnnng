@@ -3,17 +3,17 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>ADRRR · Adrian Ng: systematic markets research</title>
-  <meta name="description" content="Adrian Ng's open trading workbench from Hong Kong: Politician Tracker, a TD Sequential backtester on real price history, and the daily Morning Report.">
-  <meta name="theme-color" content="#05070b">
+  <title>ADRRR · Adrian Ng</title>
+  <meta name="description" content="Adrian Ng's market research from Hong Kong: Politician Tracker, a TD Sequential backtester on real price history, and the daily Morning Report.">
+  <meta name="theme-color" content="#000000">
   <meta property="og:title" content="ADRRR · Adrian Ng">
-  <meta property="og:description" content="Follow the flow, test ideas against real history, read the tape every morning.">
+  <meta property="og:description" content="Systematic markets research from Hong Kong.">
   <meta property="og:url" content="https://adrnnng.com/">
   <meta property="og:type" content="website">
   <link rel="icon" href="/assets/img/favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Instrument+Serif:ital@1&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;700&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap">
   <link rel="stylesheet" href="/assets/css/theme.css">
   <link rel="stylesheet" href="/assets/css/home.css">
   <link rel="preload" href="/assets/tools.json" as="fetch" crossorigin>
@@ -21,33 +21,26 @@
 </head>
 <body class="home">
   <header class="site-header" data-site-header>
-    <div class="container"><a class="brand" href="/"><span class="brand-name">ADRRR</span></a></div>
+    <div class="container"><a class="brand" href="/"><span class="brand-en">ADRRR</span></a></div>
   </header>
 
   <main>
-    <section class="hero">
-      <div class="hero-bg" aria-hidden="true"></div>
-      <div class="container hero-grid">
-        <div class="hero-copy">
-          <span class="kicker">Hong Kong · Systematic markets research</span>
-          <h1>Markets,<br><span class="display">measured.</span></h1>
-          <p class="lede">I'm Adrian Ng. This is my open workbench: tools that follow the money, test trading rules against real price history, and brief the market every morning. Rules over opinions; every claim backed by data.</p>
-          <div class="cta">
-            <a class="btn btn-primary" href="/backtest/">Run a backtest <span class="arrow">→</span></a>
-            <a class="btn" href="/news/">Today's Morning Report</a>
-          </div>
-          <dl class="hero-stats" id="hero-stats">
-            <div><dt>Tools</dt><dd class="num" data-stat="tools">3</dd></div>
-            <div><dt>Tickers</dt><dd class="num" data-stat="tickers">47</dd></div>
-            <div><dt>Daily history</dt><dd class="num" data-stat="years">36 yrs</dd></div>
-            <div><dt>Refresh</dt><dd class="num">Daily</dd></div>
-          </dl>
+    <section class="nameplate">
+      <div class="container lead">
+        <div class="lead-copy">
+          <p class="kicker">Hong Kong <span class="sep">/</span> Systematic markets research</p>
+          <h1><span class="en">Workbench</span><span class="zh">工作台</span></h1>
+          <p class="dek">Adrian Ng. Follow the money, test trading rules against real price history, and brief the market every morning.</p>
+          <p class="byl">
+            <span class="num" id="edition-date"></span>
+            <a class="whylink" href="/news/">Today's Morning Report →</a>
+            <a class="whylink" href="/backtest/">Open Backtest →</a>
+          </p>
         </div>
-
-        <figure class="signal-card panel" id="signal-card">
+        <figure class="signal-card" id="signal-card">
           <div class="sc-head">
             <div>
-              <span class="sc-label">TD Sequential · live counts</span>
+              <span class="sc-label">TD Sequential · daily</span>
               <div class="sc-title"><span class="num" id="sc-symbol">SPY</span> <span class="sc-name" id="sc-name"></span></div>
             </div>
             <div class="sc-price">
@@ -58,10 +51,22 @@
           <div class="sc-chips seg" id="sc-chips" role="group" aria-label="Symbol"></div>
           <div class="sc-chart" id="sc-chart" role="img" aria-label="Candlestick chart with TD Sequential counts"></div>
           <figcaption class="sc-foot">
-            <span><i class="lg lg-buy"></i>Buy setup</span><span><i class="lg lg-sell"></i>Sell setup</span><span><b>9</b> completed setup</span><span><b>13</b> countdown</span>
-            <span class="sc-src" id="sc-src">Daily bars · Yahoo Finance</span>
+            <span><i class="lg lg-buy"></i>Buy setup</span>
+            <span><i class="lg lg-sell"></i>Sell setup</span>
+            <span><b>9</b> completed</span>
+            <span><b>13</b> countdown</span>
+            <span class="sc-src" id="sc-src">Yahoo Finance</span>
           </figcaption>
         </figure>
+      </div>
+    </section>
+
+    <section class="stats-row" aria-label="Edition figures">
+      <div class="container stats">
+        <div class="stat"><div class="k">Tools <span class="zh">工具</span></div><div class="v num" data-stat="tools">3</div><div class="s">Published on this site</div></div>
+        <div class="stat"><div class="k">Tickers <span class="zh">代碼</span></div><div class="v num" data-stat="tickers">47</div><div class="s">US, HK, index, crypto</div></div>
+        <div class="stat"><div class="k">History <span class="zh">歷史</span></div><div class="v num" data-stat="years">36 yrs</div><div class="s">Daily bars from 1990</div></div>
+        <div class="stat"><div class="k">Refresh <span class="zh">更新</span></div><div class="v">Daily</div><div class="s">Prices after the US close</div></div>
       </div>
     </section>
 
@@ -69,42 +74,17 @@
       <div class="tape-track" id="tape"></div>
     </section>
 
-    <section class="container tools" id="tools">
-      <div class="section-head reveal">
-        <span class="kicker">The workbench</span>
-        <h2>Tools</h2>
-        <p class="muted">Each one is a standalone page with its own data pipeline. New ones show up here as they ship.</p>
+    <section class="container index" id="tools">
+      <div class="sh">
+        <h2>Index <span class="zh">目錄</span></h2>
+        <span class="aux">Each tool is a page with its own data. New ones appear here.</span>
       </div>
-      <div class="tool-grid" id="tool-grid">
+      <div class="tool-index" id="tool-grid">
         <noscript>
-          <a class="tool-card" href="/backtest/"><h3>Backtest</h3></a>
-          <a class="tool-card" href="/politician-tracker/"><h3>Politician Tracker</h3></a>
-          <a class="tool-card" href="/news/"><h3>Morning Report</h3></a>
+          <a class="tool-row" href="/backtest/"><h3>Backtest</h3></a>
+          <a class="tool-row" href="/politician-tracker/"><h3>Politician Tracker</h3></a>
+          <a class="tool-row" href="/news/"><h3>Morning Report</h3></a>
         </noscript>
-      </div>
-    </section>
-
-    <section class="container approach">
-      <div class="section-head reveal">
-        <span class="kicker">Approach</span>
-        <h2>How the work is done</h2>
-      </div>
-      <div class="approach-grid">
-        <article class="reveal">
-          <span class="ap-n num">01</span>
-          <h3>Rules, not opinions</h3>
-          <p>Indicators like RSI or MACD invite you to see what you want to see. DeMark's TD Sequential is a strict count: nine closes for a Setup, thirteen for a Countdown. Objective rules can be tested.</p>
-        </article>
-        <article class="reveal">
-          <span class="ap-n num">02</span>
-          <h3>Verified in code</h3>
-          <p>Every strategy here started as a Python or Pine Script model. The backtester is cross-checked against an independent implementation, and its metrics are tested against hand-worked examples.</p>
-        </article>
-        <article class="reveal">
-          <span class="ap-n num">03</span>
-          <h3>Shown in public</h3>
-          <p>Real data, published sources, no cherry-picked screenshots. Anyone can rerun a backtest, change a parameter and share the link.</p>
-        </article>
       </div>
     </section>
   </main>
