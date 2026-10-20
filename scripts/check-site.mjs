@@ -62,6 +62,19 @@ for (const t of reg.tools) {
 }
 notes.push(`${reg.tools.length} tools registered (${reg.tools.filter((t) => t.href).length} with pages)`);
 
+// A root 404.html is what stops Cloudflare Pages from serving index.html with 200 for unknown paths.
+const notFound = join(ROOT, '404.html');
+if (!existsSync(notFound)) err('404.html missing at the site root; Pages would serve index.html with status 200');
+else {
+  const html = readFileSync(notFound, 'utf8');
+  for (const needle of ['/assets/css/theme.css', '/assets/js/site.js', 'data-site-header', 'data-site-footer']) {
+    if (!html.includes(needle)) err(`404.html must include ${needle}`);
+  }
+  for (const href of ['href="/"', 'href="/backtest/"', 'href="/politician-tracker/"', 'href="/news/"']) {
+    if (!html.includes(href)) err(`404.html must link ${href}`);
+  }
+}
+
 // ---- reserved paths: published by someone else, must not exist in the repo
 for (const r of reserved) {
   const clash = files.filter((f) => rel(f).startsWith(r));

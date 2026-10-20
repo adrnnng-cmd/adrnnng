@@ -233,8 +233,10 @@ including `image_url_original`, are ignored. The News Analyst publishes that fil
 report. The only copy in this repo is `scripts/preview/latest.json`, and `assemble-deploy.sh`
 does not upload `scripts/`.
 
-This repo owns the site root outside `news/`: `index.html`, `_headers`, `_redirects`, `assets/`,
-`backtest/` (without `backtest/tests/`), and `politician-tracker/`. `_redirects` only aliases
+This repo owns the site root outside `news/`: `index.html`, `404.html`, `_headers`, `_redirects`,
+`assets/`, `backtest/` (without `backtest/tests/`), and `politician-tracker/`. `404.html` must be
+in every upload. Without it, Pages treats the site as a single-page app and serves `index.html`
+with status 200 for unknown paths, including `/backtest/tests/`. `_redirects` only aliases
 `/backtesting` to `/backtest/`. The News Analyst merges the `/latest` redirect rules at upload
 time and does not write a root `index.html`.
 
