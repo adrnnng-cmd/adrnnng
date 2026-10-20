@@ -1,8 +1,7 @@
 // Shared site chrome. Include on every page that uses the design system:
-//   <header class="site-header" data-site-header></header> ... <footer data-site-footer></footer>
+//   <header class="mast" data-site-header></header> ... <footer data-site-footer></footer>
 //   <script type="module" src="/assets/js/site.js"></script>
-// Header nav and footer links come from /assets/tools.json, so registering a tool there is
-// all it takes to list it everywhere.
+// Header nav and footer links come from /assets/tools.json.
 
 const REGISTRY_URL = '/assets/tools.json';
 let registryPromise = null;
@@ -38,19 +37,31 @@ function isActive(href, path) {
   return path === href || path.startsWith(href);
 }
 
+export function mastDate(d = new Date()) {
+  return d.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Hong_Kong' }).toUpperCase();
+}
+
 function renderHeader(el, reg) {
   const path = location.pathname;
   const items = reg.tools.filter((t) => t.nav && t.href);
-  el.innerHTML = `<div class="container">
-    <a class="brand" href="/" aria-label="${esc(reg.site.name)} home">
-      <span class="brand-en">${esc(reg.site.name)}</span>
+  const news = items.find((t) => t.id === 'news');
+  const rest = items.filter((t) => t.id !== 'news');
+  const home = el.dataset.mast === 'home';
+  el.classList.add('mast');
+  el.innerHTML = `<div class="wrap mast-in">
+    <a class="logo" href="/" aria-label="${esc(reg.site.name)} home">
+      <span class="en">${esc(reg.site.name)}</span>
+      ${reg.site.zh ? `<span class="zh">${esc(reg.site.zh)}</span>` : ''}
     </a>
     <button class="nav-toggle" aria-label="Menu" aria-expanded="false"><span></span></button>
-    <nav class="site-nav" aria-label="Tools">
-      ${items
-        .map((t) => `<a href="${esc(t.href)}"${isActive(t.href, path) ? ' aria-current="page"' : ''}>${esc(t.title)}${t.status === 'new' ? '<span class="dot" title="New"></span>' : ''}</a>`)
+    <div class="mast-r">
+      <span class="d">${mastDate()} · HKT</span>
+      ${home ? '' : rest
+        .map((t) => `<a href="${esc(t.href)}"${isActive(t.href, path) ? ' aria-current="page"' : ''}>${esc(t.title)}</a>`)
         .join('')}
-    </nav></div>`;
+      ${news ? `<a class="box" href="${esc(news.href)}"${isActive(news.href, path) ? ' aria-current="page"' : ''}>${esc(news.title)}</a>` : ''}
+    </div>
+  </div>`;
   const btn = el.querySelector('.nav-toggle');
   btn.addEventListener('click', () => {
     const open = el.dataset.open !== 'true';
@@ -61,21 +72,13 @@ function renderHeader(el, reg) {
 
 function renderFooter(el, reg) {
   const live = reg.tools.filter((t) => t.href);
-  const soon = reg.tools.filter((t) => !t.href);
   el.classList.add('site-footer');
-  el.innerHTML = `<div class="container">
-    <div class="colophon">
-      <a class="brand" href="/"><span class="brand-en">${esc(reg.site.name)}</span></a>
-      <span>${esc(reg.site.owner)} · Hong Kong</span>
+  el.innerHTML = `<div class="wrap">
+    <div class="row">
+      <span>${esc(reg.site.owner)} · Hong Kong · ${esc(reg.site.name)}</span>
+      <span>${live.map((t) => `<a href="${esc(t.href)}">${esc(t.title)}</a>`).join(' · ')}</span>
     </div>
-    <nav aria-label="Footer">
-      ${live.map((t) => `<a href="${esc(t.href)}">${esc(t.title)}</a>`).join('')}
-      ${soon.map((t) => `<span class="muted">${esc(t.title)}</span>`).join('')}
-    </nav>
-    <div class="fine">
-      <span>© ${new Date().getFullYear()} ${esc(reg.site.owner)}</span>
-      <span>Research and education only. Not investment advice. Backtests are hypothetical and do not predict future results.</span>
-    </div>
+    <div class="fine">Research and education only. Not investment advice. Backtests are hypothetical and do not predict future results.</div>
   </div>`;
 }
 

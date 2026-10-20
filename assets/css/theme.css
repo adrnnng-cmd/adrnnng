@@ -71,8 +71,8 @@ p { margin: 0; }
 .down { color: var(--down); }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
-.container { width: 100%; max-width: var(--container); margin: 0 auto; padding: 0 20px; }
-@media (max-width: 640px) { .container { padding: 0 16px; } }
+.container, .wrap { width: 100%; max-width: var(--container); margin: 0 auto; padding: 0 20px; }
+@media (max-width: 640px) { .container, .wrap { padding: 0 16px; } }
 
 .kicker {
   display: inline-flex; align-items: center; gap: 8px;
@@ -80,33 +80,33 @@ p { margin: 0; }
 }
 .kicker::before { display: none; }
 
-/* ---------- Site header: black mast, typographic wordmark ---------- */
-.site-header {
-  position: sticky; top: 0; z-index: 50; height: var(--header-h);
-  background: #000; color: #fff;
-  border-bottom: 0;
+/* ---------- Mast (same system as /news/20261020/) ---------- */
+.mast, .site-header {
+  background: #000; color: #fff; border-bottom: 0;
 }
-.site-header .container { height: 100%; display: flex; align-items: center; gap: 28px; }
-.brand { display: inline-flex; align-items: baseline; gap: 10px; text-decoration: none; flex-shrink: 0; color: inherit; }
-.brand-en {
+.mast-in, .site-header .container {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  min-height: 60px; padding-top: 10px; padding-bottom: 10px;
+}
+.logo, .brand {
+  text-decoration: none; display: flex; align-items: baseline; gap: 10px;
+  flex-wrap: wrap; min-width: 0; color: #fff; flex-shrink: 0;
+}
+.logo .en, .brand-en {
   font-family: var(--font-display); font-weight: 700; font-size: 26px;
-  letter-spacing: 0.02em; line-height: 1; color: inherit;
+  letter-spacing: -0.01em; line-height: 1; color: inherit;
 }
-.site-header .brand { color: #fff; }
-.brand-zh { font-size: 13px; font-weight: 500; color: #bdbdbd; letter-spacing: 0.08em; }
-.site-nav { display: flex; align-items: center; gap: 16px; margin-left: auto; }
-.site-nav a {
-  position: relative; padding: 4px 0; text-decoration: none;
-  font-size: 12.5px; font-weight: 500; color: #cfcfcf; letter-spacing: 0.01em;
-  transition: color 0.15s;
+.logo .zh, .brand-zh { font-size: 13px; font-weight: 500; color: #bdbdbd; letter-spacing: 0.08em; }
+.mast-r {
+  display: flex; align-items: center; gap: 16px; font-size: 12px; color: #cfcfcf; white-space: nowrap;
 }
-.site-nav a:hover { color: #fff; text-decoration: underline; text-underline-offset: 5px; }
-.site-nav a[aria-current='page'] { color: #fff; font-weight: 600; }
-.site-nav a .dot {
-  display: inline-block; width: 5px; height: 5px; margin-left: 6px;
-  border-radius: 0; background: #fff; vertical-align: 2px;
-}
-.nav-toggle { display: none; margin-left: auto; background: none; border: 1px solid #555; border-radius: 2px; width: 40px; height: 36px; cursor: pointer; }
+.mast-r .d { font-family: var(--font-mono); letter-spacing: 0.04em; }
+.mast-r a { color: #fff; text-decoration: none; font-weight: 500; }
+.mast-r a:hover { text-decoration: underline; text-underline-offset: 4px; }
+.mast-r a[aria-current='page'] { font-weight: 600; color: #fff; }
+.mast-r a.box { font-weight: 600; border: 1px solid #555; padding: 4px 10px; border-radius: 2px; }
+.mast-r a.box:hover { border-color: #fff; text-decoration: none; }
+.nav-toggle { display: none; background: none; border: 1px solid #555; border-radius: 2px; width: 40px; height: 36px; cursor: pointer; }
 .nav-toggle span, .nav-toggle span::before, .nav-toggle span::after {
   display: block; width: 16px; height: 1.5px; background: #fff; margin: 0 auto; position: relative; content: '';
 }
@@ -114,29 +114,34 @@ p { margin: 0; }
 .nav-toggle span::after { position: absolute; top: 5px; }
 @media (max-width: 760px) {
   .nav-toggle { display: block; }
-  .brand-zh { display: none; }
-  .site-nav {
-    position: fixed; top: var(--header-h); left: 0; right: 0; flex-direction: column; align-items: stretch; gap: 0;
-    padding: 8px 16px 16px; background: #000; border-bottom: 1px solid #333;
-    transform: translateY(-8px); opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s;
+  .logo .zh, .brand-zh { display: none; }
+  .mast-r {
+    display: none; position: absolute; left: 0; right: 0; top: 100%;
+    flex-direction: column; align-items: stretch; gap: 0; white-space: normal;
+    background: #000; padding: 8px 16px 14px; border-top: 1px solid #333;
   }
-  .site-nav a { padding: 12px 0; font-size: 15px; border-bottom: 1px solid #222; }
-  .site-header[data-open='true'] .site-nav { opacity: 1; transform: none; pointer-events: auto; }
+  .mast[data-open='true'] .mast-r, .site-header[data-open='true'] .mast-r {
+    display: flex;
+  }
+  .mast-r a { padding: 10px 0; border-bottom: 1px solid #222; }
+  .mast-r a.box { border: 1px solid #555; padding: 8px 10px; margin-top: 8px; text-align: center; }
+  .mast, .site-header { position: relative; }
 }
 
-/* ---------- Footer ---------- */
-.site-footer { margin-top: 72px; border-top: 1px solid var(--line); background: var(--bg); }
-.site-footer .container {
-  padding-top: 22px; padding-bottom: 28px;
-  display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap;
-  align-items: baseline;
+/* ---------- Footer (MREP colophon) ---------- */
+.site-footer, .foot {
+  margin-top: 40px; border-top: 3px solid #000; padding: 14px 0 50px;
+  font-size: 12px; color: var(--muted); line-height: 1.7; background: var(--bg);
 }
-.site-footer .colophon { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: baseline; color: var(--muted); font-size: 12.5px; }
-.site-footer .colophon .brand-en { font-size: 18px; color: var(--text); }
-.site-footer nav { display: flex; flex-wrap: wrap; gap: 8px 16px; }
-.site-footer nav a { color: var(--text-2); text-decoration: none; font-size: 13px; }
-.site-footer nav a:hover { text-decoration: underline; }
-.site-footer .fine { width: 100%; padding-top: 16px; border-top: 1px solid var(--line); font-size: 12px; color: var(--faint); display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.site-footer .container, .site-footer .row, .foot .row {
+  display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 18px; align-items: baseline;
+}
+.site-footer a, .foot a { color: var(--text-2); text-decoration: none; }
+.site-footer a:hover, .foot a:hover { text-decoration: underline; }
+.site-footer .colophon { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: baseline; }
+.site-footer .colophon .brand-en { font-size: 16px; color: var(--text); }
+.site-footer nav { display: flex; flex-wrap: wrap; gap: 8px 14px; }
+.site-footer .fine { width: 100%; }
 
 /* ---------- Buttons ---------- */
 .btn {

@@ -1,9 +1,9 @@
-import { loadRegistry, esc, revealOnScroll } from './site.js';
+import { loadRegistry, esc, revealOnScroll, mastDate } from './site.js';
 import { tdSequential } from '/backtest/strategies/td-sequential.js';
 
 const PRICES = '/backtest/data/prices/';
 const STATUS_LABEL = { live: 'Live', new: 'New', beta: 'Beta', soon: 'In the lab' };
-const TAPE = ['SPY', 'QQQ', '^GSPC', '^NDX', '^HSI', '2800.HK', '0700.HK', '9988.HK', '3690.HK', 'AAPL', 'NVDA', 'MSFT', 'GOOGL', 'TSLA', 'LLY', 'ORCL', 'GLD', 'TLT', 'BTC-USD', 'ETH-USD'];
+const TAPE = ['^GSPC', '^NDX', '^HSI', '2800.HK', '0700.HK', 'AAPL', 'NVDA', 'MSFT', 'TSLA', 'GLD', 'BTC-USD'];
 const LABEL = { '^GSPC': 'S&P 500', '^NDX': 'Nasdaq 100', '^HSI': 'Hang Seng', 'BTC-USD': 'BTC', 'ETH-USD': 'ETH' };
 
 const fmtPrice = (v) => v.toLocaleString('en-US', { minimumFractionDigits: v >= 1000 ? 0 : 2, maximumFractionDigits: v >= 1000 ? 0 : 2 });
@@ -18,18 +18,12 @@ async function renderTools() {
   grid.innerHTML = ordered
     .map((t) => {
       const tag = t.href ? 'a' : 'div';
-      const cls = ['tool-row', 'reveal', t.href ? '' : 'soon'].join(' ');
+      const cls = ['story', t.href ? '' : 'soon'].join(' ');
       return `<${tag} class="${cls}" ${t.href ? `href="${esc(t.href)}"` : 'aria-disabled="true"'} data-tool="${esc(t.id)}">
-        <div class="tc-cat">${esc(t.category || '')}</div>
-        <div>
-          <h3>${esc(t.title)}${t.zh ? `<span class="zh">${esc(t.zh)}</span>` : ''}</h3>
-          <p>${esc(t.summary)}</p>
-          ${t.highlights?.length ? `<ul class="tc-hl">${t.highlights.map((h) => `<li>${esc(h)}</li>`).join('')}</ul>` : ''}
-        </div>
-        <div class="tc-meta">
-          <span class="badge badge-${esc(t.status)}">${STATUS_LABEL[t.status] || esc(t.status)}</span>
-          ${t.href ? `<span class="tc-go">Open <span class="arrow">→</span></span>` : ''}
-        </div>
+        <div class="meta"><span class="tag">${esc(t.category || '')}</span><span class="badge badge-${esc(t.status)}">${STATUS_LABEL[t.status] || esc(t.status)}</span></div>
+        <h3>${esc(t.title)}${t.zh ? `<span class="zh">${esc(t.zh)}</span>` : ''}</h3>
+        <p class="body">${esc(t.summary)}</p>
+        ${t.highlights?.length ? `<ul class="chips">${t.highlights.map((h) => `<li class="chip">${esc(h)}</li>`).join('')}</ul>` : ''}
       </${tag}>`;
     })
     .join('');
@@ -41,18 +35,18 @@ async function renderTape() {
   const m = await getJson(PRICES + 'manifest.json');
   const by = Object.fromEntries(m.symbols.map((s) => [s.symbol, s]));
   const items = TAPE.map((s) => by[s]).filter(Boolean);
-  const asOf = items.map((s) => s.last).sort().at(-1);
+  const arrow = (p) => (p > 0 ? '▲' : p < 0 ? '▼' : '');
   const html =
+    `<span class="lbl">ADRRR</span>` +
     items
-      .map(
-        (s) => `<a class="tape-item" href="/backtest/#symbol=${encodeURIComponent(s.symbol)}"><span class="s">${esc(LABEL[s.symbol] || s.symbol)}</span><span class="p num">${fmtPrice(s.last_close)}</span><span class="num ${s.change_pct >= 0 ? 'up' : 'down'}">${fmtPct(s.change_pct)}</span></a>`,
-      )
-      .join('') + `<span class="tape-item tape-note">Last close · ${esc(asOf)} · Yahoo Finance</span>`;
-  document.getElementById('tape').innerHTML = html + html;
-  document.querySelector('[data-stat="tickers"]').textContent = m.symbols.length;
-  const first = m.symbols.map((s) => s.first).sort()[0];
-  const years = Math.floor((Date.now() - Date.parse(first)) / 31557600000);
-  document.querySelector('[data-stat="years"]').textContent = `${years} yrs`;
+      .map((s) => {
+        const cls = s.change_pct > 0 ? 'up' : s.change_pct < 0 ? 'down' : 'muted';
+        return `<a class="tk" href="/backtest/#symbol=${encodeURIComponent(s.symbol)}"><b>${esc(LABEL[s.symbol] || s.symbol)}</b><span class="v">${fmtPrice(s.last_close)}</span><span class="c ${cls}">${arrow(s.change_pct)}${Math.abs(s.change_pct).toFixed(2)}%</span></a>`;
+      })
+      .join('');
+  document.getElementById('tape').innerHTML = html;
+  const tickers = document.querySelector('[data-stat="tickers"]');
+  if (tickers) tickers.textContent = m.symbols.length;
 }
 
 // ---------- Hero: real candles with TD Sequential counts ----------
@@ -155,11 +149,16 @@ function drawSignal() {
   el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${parts.join('')}</svg>`;
 }
 
-const edition = document.getElementById('edition-date');
-if (edition) {
-  const d = new Date();
-  edition.textContent = d.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase();
+function editionZh(d = new Date()) {
+  const fmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Hong_Kong', year: 'numeric', month: 'numeric', day: 'numeric', weekday: 'short' });
+  const map = Object.fromEntries(fmt.formatToParts(d).map((p) => [p.type, p.value]));
+  const wd = { Sun: '日', Mon: '一', Tue: '二', Wed: '三', Thu: '四', Fri: '五', Sat: '六' }[map.weekday] || map.weekday;
+  return `${map.year}年${map.month}月${map.day}日（${wd}）`;
 }
+const edition = document.getElementById('edition-date');
+if (edition) edition.textContent = editionZh();
+const dow = document.getElementById('edition-dow');
+if (dow) dow.textContent = mastDate();
 
 renderTools().catch((e) => console.warn(e));
 renderTape().catch((e) => console.warn(e));
