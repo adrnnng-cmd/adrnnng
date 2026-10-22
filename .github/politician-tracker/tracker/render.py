@@ -214,6 +214,14 @@ def _e(s) -> str:
     return escape(str(s or ""), quote=True)
 
 
+def _portrait(src: str, alt: str, placeholder: str) -> str:
+    """Member photo. onerror swaps a broken file for the neutral placeholder."""
+    return (
+        f'<img class="ph" src="{_e(src)}" alt="{_e(alt)}" loading="lazy" width="76" height="92" '
+        f"onerror=\"this.onerror=null;this.src='{_e(placeholder)}'\">"
+    )
+
+
 def _fmt_date(iso: str) -> str:
     d = parse_date(iso)
     return d.strftime("%Y-%m-%d") if d else "—"
@@ -338,8 +346,9 @@ def render_page(cfg: dict, payload: dict, now: datetime) -> str:
             else "No disclosures in window"
         )
         initials = "".join(w[0] for w in v["name"].split()[:2])
+        placeholder = f"/{site['path']}/img/placeholder.svg"
         photo = (
-            f'<img class="ph" src="{_e(v["photo"])}" alt="{_e(v["name"])}" loading="lazy" width="76" height="92">'
+            _portrait(v["photo"], v["name"], placeholder)
             if v.get("photo")
             else f'<div class="ph ini" aria-hidden="true">{_e(initials)}</div>'
         )

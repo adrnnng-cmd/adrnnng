@@ -7,7 +7,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "test": "node --test \"backtest/tests/*.test.mjs\" && PYTHONPATH=.github/backtest python3 -m unittest discover -s .github/backtest/tests",
+    "test": "node --test \"backtest/tests/*.test.mjs\" && PYTHONPATH=.github/backtest python3 -m unittest discover -s .github/backtest/tests && PYTHONPATH=.github/politician-tracker python3 -m unittest discover -s .github/politician-tracker/tests",
     "check": "node scripts/check-site.mjs",
     "serve": "python3 -m http.server 8788",
     "new-tool": "node scripts/new-tool.mjs",

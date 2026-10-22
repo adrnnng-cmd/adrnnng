@@ -1,7 +1,8 @@
 name: Politician Tracker refresh
 
-# Rebuilds politician-tracker/{index.html,data.json} from free public sources
-# and commits the result. Only that folder is ever staged.
+# Rebuilds politician-tracker/{index.html,data.json,img/} from free public sources
+# and commits the result. Only that folder is ever staged. img/<bioguide>.jpg is
+# every member in the trades, not just the VIP list. Existing portraits are skipped.
 on:
   schedule:
     - cron: "5 23 * * 0-5" # 07:05 HKT, Monday–Saturday

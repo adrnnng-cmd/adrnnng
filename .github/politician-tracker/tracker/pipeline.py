@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -175,25 +176,78 @@ def dedupe(batches: list[list[Trade]]) -> list[Trade]:
     return [t for _, t in best.values()]
 
 
-PHOTO_URL = "https://unitedstates.github.io/images/congress/225x275/{}.jpg"
+# Official portraits. unitedstates.io first; bioguide.congress.gov serves the same
+# member at two paths and answers 403 on one of them often enough that both are tried.
+# Existing files are never re-downloaded.
+BIOGUIDE_RE = re.compile(r"^[A-Z]\d{6}$")
+UNITEDSTATES_PHOTO = "https://theunitedstates.io/images/congress/225x275/{}.jpg"
+BIOGUIDE_PHOTO = "https://bioguide.congress.gov/photo/{}.jpg"
+BIOGUIDE_PHOTO_LETTER = "https://bioguide.congress.gov/bioguide/photo/{}/{}.jpg"
 
 
-def fetch_photos(client: Client, vips: list[dict], out_dir: Path, url_prefix: str) -> None:
-    """Cache public-domain member portraits as static files; sets v["photo"] when available."""
+def photo_urls(bioguide: str) -> list[str]:
+    return [
+        UNITEDSTATES_PHOTO.format(bioguide),
+        BIOGUIDE_PHOTO.format(bioguide),
+        BIOGUIDE_PHOTO_LETTER.format(bioguide[0], bioguide),
+    ]
+
+
+def is_jpeg(blob: bytes) -> bool:
+    return len(blob) >= 100 and blob[:3] == b"\xff\xd8\xff"
+
+
+def member_bioguides(payload: dict) -> list[str]:
+    """Every bioguide on the page: the VIP list and every trade, VIP or not."""
+    seen: set[str] = set()
+    out: list[str] = []
+    for row in [*(payload.get("vip") or []), *(payload.get("trades") or [])]:
+        bioguide = row.get("bioguide") or ""
+        if bioguide and bioguide not in seen and BIOGUIDE_RE.fullmatch(bioguide):
+            seen.add(bioguide)
+            out.append(bioguide)
+    return out
+
+
+def fetch_photos(client: Client, bioguides: list[str], out_dir: Path) -> None:
+    """Cache official portraits as img/<bioguide>.jpg. Skip files that already exist."""
+    img_dir = out_dir / "img"
+    seen: set[str] = set()
+    for bioguide in bioguides:
+        if not bioguide or bioguide in seen or not BIOGUIDE_RE.fullmatch(bioguide):
+            continue
+        seen.add(bioguide)
+        path = img_dir / f"{bioguide}.jpg"
+        if path.exists():
+            continue
+        blob = _download_photo(client, bioguide)
+        if blob is None:
+            continue
+        img_dir.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(blob)
+        log.info("saved portrait %s", bioguide)
+
+
+def _download_photo(client: Client, bioguide: str) -> bytes | None:
+    for url in photo_urls(bioguide):
+        try:
+            blob = client.request(url)
+        except Exception as e:
+            log.warning("photo for %s unavailable: %s", bioguide, e)
+            continue
+        if is_jpeg(blob):
+            return blob
+        log.warning("photo for %s from %s was not a JPEG", bioguide, url)
+    return None
+
+
+def assign_vip_photos(vips: list[dict], out_dir: Path, url_prefix: str) -> None:
+    """Point VIP cards at the cached file when it exists. A missing file keeps the initials placeholder."""
     img_dir = out_dir / "img"
     for v in vips:
         path = img_dir / f"{v['bioguide']}.jpg"
-        if not path.exists():
-            try:
-                blob = client.request(PHOTO_URL.format(v["bioguide"]))
-                if blob[:3] != b"\xff\xd8\xff":
-                    raise ValueError("not a JPEG")
-                img_dir.mkdir(parents=True, exist_ok=True)
-                path.write_bytes(blob)
-            except Exception as e:
-                log.warning("photo for %s unavailable: %s", v["name"], e)
-                continue
-        v["photo"] = f"{url_prefix}/img/{path.name}"
+        if path.is_file():
+            v["photo"] = f"{url_prefix}/img/{path.name}"
 
 
 def load_previous(path: Path) -> list[Trade]:
@@ -215,7 +269,8 @@ def run(cfg: dict, out_root: Path, client: Client | None = None, now: datetime |
     out_dir = out_root / cfg["site"]["path"]
     data_path = out_dir / "data.json"
 
-    collected = collect(cfg, client or Client(), today)
+    http = client or Client()
+    collected = collect(cfg, http, today)
     enricher = Enricher(cfg, collected.roster, collected.senate_filings, collected.house_index)
     fresh = [enricher.apply(t) for t in collected.trades]
     previous = load_previous(data_path)
@@ -245,7 +300,9 @@ def run(cfg: dict, out_root: Path, client: Client | None = None, now: datetime |
     from .render import render_page
 
     out_dir.mkdir(parents=True, exist_ok=True)
-    fetch_photos(client or Client(), payload["vip"], out_dir, f"/{cfg['site']['path']}")
+    prefix = f"/{cfg['site']['path']}"
+    fetch_photos(http, member_bioguides(payload), out_dir)
+    assign_vip_photos(payload["vip"], out_dir, prefix)
     data_path.write_text(json.dumps(payload, ensure_ascii=False, indent=1), "utf-8")
     (out_dir / "index.html").write_text(render_page(cfg, payload, now), "utf-8")
     return payload

@@ -1,5 +1,6 @@
 import { loadRegistry, esc } from './site.js';
 import { newsDoorCaption, parseLatest } from './latest.js';
+import { memberPhotoImg } from './member-photo.js';
 import { tdSequential } from '/backtest/strategies/td-sequential.js';
 
 const PRICES = '/backtest/data/prices/';
@@ -114,12 +115,14 @@ function paintReport(r) {
     .join('');
 }
 
-function doorPhoto({ webp, jpg, src, title, sub, subClass = '' }) {
-  const img = webp
-    ? `<picture><source srcset="${esc(webp)} 2x" type="image/webp"><img src="${esc(jpg)}" srcset="${esc(jpg)} 2x" alt="" width="56" height="70"></picture>`
-    : src
-      ? `<img src="${esc(src)}" alt="" width="56" height="70">`
-      : '';
+function doorPhoto({ webp, jpg, src, img: imgHtml, title, sub, subClass = '' }) {
+  const img = imgHtml
+    ? imgHtml
+    : webp
+      ? `<picture><source srcset="${esc(webp)} 2x" type="image/webp"><img src="${esc(jpg)}" srcset="${esc(jpg)} 2x" alt="" width="56" height="70"></picture>`
+      : src
+        ? `<img src="${esc(src)}" alt="" width="56" height="70">`
+        : '';
   return `<div class="door-photo">${img}<div><b>${esc(title)}</b><span class="${esc(subClass)}">${esc(sub)}</span></div></div>`;
 }
 
@@ -131,8 +134,7 @@ async function renderDoors() {
   try {
     const data = await getJson('/politician-tracker/data.json');
     const trade = data.trades?.[0];
-    const vip = (data.vip || []).find((v) => v.bioguide === trade?.bioguide);
-    if (trade) filing = { ...trade, photo: vip?.photo };
+    if (trade) filing = trade;
   } catch { /* tracker data is optional on the cover */ }
   const newsCap = newsDoorCaption(latestRaw);
   document.getElementById('tools').innerHTML = tools
@@ -147,7 +149,7 @@ async function renderDoors() {
         });
       } else if (t.id === 'politician-tracker' && filing) {
         body = doorPhoto({
-          src: filing.photo,
+          img: memberPhotoImg(filing.bioguide),
           title: filing.name,
           sub: `${filing.tx} ${filing.ticker} · ${filing.amount}`,
           subClass: filing.tx === 'Buy' ? 'up' : 'down',
