@@ -30,6 +30,7 @@ backtest/
   engine/                      bars, indicators, execution loop, metrics (pure ES modules)
   strategies/                  strategy plug-ins + registry
   providers/                   price-data plug-ins + registry
+  runners/                     Node-only studies (HSI ATR SuperTrend phase 1). Not a page.
   data/prices/                 daily CSVs + manifest.json (written by the scheduled fetch)
   tests/                       node --test unit tests; tests/reference = independent Python cross-check
 politician-tracker/            built page + data.json + img/ (committed by its workflow)
@@ -130,13 +131,37 @@ charts.js / app.js  →  UI
   **Profit factor** = gross profit / gross loss. Also: volatility, longest drawdown, exposure,
   average/best/worst trade, average bars held, beta and correlation to buy & hold.
 
-### Strategy included
-
-For now the page ships with TD Sequential only; other rules plug in through the interface in the next section.
+### Strategies
 
 | id | Rule |
 | --- | --- |
 | `td-sequential` | DeMark TD Sequential. Setup: 9 consecutive closes below (above) the close 4 bars earlier, started by a price flip; optional perfection filter. Countdown: 13 closes ≤ low (≥ high) 2 bars earlier, bar 13 must reach the close of countdown bar 8 (else deferred "+"), cancelled by an opposite setup or a close through TDST; optional recycling. Trade on Setup 9, Countdown 13, or either; the opposite signal exits (or reverses). |
+| `atr-supertrend` | ATR SuperTrend [QuantAlgo](https://www.tradingview.com/script/5ZlvGLXX-ATR-Supertrend-QuantAlgo/). EMA-smoothed close versus a ratcheting ATR band. Bull trend is long, bear trend is short (needs Allow short selling on this page). Defaults: ATR length 10, factor 2.5, smoothing 2. |
+
+### HSI ATR SuperTrend, phase 1
+
+A separate Node runner studies that signal on a private continuous HSI 1-minute file. It does not use the page's percent-of-equity engine. Phase 1 is price movement only: one notional unit of the index, P&L in index points and in percent of the run's first close. No contract size, commission, or slippage. `phase2CostHook` in `backtest/runners/phase1.js` is where Phase 2 (Mini HSI, HKD 10/point, HKD 40 round-turn) will subtract costs; it is left disabled, so net points equal gross points.
+
+Day session only. The first regular bar at or after 09:15 HKT is the open (the 08:45–09:15 auction and the 12:30–13:00 pre-open are dropped). The position is held through lunch and flattened at the last day-session bar's close (16:29 open on a full 1-minute day). Bull flip → long, bear flip → short, and a later flip reverses. Entry arms:
+
+| arm | First entry |
+| --- | --- |
+| `control` | any flip on the day-session bars |
+| `A-S` | at 09:15 (or the first bar after it), take the current trend, no flip required |
+| `A-F` | first flip at or after 09:15 |
+| `B-S` / `B-F` | the same at 09:30 |
+
+After that entry, flips are followed until the end-of-day flatten. With the session filter in place, `control` and `A-F` are the same study: nothing before 09:15 reaches the simulator. A flip fills at the next bar's open. A state arm fills at the clock bar's open, using only the prior bar's trend.
+
+The matrix is 1m and 5m (5m resampled from the day-session 1m bars) × ATR length 10, 11, 12, 13, 14 × those five arms = 50 runs. Factor 2.5 and EMA smoothing 2. Each run records total points, percent return, win rate, trades, average points per trade, max drawdown in points and percent, Sharpe on daily returns (sample stdev, rf = 0, √252), a long/short split, and the equity curve. `summary.csv` / `summary.json` rank the 50 runs by points.
+
+The real HSI file is private and is not in this repo. Do not commit it. Point the runner at a local CSV or parquet (`time_key`, `open`, `high`, `low`, `close`, `volume`; `time_key` is the bar open in Asia/Hong_Kong). Parquet needs pyarrow, polars, or duckdb already installed; this repo does not install them. CSV needs nothing.
+
+```bash
+node backtest/runners/hsi-supertrend-phase1.js --data /path/to/HSImain_1m.parquet
+```
+
+`HSI_BARS_PATH` is the same path when `--data` is omitted. Output defaults to `backtest/output/hsi-supertrend-phase1/` (gitignored): `summary.csv`, `summary.json`, and `runs/<id>.json`. The reader is not a browser provider and the site does not serve the bars.
 
 ### Add a strategy
 

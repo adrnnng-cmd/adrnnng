@@ -1,11 +1,44 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { sma, ema, rsi, macd, bollinger, donchian } from '../engine/indicators.js';
+import { sma, ema, pineEma, rma, trueRange, atr, rsi, macd, bollinger, donchian } from '../engine/indicators.js';
 
 const round = (v, d = 2) => (v == null ? null : Math.round(v * 10 ** d) / 10 ** d);
 
 test('sma', () => {
   assert.deepEqual(sma([1, 2, 3, 4, 5], 3), [null, null, 2, 3, 4]);
+});
+
+const near = (a, b) => Math.abs(a - b) < 1e-12;
+
+test('pineEma seeds with the first value (TradingView ta.ema)', () => {
+  const e = pineEma([10, 11, 13], 2);
+  assert.equal(e[0], 10);
+  assert.ok(near(e[1], 32 / 3));
+  assert.ok(near(e[2], 110 / 9));
+  assert.equal(pineEma([1, null, 3], 2)[1], null);
+  assert.ok(near(pineEma([1, null, 3], 2)[2], (2 / 3) * 3 + (1 / 3) * 1));
+});
+
+test('rma seeds with an SMA then uses the Wilder recurrence', () => {
+  const out = rma([2, 3, 4, 3, 5, 3, 3], 3);
+  assert.deepEqual(out.slice(0, 2), [null, null]);
+  assert.equal(out[2], 3);
+  assert.equal(out[3], 3);
+  assert.ok(near(out[4], 11 / 3));
+  assert.ok(near(out[5], 31 / 9));
+  assert.ok(near(out[6], 89 / 27));
+  const skipped = rma([2, null, 3, 4], 3);
+  assert.equal(skipped[1], null);
+  assert.equal(skipped[3], 3);
+});
+
+test('true range uses high-low on the first bar and the previous close after that', () => {
+  const bars = [
+    { high: 11, low: 9, close: 10 },
+    { high: 12, low: 9, close: 11 },
+  ];
+  assert.deepEqual(trueRange(bars), [2, 3]);
+  assert.equal(atr(bars, 2)[1], 2.5);
 });
 
 test('ema is seeded with the SMA', () => {
