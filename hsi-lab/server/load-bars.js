@@ -79,7 +79,10 @@ export async function loadBars(binding, spec, now = Date.now()) {
   for (let year = fromY; year <= toY; year++) {
     if (!available.has(year)) continue;
     const chunk = await yearBars(store, year, now);
-    if (chunk) bars.push(...chunk);
+    // A spread of ~237k bars throws RangeError. Append one bar at a time.
+    if (chunk) {
+      for (let i = 0; i < chunk.length; i++) bars.push(chunk[i]);
+    }
   }
   return bars;
 }

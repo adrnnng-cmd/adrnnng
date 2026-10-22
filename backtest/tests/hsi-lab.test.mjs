@@ -7,7 +7,12 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { atrSupertrend } from '../strategies/atr-supertrend.js';
 import { barDate, barMinutes, resampleMinutes } from '../engine/intraday.js';
+import { gzipSync } from 'node:zlib';
 import { decodeYear, encodeYear, objectKey } from '../../hsi-lab/engine/archive.js';
+import { bundleKey, bundleKeys, gridJobs, validateLookup } from '../../hsi-lab/engine/grid.js';
+import { computeEntryGroup, prepareDayBars, requestedRanges } from '../../hsi-lab/engine/precompute.js';
+import { applyCost } from '../../hsi-lab/engine/results.js';
+import { resetLookupCache } from '../../hsi-lab/server/lookup.js';
 import { buildSignals } from '../../hsi-lab/engine/signals.js';
 import { simulateHsi } from '../../hsi-lab/engine/simulate.js';
 import { runLab, toPublicResult } from '../../hsi-lab/engine/run.js';
@@ -529,30 +534,49 @@ function post(body, origin = 'https://adrnnng.com') {
   });
 }
 
+function resultKv(files) {
+  const objects = new Map(Object.entries(files).map(([key, bundle]) => [key, gzipSync(Buffer.from(JSON.stringify(bundle)))]));
+  const gets = [];
+  return {
+    gets,
+    async get(key, type) {
+      gets.push([key, type]);
+      const bytes = objects.get(key);
+      if (!bytes || type !== 'arrayBuffer') return null;
+      return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+    },
+    async list() {
+      return { keys: [...objects.keys()].map((name) => ({ name })), list_complete: true };
+    },
+  };
+}
+
 test('the endpoint returns scores, rate-limits, and never echoes bars', async () => {
-  resetArchiveCache();
+  resetLookupCache();
   const planted = 54321.25;
-  const bars = zigzagSeries(['2023-12-28', '2024-01-02'], { base: planted });
-  const store = bucket({
-    2022: [bar('2022-01-03', 9 * 60 + 15, 10, 11), bar('2022-01-03', 9 * 60 + 16, 11, 12)],
-    2023: bars.filter((b) => b.time.startsWith('2023')),
-    2024: bars.filter((b) => b.time.startsWith('2024')),
-  }, { paginate: true });
+  const clock = new Date('2026-10-22T00:00:00Z');
+  const bars = zigzagSeries(['2024-03-04'], { base: planted });
+  const group = computeEntryGroup(prepareDayBars(bars), {
+    entryTimeframe: 5,
+    atrLength: 14,
+    ranges: ['2024', 'all'],
+    now: clock,
+  });
+  const key = bundleKey(5, 14, '2024');
+  const store = resultKv({ [key]: group.bundles['2024'] });
   const limiter = createLimiter({ limit: 5 });
   const res = await handle(post({
-    strategy: 'atr-supertrend',
-    atrLength: 8,
-    exitAtrLength: 8,
-    factor: 1,
-    smoothing: 1,
     entryTimeframe: 5,
-    exitTimeframe: 1,
-    entryRule: 'flip',
-    exitRule: 'reverse',
-    from: '2024-01-02',
-    to: '2024-01-02',
+    atrLength: 14,
+    exitTimeframe: 5,
+    exitAtrLength: 14,
+    entryRule: 'clock',
+    clock: '09:30',
+    exitRule: 'reenter',
+    range: '2024',
     costs: true,
-  }), { HSI_BARS: store }, { limiter });
+    costPoints: 6,
+  }), { HSI_BARS: store }, { limiter, clock });
   const text = await res.text();
   assert.equal(res.status, 200, text);
   assert.equal(text.includes(String(planted)), false);
@@ -561,12 +585,11 @@ test('the endpoint returns scores, rate-limits, and never echoes bars', async ()
   walk(body);
   assert.equal(typeof body.metrics.trades, 'number');
   assert.equal(Array.isArray(body.trades), false);
-  assert.equal(body.metrics.sessionDays, 1);
+  assert.equal(body.metrics.netPoints, Number((body.metrics.grossPoints - 6 * body.metrics.trades).toFixed(2)));
+  assert.ok(body.equity.length <= 250);
   assert.ok(body.equity.every((p) => p.date.startsWith('2024')));
-  assert.ok(store.gets.includes('v1/1m/2023.bin'));
-  assert.ok(store.gets.includes('v1/1m/2024.bin'));
-  assert.equal(store.gets.includes('v1/1m/2022.bin'), false);
-  assert.equal(store.gets.includes('v1/1m/manifest.json'), false);
+  assert.deepEqual(store.gets.map((call) => call[0]), [key]);
+  assert.equal(store.gets.some((call) => String(call[0]).includes('.bin')), false);
 
   const leaked = await handle(post({ bars: [{ close: planted }], strategy: 'atr-supertrend' }), { HSI_BARS: store }, { limiter });
   const leakedText = await leaked.text();
@@ -581,14 +604,14 @@ test('the endpoint returns scores, rate-limits, and never echoes bars', async ()
   const local = await handle(post('{}', 'http://127.0.0.1:8788'), {}, { limiter: createLimiter() });
   assert.equal(local.status, 503);
 
-  resetArchiveCache();
+  resetLookupCache();
   const empty = {
     async get() { return null; },
-    async list() { return { objects: [], truncated: false }; },
+    async list() { return { keys: [], list_complete: true }; },
   };
-  const vacant = await handle(post({}), { HSI_BARS: empty }, { limiter: createLimiter() });
-  assert.equal(vacant.status, 503);
-  assert.match(await vacant.text(), /empty/i);
+  const vacant = await handle(post({}), { HSI_BARS: empty }, { limiter: createLimiter(), clock });
+  assert.equal(vacant.status, 404);
+  assert.match(await vacant.text(), /not in the archive/i);
 
   resetArchiveCache();
   const corrupt = {
@@ -618,53 +641,19 @@ test('the endpoint returns scores, rate-limits, and never echoes bars', async ()
   const described = await handle(new Request('https://adrnnng.com/api/hsi-lab'));
   const registry = await described.json();
   assert.equal(registry.strategies[0].id, 'atr-supertrend');
-  assert.equal(registry.defaults.atrLength, DEFAULTS.atrLength);
+  assert.equal(registry.defaults.atrLength, 14);
+  assert.equal(registry.defaults.range, 'all');
+  assert.ok(registry.grid.atrLengths.includes(10));
+  assert.ok(registry.grid.ranges.includes('all'));
+  assert.ok(registry.grid.ranges.includes('2020'));
   walk(registry);
 });
 
 test('KV is the default read and a decoded year is not fetched again', async () => {
   resetArchiveCache();
-  const secret = 22222.75;
-  const older = zigzagSeries(['2023-12-28'], { base: secret, step: 30, period: 12 });
-  const day = zigzagSeries(['2024-03-04'], { base: secret });
-  const store = kvStore({
-    2023: older,
-    2024: day,
-  }, { paginate: true });
-  const body = {
-    strategy: 'atr-supertrend',
-    atrLength: 8,
-    factor: 1,
-    smoothing: 1,
-    entryTimeframe: 1,
-    exitTimeframe: 5,
-    entryRule: 'flip',
-    exitRule: 'flat',
-    from: '2024-03-04',
-    to: '2024-03-04',
-    costs: true,
-    costPoints: 6,
-  };
-  const first = await handle(post(body), { HSI_BARS: store }, { limiter: createLimiter() });
-  const text = await first.text();
-  assert.equal(first.status, 200, text);
-  assert.equal(text.includes(String(secret)), false);
-  assert.equal(text.includes('T09'), false);
-  walk(JSON.parse(text));
-  assert.deepEqual(store.gets.map((call) => call[0]).sort(), ['v1/1m/2023.bin', 'v1/1m/2024.bin']);
-  assert.ok(store.gets.every((call) => call[1] === 'arrayBuffer'));
-  assert.equal(store.gets.some((call) => String(call[0]).includes('manifest')), false);
-  assert.deepEqual(store.lists, [null, 'next']);
-  const reads = store.gets.length;
-  const pages = store.lists.length;
-  const second = await handle(post(body), { HSI_BARS: store }, { limiter: createLimiter() });
-  assert.equal(second.status, 200);
-  assert.equal(store.gets.length, reads);
-  assert.equal(store.lists.length, pages);
-
-  resetArchiveCache();
+  const day = zigzagSeries(['2024-03-04'], { base: 18000 });
   const timed = kvStore({ 2024: day });
-  const spec = validateInput(body);
+  const spec = validateInput({ from: '2024-03-04', to: '2024-03-04' });
   const t0 = 1_700_000_000_000;
   await loadBars(timed, spec, t0);
   const warm = timed.gets.length;
@@ -711,9 +700,10 @@ test('auth is one hook and the route does not publish bars', async () => {
   assert.match(app, /\/api\/hsi-lab/);
   assert.doesNotMatch(app, /\/api\/bars|loadLocalBars|HSI_BARS/);
   const html = readFileSync(join(root, 'hsi-lab/index.html'), 'utf8');
-  assert.match(html, /id="atr-length"[^>]*value="14"/);
-  assert.match(html, /id="factor"[^>]*value="2.5"/);
+  assert.match(html, /id="atr-length"[\s\S]*value="14" selected/);
+  assert.match(html, /Factor <b>2\.5<\/b>/);
   assert.match(html, /value="reenter" selected/);
+  assert.match(html, /id="range"/);
   assert.match(html, /data-site-header/);
   assert.match(html, /\/assets\/js\/site\.js/);
 });
@@ -758,6 +748,142 @@ test('input bounds reject a timeframe, a clock outside the window, and a wide ra
   assert.throws(() => study({ from: '2024-01-02' }), /both dates/);
   assert.equal(validateInput({}).strategy, 'atr-supertrend');
   assert.equal(validateInput({}).exitRule, 'reenter');
+  const clock = new Date('2026-10-22T00:00:00Z');
+  assert.throws(() => validateLookup({ atrLength: 8 }, clock), /ATR length/);
+  assert.throws(() => validateLookup({ factor: 2.5 }, clock), /Unknown field/);
+  assert.throws(() => validateLookup({ entryTimeframe: 5, exitTimeframe: 5, atrLength: 14, exitAtrLength: 10 }, clock), /one ATR/);
+  assert.throws(() => validateLookup({ range: '2019' }, clock), /Range/);
+  assert.equal(validateLookup({ range: '2024' }, clock).key, 'v1/results/5m-14/2024.json.gz');
+  assert.equal(gridJobs().length, 900);
+  assert.ok(gridJobs().filter((job) => job.entryTimeframe === job.exitTimeframe).every((job) => job.atrLength === job.exitAtrLength));
+  const years = requestedRanges([], clock);
+  assert.deepEqual(years, ['2020', '2021', '2022', '2023', '2024', '2025', '2026', 'all']);
+  assert.equal(bundleKeys(years).length, 80);
+  assert.ok(bundleKeys(years).length <= 150);
+  assert.deepEqual(requestedRanges(['2026'], clock), ['2026', 'all']);
+});
+
+test('a precomputed year matches a direct run and costs are applied on lookup', () => {
+  const clock = new Date('2026-10-22T00:00:00Z');
+  const bars = zigzagSeries(['2023-12-28', '2024-03-04', '2024-03-05'], { base: 18000 });
+  const day = prepareDayBars(bars);
+  const group = computeEntryGroup(day, { entryTimeframe: 5, atrLength: 14, ranges: ['2024', 'all'], now: clock });
+  const cell = group.bundles['2024'].rows['5:14:clock:09:30:reenter'];
+  const direct = runLab(bars, {
+    atrLength: 14,
+    exitAtrLength: 14,
+    factor: 2.5,
+    smoothing: 2,
+    entryTimeframe: 5,
+    exitTimeframe: 5,
+    entryRule: 'clock',
+    clock: '09:30',
+    exitRule: 'reenter',
+    from: '2024-03-04',
+    to: '2024-12-31',
+    windowStart: '09:15',
+    windowEnd: '16:30',
+    costs: true,
+    costPoints: 6,
+  });
+  assert.equal(cell.t, direct.result.metrics.trades);
+  assert.equal(cell.g, direct.result.metrics.grossPoints);
+  assert.equal(cell.d, direct.result.metrics.sessionDays);
+  const looked = validateLookup({
+    entryTimeframe: 5,
+    atrLength: 14,
+    exitTimeframe: 5,
+    exitAtrLength: 14,
+    entryRule: 'clock',
+    clock: '09:30',
+    exitRule: 'reenter',
+    range: '2024',
+    costs: true,
+    costPoints: 6,
+  }, clock);
+  const pub = applyCost(cell, looked);
+  assert.equal(pub.metrics.netPoints, direct.result.metrics.netPoints);
+  assert.equal(pub.metrics.grossPoints, direct.result.metrics.grossPoints);
+  const gross = applyCost(cell, { ...looked, costs: false, costPoints: 0 });
+  assert.equal(gross.metrics.maxDrawdownPoints, direct.result.metrics.maxDrawdownPoints);
+  assert.ok(pub.equity.length <= 250);
+  assert.equal(JSON.stringify(pub).includes('18000'), false);
+});
+
+test('one lookup stays fast on a realistic bundle', async () => {
+  resetLookupCache();
+  const rows = {};
+  const eq = [];
+  for (let i = 0; i < 250; i++) {
+    const day = String((i % 27) + 1).padStart(2, '0');
+    const month = String((i % 12) + 1).padStart(2, '0');
+    eq.push([`2024-${month}-${day}`, i - 40, i]);
+  }
+  for (let i = 0; i < 90; i++) {
+    rows[`x:${i}:flip:-:flat`] = { t: 250, d: 250, w: 100, gw: 400, gl: 200, g: 200, h: 5000, dd: -80, dd6: -90, dd8: -100, eq, y: [[2024, 250, 100, 200]], hr: [[9, 250, 100, 200]] };
+  }
+  rows['5:14:clock:09:30:reenter'] = rows['x:0:flip:-:flat'];
+  const store = resultKv({ 'v1/results/5m-14/all.json.gz': { v: 1, rows } });
+  const started = performance.now();
+  const res = await handle(post({}), { HSI_BARS: store }, { limiter: createLimiter(), clock: new Date('2026-10-22T00:00:00Z') });
+  const elapsed = performance.now() - started;
+  const text = await res.text();
+  assert.equal(res.status, 200, text);
+  assert.ok(elapsed < 80, `lookup took ${elapsed.toFixed(1)}ms`);
+  assert.equal(text.includes('18000'), false);
+  const reads = store.gets.length;
+  const again = await handle(post({}), { HSI_BARS: store }, { limiter: createLimiter(), clock: new Date('2026-10-22T00:00:00Z') });
+  assert.equal(again.status, 200);
+  assert.equal(store.gets.length, reads);
+});
+
+test('year bins above the spread limit still concatenate', async () => {
+  resetArchiveCache();
+  const count = 240000;
+  const bars = new Array(count);
+  let t = Date.parse('2024-01-02T00:00:00Z');
+  for (let i = 0; i < count; i++) {
+    bars[i] = { time: new Date(t).toISOString().slice(0, 19), open: 1, high: 1, low: 1, close: 1, volume: 1 };
+    t += 60000;
+  }
+  const store = bucket({ 2024: bars, 2023: [bar('2023-01-03', 9 * 60 + 15, 1, 1)] });
+  const spec = validateInput({ from: '2024-01-02', to: '2024-12-31' });
+  const loaded = await loadBars(store, spec);
+  assert.equal(loaded.length, count + 1);
+});
+
+test('precompute script writes result keys with worker threads and no prices', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'hsi-pre-'));
+  const csv = join(dir, 'in.csv');
+  const price = '54321.25';
+  writeFileSync(csv, [
+    'time_key,open,high,low,close,volume',
+    `2024-03-04 09:15:00,${price},54330,54310,54320,5`,
+    '2024-03-04 09:16:00,54320,54340,54315,54328,6',
+    '2026-01-05 09:15:00,19000,19010,18990,19002,4',
+    '2026-01-05 09:16:00,19002,19020,18995,19008,4',
+  ].join('\n'));
+  const out = join(dir, 'results');
+  const packed = spawnSync('node', ['scripts/hsi-lab-precompute.mjs', '--data', csv, '--out', out, '--years', '2026', '--threads', '2'], {
+    encoding: 'utf8',
+    cwd: root,
+  });
+  assert.equal(packed.status, 0, packed.stderr);
+  assert.equal(packed.stdout.includes(price), false);
+  assert.equal(packed.stdout.includes('19000'), false);
+  const manifest = JSON.parse(readFileSync(join(out, 'v1/results/manifest.json'), 'utf8'));
+  assert.equal(manifest.namespaceId, 'f6577e29d4b249dea5a81b4f00443082');
+  assert.equal(JSON.stringify(manifest).includes(price), false);
+  assert.ok(manifest.keys.includes('v1/results/5m-14/2026.json.gz'));
+  assert.ok(manifest.keys.includes('v1/results/5m-14/all.json.gz'));
+  assert.equal(manifest.keys.some((key) => key.includes('/2024.json.gz')), false);
+  assert.ok(manifest.keys.length <= 150);
+  const refused = spawnSync('node', ['scripts/hsi-lab-precompute.mjs', '--data', csv, '--out', join(root, 'hsi-lab'), '--years', '2026', '--threads', '1'], {
+    encoding: 'utf8',
+    cwd: root,
+  });
+  assert.notEqual(refused.status, 0);
+  assert.match(refused.stderr, /Refusing/);
 });
 
 function walk(value, path = '') {

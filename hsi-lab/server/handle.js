@@ -1,11 +1,12 @@
-// POST /api/hsi-lab runs one backtest. GET describes the strategy registry.
-// There is no bars route. The JSON body is settings only; bars come from KV.
+// POST /api/hsi-lab looks up one precomputed score. GET describes the grid.
+// There is no bars route. The JSON body is a grid cell; the tape never leaves KV.
 
-import { ARCHIVE, ArchiveError } from '../engine/archive.js';
-import { runSpec } from '../engine/run.js';
+import { ArchiveError } from '../engine/archive.js';
+import { LOOKUP_DEFAULTS, publicGrid, validateLookup } from '../engine/grid.js';
 import { STRATEGIES } from '../engine/registry.js';
-import { BOUNDS, DEFAULTS, ValidationError, validateInput } from '../engine/validate.js';
-import { ArchiveEmpty, ArchiveUnconfigured, loadBars } from './load-bars.js';
+import { ValidationError } from '../engine/validate.js';
+import { ArchiveUnconfigured } from './load-bars.js';
+import { ResultMissing, lookupResult } from './lookup.js';
 import { clientKey, limiter as sharedLimiter } from './rate-limit.js';
 
 const MAX_BODY = 4096;
@@ -45,26 +46,17 @@ export function originAllowed(origin) {
   return false;
 }
 
-function registryBody() {
+function registryBody(now) {
   return {
     strategies: STRATEGIES.map((s) => ({ id: s.id, name: s.name, summary: s.summary })),
-    defaults: DEFAULTS,
-    bounds: {
-      atrLength: BOUNDS.atrLength,
-      factor: BOUNDS.factor,
-      smoothing: BOUNDS.smoothing,
-      timeframes: BOUNDS.timeframes,
-      entryRules: BOUNDS.entryRules,
-      exitRules: BOUNDS.exitRules,
-      costPoints: BOUNDS.costPoints,
-      maxRangeDays: BOUNDS.maxRangeDays,
-    },
-    archive: { format: ARCHIVE.format, version: ARCHIVE.version },
+    defaults: LOOKUP_DEFAULTS,
+    grid: publicGrid(now),
   };
 }
 
 export async function handle(request, env, options = {}) {
-  if (request.method === 'GET') return json(200, registryBody());
+  const clock = options.clock instanceof Date ? options.clock : new Date();
+  if (request.method === 'GET') return json(200, registryBody(clock));
   if (request.method !== 'POST') return json(405, { error: 'Use POST.' }, { allow: 'GET, POST' });
   if (!originAllowed(request.headers.get('origin'))) return json(403, { error: 'This origin is not allowed.' });
 
@@ -93,11 +85,11 @@ export async function handle(request, env, options = {}) {
   }
 
   try {
-    const spec = validateInput(body);
-    const bars = await loadBars(env?.HSI_BARS, spec);
-    return json(200, runSpec(bars, spec).result);
+    const spec = validateLookup(body, clock);
+    const result = await lookupResult(env?.HSI_BARS, spec, options.now);
+    return json(200, result);
   } catch (err) {
-    if (err instanceof ValidationError || err instanceof ArchiveError || err instanceof ArchiveEmpty || err instanceof ArchiveUnconfigured || err instanceof HttpError) {
+    if (err instanceof ValidationError || err instanceof ArchiveError || err instanceof ArchiveUnconfigured || err instanceof ResultMissing || err instanceof HttpError) {
       return json(err.status, { error: err.message });
     }
     console.error('hsi-lab', err?.name || 'Error');

@@ -2,8 +2,10 @@
 
 const ENTRY_HELP = {
   flip: 'Enter on every entry-timeframe flip, in that flip’s direction.',
-  clock: 'At the clock, take the direction of the last completed entry bar. No flip required.',
-  firstFlip: 'Take the first entry-timeframe flip whose signal bar is at or after the clock.',
+  'clock@09:15': 'At 09:15, take the direction of the last completed entry bar. No flip required.',
+  'clock@09:30': 'At 09:30, take the direction of the last completed entry bar. No flip required.',
+  'firstFlip@09:15': 'Take the first entry-timeframe flip whose signal bar is at or after 09:15.',
+  'firstFlip@09:30': 'Take the first entry-timeframe flip whose signal bar is at or after 09:30.',
 };
 
 const EXIT_HELP = {
@@ -56,41 +58,46 @@ function num(id) {
   return Number($(id).value);
 }
 
-function clockValue(id) {
-  const match = /^(\d{2}):(\d{2})/.exec($(id).value);
-  return match ? `${match[1]}:${match[2]}` : $(id).value;
+function entryChoice() {
+  const value = $('entry-rule').value;
+  const at = value.indexOf('@');
+  if (at === -1) return { entryRule: value, clock: null };
+  return { entryRule: value.slice(0, at), clock: value.slice(at + 1) };
 }
 
 function payload() {
+  const entry = entryChoice();
+  const entryTimeframe = selectedTf('entry-tf');
+  const exitTimeframe = selectedTf('exit-tf');
+  const atrLength = num('atr-length');
   const body = {
     strategy: $('strategy').value,
-    atrLength: num('atr-length'),
-    exitAtrLength: num('exit-atr-length'),
-    factor: num('factor'),
-    smoothing: num('smoothing'),
-    entryTimeframe: selectedTf('entry-tf'),
-    exitTimeframe: selectedTf('exit-tf'),
-    entryRule: $('entry-rule').value,
+    atrLength,
+    exitAtrLength: entryTimeframe === exitTimeframe ? atrLength : num('exit-atr-length'),
+    entryTimeframe,
+    exitTimeframe,
+    entryRule: entry.entryRule,
     exitRule: $('exit-rule').value,
-    windowStart: clockValue('window-start'),
-    windowEnd: clockValue('window-end'),
+    range: $('range').value,
     costs: $('costs').checked,
   };
-  if (body.entryRule !== 'flip') body.clock = clockValue('clock');
+  if (entry.clock) body.clock = entry.clock;
   if (body.costs) body.costPoints = num('cost-points');
-  if ($('from').value && $('to').value) {
-    body.from = $('from').value;
-    body.to = $('to').value;
-  }
   return body;
 }
 
+function syncTimeframes() {
+  const same = selectedTf('entry-tf') === selectedTf('exit-tf');
+  const exitAtr = $('exit-atr-length');
+  exitAtr.disabled = same;
+  if (same) exitAtr.value = $('atr-length').value;
+  $('tf-help').textContent = same
+    ? 'The same timeframe uses one ATR length.'
+    : 'The exit timeframe keeps its own ATR length, from 10 to 14.';
+}
+
 function syncEntry() {
-  const rule = $('entry-rule').value;
-  $('entry-help').textContent = ENTRY_HELP[rule] || '';
-  const needsClock = rule !== 'flip';
-  $('clock').disabled = !needsClock;
-  $('clock-field').style.opacity = needsClock ? '1' : '0.45';
+  $('entry-help').textContent = ENTRY_HELP[$('entry-rule').value] || '';
 }
 
 function syncExit() {
@@ -199,7 +206,7 @@ function render(result) {
     <div class="stat-grid">${stats.map(([k, v]) => `<div><span>${esc(k)}</span><b>${esc(v)}</b></div>`).join('')}</div>
     <div class="curve">
       <h2>Equity</h2>
-      <p class="panel-sub">Cumulative points at each session flatten, from zero.</p>
+      <p class="panel-sub">Cumulative points from zero.</p>
       ${equity.length ? curveSvg(equity) : '<p class="lab-help">No session days in this range.</p>'}
       ${equity.length ? `<div class="eq-dates"><span>${esc(equity[0].date)}</span><span>${esc(equity[equity.length - 1].date)}</span></div>` : ''}
     </div>
@@ -215,12 +222,6 @@ function renderError(message) {
 }
 
 async function run() {
-  const from = $('from').value;
-  const to = $('to').value;
-  if ((from && !to) || (!from && to)) {
-    renderError('Provide both dates, or leave both empty.');
-    return;
-  }
   const button = $('run');
   button.disabled = true;
   button.textContent = 'Running…';
@@ -253,11 +254,24 @@ async function run() {
   }
 }
 
+function fillRanges(ranges) {
+  if (!Array.isArray(ranges) || !ranges.length) return;
+  const sel = $('range');
+  const current = sel.value;
+  sel.innerHTML = ranges.map((range) => {
+    const label = range === 'all' ? 'All years' : range;
+    return `<option value="${esc(range)}">${esc(label)}</option>`;
+  }).join('');
+  if ([...sel.options].some((option) => option.value === current)) sel.value = current;
+}
+
 function boot() {
-  wireSeg('entry-tf');
+  wireSeg('entry-tf', () => syncTimeframes());
   wireSeg('exit-tf', (tf) => {
     if (!costDirty) $('cost-points').value = String(defaultCost(tf));
+    syncTimeframes();
   });
+  $('atr-length').addEventListener('change', syncTimeframes);
   $('entry-rule').addEventListener('change', syncEntry);
   $('exit-rule').addEventListener('change', syncExit);
   $('costs').addEventListener('change', syncCosts);
@@ -271,6 +285,7 @@ function boot() {
   syncEntry();
   syncExit();
   syncCosts();
+  syncTimeframes();
   fetch('/api/hsi-lab')
     .then((res) => (res.ok ? res.json() : null))
     .then((body) => {
@@ -281,6 +296,7 @@ function boot() {
       if ([...sel.options].some((o) => o.value === current)) sel.value = current;
       const chosen = body.strategies.find((s) => s.id === sel.value);
       if (chosen?.summary) $('strategy-help').textContent = chosen.summary;
+      fillRanges(body.grid?.ranges);
     })
     .catch(() => {});
 }

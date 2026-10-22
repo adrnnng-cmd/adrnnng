@@ -9,7 +9,7 @@ static JSON/CSV.
 | --- | --- | --- |
 | `/` | Landing page (`index.html`, `assets/js/home.js`) | this repo |
 | `/backtest/` | Backtest tool | this repo; prices refreshed by `backtest-prices.yml` |
-| `/hsi-lab/` | HSI futures strategy lab | this repo. Bars stay in a private Workers KV namespace; a Pages Function returns points only |
+| `/hsi-lab/` | HSI futures strategy lab | this repo. Precomputed scores stay in Workers KV; a Pages Function returns points only |
 | `/politician-tracker/` | Politician Tracker | this repo; page rebuilt by `politician-tracker.yml` |
 | `/news/` | Morning Report | **News Analyst agent** (direct Wrangler upload, ~08:15 HKT). Not in this repo. |
 
@@ -37,7 +37,8 @@ backtest/
 politician-tracker/            built page + data.json + img/ (committed by its workflow)
 hsi-lab/                       public lab page, engine, and request handler
 functions/api/hsi-lab/         Cloudflare Pages Function (GET the registry, POST a run)
-scripts/pack-hsi-r2.mjs        private packer: cleaned parquet/CSV → KV year values
+scripts/pack-hsi-r2.mjs        private packer: cleaned parquet/CSV → year bins
+scripts/hsi-lab-precompute.mjs private grid: tape → gzipped result bundles for KV
 .github/<tool>/                data builders run by Actions (Python stdlib, no pip installs)
 .github/workflows/             scheduled refreshes, publish ping, site check
 scripts/                       check-site, new-tool scaffolder + template, assemble-deploy
@@ -169,41 +170,47 @@ node backtest/runners/hsi-supertrend-phase1.js --data /path/to/HSImain_1m.parque
 
 ### HSI Strategy Lab
 
-`/hsi-lab/` is the public page for that study. There is no login. Adrian sets the rule and the server returns the score: trades, trades per day, win rate, profit factor, average points, average hold, max drawdown, gross and net points, an equity curve in cumulative points, and breakdowns by year and by entry hour. The response has no prices, no entry or exit levels, and no per-trade timestamps.
+`/hsi-lab/` is the public page for that study. There is no login. The free plan allows about 10ms of CPU and 128MB per request, so the page does not run the backtest. Adrian picks a cell in a precomputed grid and the server looks up the score: trades, trades per day, win rate, profit factor, average points, average hold, max drawdown, gross and net points, an equity curve of at most 250 cumulative points, and breakdowns by year and by entry hour. The response has no prices, no entry or exit levels, and no per-trade timestamps.
 
-The page calls `POST /api/hsi-lab`. `GET /api/hsi-lab` returns the strategy registry and the input bounds. There is no `/api/bars`. `functions/api/hsi-lab/_middleware.js` is the only auth hook: `authorize()` in `hsi-lab/server/auth.js` currently allows every request, and a later login replaces that function.
+The grid is entry timeframe 1m or 5m, entry ATR 10 through 14, exit timeframe 1m or 5m, and exit ATR 10 through 14. When the timeframes match, both sides share one ATR. Then five entry rules (any flip, the 09:15 state, the 09:30 state, the first flip after 09:15, the first flip after 09:30) and three exits (flat, re-enter the same way, reverse). Factor is 2.5, smoothing is 2, and the window is the day session 09:15–16:30. Ranges are each calendar year from 2020 through the current year, plus ALL. That is 900 studies. A full archive is 80 gzip bundles plus a manifest, under the 150-key budget.
 
-ATR SuperTrend is the only strategy. The registry is `hsi-lab/engine/registry.js`. A flip is known at the signal bar's close and fills at the next 1-minute open, on the same date. A 5-minute flip fills at the first 1-minute open of the next 5-minute bucket. Clock entries use the last completed bar's trend. The position flattens at the last bar inside the trading window (the day session only). Costs default to 8 points per round trip when the exit is 1-minute and 6 when it is 5-minute. The endpoint allows 30 runs a minute per IP on each isolate, and it rejects out-of-range inputs before it reads the archive.
+Net points are gross minus the round-trip cost times the number of trades. Win rate and profit factor stay on gross points. Max drawdown at a cost of 0, 6, or 8 is the marked path. Any other cost is a straight line through those three. Costs default to 8 points when the exit is 1-minute and 6 when it is 5-minute.
 
-Bars are not in git. A Pages Function reads them from a private Workers KV namespace bound as `HSI_BARS`. The same binding name can point at an R2 bucket later; the worker accepts either shape, and KV is the one to configure.
+The page calls `POST /api/hsi-lab`. `GET /api/hsi-lab` returns the grid. There is no `/api/bars`. `functions/api/hsi-lab/_middleware.js` is the only auth hook: `authorize()` in `hsi-lab/server/auth.js` currently allows every request, and a later login replaces that function. The endpoint allows 30 lookups a minute per IP on each isolate. A missing `HSI_BARS` binding returns 503. Parsed bundles stay in isolate memory for 10 minutes.
 
-Object layout, little-endian:
+A flip is known at the signal bar's close and fills at the next 1-minute open, on the same date. A 5-minute flip fills at the first 1-minute open of the next 5-minute bucket. Clock entries use the last completed bar's trend. The position flattens at the last bar of the day session.
 
-| | |
-| --- | --- |
-| Key | `v1/1m/YYYY.bin` |
-| Header, 16 bytes | `HSI1`, version `1` uint8, flags `0` uint8, year uint16, count uint32, reserved uint32 |
-| Record, 40 bytes | days since 1970-01-01 uint16, minute of the bar open uint16, open/high/low/close float64, volume uint32 |
-
-`time_key` is the bar open in Asia/Hong_Kong. Prices are float64 so the pack is exact. A year file is about 9 MB, under the KV value limit of 25 MB. The worker reads with `env.HSI_BARS.get(key, 'arrayBuffer')`, loads the years the request needs plus the previous year so the indicator can warm up, and ignores `v1/1m/manifest.json`. Decoded years are cached in the isolate for 10 minutes so repeat runs do not spend the free plan's 100,000 KV reads a day.
-
-Pack and upload, from a machine that already has the cleaned file. Do not commit the output.
+Bars are not in git and never go to KV for the page. The engineer precomputes on a private machine. `--data` reads the cleaned parquet or CSV (`time_key`, `open`, `high`, `low`, `close`, `volume`, Hong Kong time). `--bins` reads packed year files from `scripts/pack-hsi-r2.mjs`. Parquet needs pyarrow, polars, or duckdb. The script uses worker threads, refuses to write inside this repository, and does not print prices.
 
 ```bash
-node scripts/pack-hsi-r2.mjs \
+node scripts/hsi-lab-precompute.mjs \
   --data /secure/HK_HSImain_1m.parquet \
-  --out /secure/hsi-bars
+  --out /secure/hsi-results
 
-# Workers & Pages → KV → Create a namespace. Copy its namespace id.
-# Pages project adrnnng → Settings → Bindings → Add → KV namespace.
-# Variable name: HSI_BARS. Do not add a wrangler.toml for this.
-npx wrangler kv key put --namespace-id <id> v1/1m/2020.bin \
-  --path /secure/hsi-bars/v1/1m/2020.bin --remote
+# Nightly: recompute the current year and ALL. Other year files in --out stay put.
+node scripts/hsi-lab-precompute.mjs \
+  --data /secure/HK_HSImain_1m.parquet \
+  --out /secure/hsi-results \
+  --years 2026
 ```
 
-Repeat the put for every `v1/1m/YYYY.bin`. The same upload can be done from the dashboard: KV → the namespace → Add entry → key `v1/1m/2020.bin` → upload the file. The manifest is for inspection; the worker does not read it. Parquet needs pyarrow, polars, or duckdb. The script refuses to write inside this repository. `assemble-deploy.sh` already ships `functions/` and `hsi-lab/` with the rest of the site. The binding is what makes Run work; without it the endpoint returns 503 and no bars.
+Each bundle is `v1/results/<entryTf>m-<entryAtr>/<year|all>.json.gz`. `v1/results/manifest.json` lists the keys and has no prices. Upload them to the Workers KV namespace `hsi-bars` (id `f6577e29d4b249dea5a81b4f00443082`).
 
-An R2 bucket bound as `HSI_BARS` still reads, via `get(key).arrayBuffer()`, if that binding is swapped back later. The upload for that path is `npx wrangler r2 object put <bucket>/v1/1m/2020.bin --file /secure/hsi-bars/v1/1m/2020.bin --remote`. Leave any such bucket private.
+```bash
+# Pages project adrnnng → Settings → Bindings → Add → KV namespace.
+# Variable name: HSI_BARS. Namespace: hsi-bars. Do not add a wrangler.toml.
+npx wrangler kv key put --namespace-id f6577e29d4b249dea5a81b4f00443082 \
+  v1/results/5m-14/all.json.gz \
+  --path /secure/hsi-results/v1/results/5m-14/all.json.gz --remote
+
+npx wrangler kv key put --namespace-id f6577e29d4b249dea5a81b4f00443082 \
+  v1/results/manifest.json \
+  --path /secure/hsi-results/v1/results/manifest.json --remote
+```
+
+Repeat the put for every `v1/results/...json.gz`, or upload the same key and file from the KV dashboard. A full grid is 80 bundles. `--years 2026` rewrites 20 bundles (10 entry cells × 2026 and ALL) plus the manifest, inside the free plan's 1,000 writes a day. The worker reads one bundle with `env.HSI_BARS.get(key, 'arrayBuffer')`. Without the binding, Run returns 503 and no bars.
+
+The same bytes can be stored in an R2 bucket bound as `HSI_BARS`. The adapter still accepts `get(key).arrayBuffer()`. KV is the binding to configure. `assemble-deploy.sh` already ships `functions/` and `hsi-lab/`.
 
 ### Add a strategy
 

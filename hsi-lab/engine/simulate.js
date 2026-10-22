@@ -66,10 +66,25 @@ export function simulateHsi(dayBars, entry, exit, spec) {
   let real = 0;
   let peak = 0;
   let dd = 0;
+  let closed = 0;
+  const trackCosts = spec.trackCosts === true;
+  const splitYears = spec.splitYears === true;
+  let real6 = 0;
+  let real8 = 0;
+  let peak6 = 0;
+  let dd6 = 0;
+  let peak8 = 0;
+  let dd8 = 0;
+  const yearMap = splitYears ? new Map() : null;
 
   const closeAt = (j, px, reason) => {
     const points = pos * (px - ep);
     real += points;
+    if (trackCosts) {
+      real6 += points - 6;
+      real8 += points - 8;
+    }
+    closed += 1;
     trades.push({
       points,
       holdMinutes: (j - ej) + (reason === 'eod' ? 1 : 0),
@@ -95,6 +110,29 @@ export function simulateHsi(dayBars, entry, exit, spec) {
       opened = false;
     }
     const tradable = inRange[j] && mins[j] >= windowStart && mins[j] < windowEnd;
+    let yearRow = null;
+    if (yearMap && inRange[j]) {
+      const y = date[j].slice(0, 4);
+      yearRow = yearMap.get(y);
+      if (!yearRow) {
+        yearRow = {
+          base: real,
+          base6: real6,
+          base8: real8,
+          closed0: closed,
+          days: new Set(),
+          equity: [],
+          peak: 0,
+          dd: 0,
+          peak6: 0,
+          dd6: 0,
+          peak8: 0,
+          dd8: 0,
+        };
+        yearMap.set(y, yearRow);
+      }
+      yearRow.days.add(date[j]);
+    }
     if (pos !== 0 && j > ej && tradable && exit.flip[j] === -pos) {
       closeAt(j, dayBars[j].open, 'x');
       if (spec.exitRule === 'flat') done = true;
@@ -121,12 +159,57 @@ export function simulateHsi(dayBars, entry, exit, spec) {
     }
     if (flattenAt[j] && pos !== 0) closeAt(j, dayBars[j].close, 'eod');
     if (inRange[j]) {
-      const eq = real + (pos ? pos * (dayBars[j].close - ep) : 0);
+      const unreal = pos ? pos * (dayBars[j].close - ep) : 0;
+      const eq = real + unreal;
       if (eq > peak) peak = eq;
       if (eq - peak < dd) dd = eq - peak;
-      if (lastInRange[j]) equity.push({ date: date[j], points: eq });
+      let eq6 = 0;
+      let eq8 = 0;
+      if (trackCosts) {
+        eq6 = real6 + unreal;
+        eq8 = real8 + unreal;
+        if (eq6 > peak6) peak6 = eq6;
+        if (eq6 - peak6 < dd6) dd6 = eq6 - peak6;
+        if (eq8 > peak8) peak8 = eq8;
+        if (eq8 - peak8 < dd8) dd8 = eq8 - peak8;
+      }
+      if (yearRow) {
+        const rel = eq - yearRow.base;
+        if (rel > yearRow.peak) yearRow.peak = rel;
+        if (rel - yearRow.peak < yearRow.dd) yearRow.dd = rel - yearRow.peak;
+        if (trackCosts) {
+          const rel6 = eq6 - yearRow.base6;
+          const rel8 = eq8 - yearRow.base8;
+          if (rel6 > yearRow.peak6) yearRow.peak6 = rel6;
+          if (rel6 - yearRow.peak6 < yearRow.dd6) yearRow.dd6 = rel6 - yearRow.peak6;
+          if (rel8 > yearRow.peak8) yearRow.peak8 = rel8;
+          if (rel8 - yearRow.peak8 < yearRow.dd8) yearRow.dd8 = rel8 - yearRow.peak8;
+        }
+      }
+      if (lastInRange[j]) {
+        equity.push({ date: date[j], points: eq, trades: closed });
+        if (yearRow) yearRow.equity.push({ date: date[j], points: eq - yearRow.base, trades: closed - yearRow.closed0 });
+      }
     }
   }
 
-  return { trades, sessionDays: days.size, grossPoints: real, maxDrawdownPoints: dd, equity };
+  const result = { trades, sessionDays: days.size, grossPoints: real, maxDrawdownPoints: dd, equity };
+  if (trackCosts) {
+    result.maxDrawdownAt6 = dd6;
+    result.maxDrawdownAt8 = dd8;
+  }
+  if (yearMap) {
+    const years = {};
+    for (const [y, row] of yearMap) {
+      years[y] = {
+        sessionDays: row.days.size,
+        maxDrawdownPoints: row.dd,
+        maxDrawdownAt6: row.dd6,
+        maxDrawdownAt8: row.dd8,
+        equity: row.equity,
+      };
+    }
+    result.years = years;
+  }
+  return result;
 }
