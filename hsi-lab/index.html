@@ -172,10 +172,10 @@
             <h3>Score</h3>
             <dl class="defs">
               <dt>Points</dt><dd>One index unit. Long is exit minus entry. Short is the opposite. Gross is before the round-trip cost. Net subtracts the cost once per closed trade.</dd>
-              <dt>Win rate and profit factor</dt><dd>Counted on gross points. A scratch is not a win. Profit factor is blank when there is no losing trade.</dd>
+              <dt>Win rate and profit factor</dt><dd>After the round-trip cost. A session’s winning trades are one bucket: gross win points minus the cost times that count. If the bucket stays positive, those trades stay wins and the remainder is profit. If it does not, the bucket is a loss and none of them count as wins. Losing and scratch trades add their gross loss plus the cost. One trade’s points are not stored, so a small winner beside a large one can still count. A scratch is not a win. Profit factor is blank when there is no losing point after cost. The hour table still counts a gross winner, because it does not store win and loss points.</dd>
               <dt>Hold</dt><dd>1-minute bars from the fill to the exit, plus one when the exit is that bar’s close. Lunch has no bars, so it is not counted.</dd>
               <dt>Max drawdown</dt><dd>Daily resolution. The peak-to-trough of the end-of-day point curve, after the round-trip cost. One point per session, not every minute. The curve shows at most 250 of those sessions. Each stored day also keeps that session’s lowest mark, in points from the session’s start.</dd>
-              <dt>Sharpe</dt><dd>Mean of daily net points divided by their sample standard deviation, times the square root of 252. In points, after the cost you chose. No risk-free rate. A session with no trade counts as zero.</dd>
+              <dt>Sharpe (ann.)</dt><dd>Annualised. Mean of daily net points divided by their sample standard deviation, times the square root of 252. In points, after the cost you chose. No risk-free rate. A session with no trade counts as zero.</dd>
               <dt>Trades per day</dt><dd>Closed trades divided by day-session dates in the range, including dates with no trade.</dd>
             </dl>
           </div>

@@ -45,7 +45,7 @@ function fmtPct(n) {
 
 function fmtPf(metrics) {
   if (!metrics || metrics.trades === 0) return '—';
-  if (metrics.profitFactor == null) return metrics.grossPoints > 0 ? '∞' : '—';
+  if (metrics.profitFactor == null) return metrics.netPoints > 0 ? '∞' : '—';
   return metrics.profitFactor.toFixed(3);
 }
 
@@ -59,7 +59,9 @@ function fmtSharpe(n) {
   return n.toFixed(2);
 }
 
-const SHARPE_TIP = 'Mean of daily net points divided by their sample standard deviation, times the square root of 252. In points, after the cost you chose. No risk-free rate. Sessions with no trade count as zero.';
+const SHARPE_TIP = 'Annualised. Mean of daily net points divided by their sample standard deviation, times the square root of 252. In points, after the cost you chose. No risk-free rate. Sessions with no trade count as zero.';
+const PF_TIP = 'After the cost you chose. Each session’s winning trades are one bucket: gross win points minus the cost times how many of them there were. If that stays positive, it is profit and those trades stay wins. If not, the bucket is a loss and none of them count as wins. Losing and scratch trades add their gross loss plus the cost. One trade’s points are not stored, so a small winner beside a large one can still count.';
+const WIN_TIP = 'Share of trades that stay winners after the cost, using that same session bucket. The hour table still counts a gross winner, because it does not store win and loss points.';
 
 function num(id) {
   return Number($(id).value);
@@ -189,12 +191,12 @@ function render(result) {
   const stats = [
     { label: 'Trades', value: m.trades.toLocaleString('en-US') },
     { label: 'Trades/day', value: m.tradesPerDay == null ? '—' : m.tradesPerDay.toFixed(2) },
-    { label: 'Win rate', value: fmtPct(m.winRate) },
-    { label: 'Profit factor', value: fmtPf(m) },
+    { label: 'Win rate', value: fmtPct(m.winRate), tip: WIN_TIP },
+    { label: 'Profit factor', value: fmtPf(m), tip: PF_TIP },
     { label: 'Avg pts', value: fmtPoints(m.avgPoints, 2) },
     { label: 'Avg hold', value: m.avgHoldMinutes == null ? '—' : `${fmtHold(m.avgHoldMinutes)} min` },
     { label: 'Max DD', value: fmtPoints(m.maxDrawdownPoints, 1), note: 'daily resolution' },
-    { label: 'Sharpe', value: fmtSharpe(m.sharpe), tip: SHARPE_TIP },
+    { label: 'Sharpe (ann.)', value: fmtSharpe(m.sharpe), tip: SHARPE_TIP },
     { label: 'Gross', value: fmtPoints(m.grossPoints, 1) },
   ];
   const equity = (result.equity || []).filter((p) => /^\d{4}-\d{2}-\d{2}$/.test(p.date) && typeof p.points === 'number');
@@ -249,7 +251,7 @@ function render(result) {
       <div><h2>By year</h2>${years}</div>
       <div><h2>By entry hour</h2>${(result.byEntryHour || []).length ? hours : '<p class="lab-help">Shown for a whole year, or for all stored years.</p>'}</div>
     </div>
-    <p class="notice lab-note">Win rate and profit factor are on gross points. Net is after the round-trip cost. No prices are in this result.</p>`;
+    <p class="notice lab-note">Win rate and profit factor use each session’s win and loss points, after the round-trip cost. The hour table still counts a win on gross points. No prices are in this result.</p>`;
 }
 
 function renderError(message) {

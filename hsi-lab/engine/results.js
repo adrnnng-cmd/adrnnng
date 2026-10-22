@@ -53,7 +53,7 @@ export function scoreStored(decoded, spec) {
       sessionDays: sliced.sessionDays,
       tradesPerDay: sliced.sessionDays ? roundTo(trades / sliced.sessionDays, 4) : null,
       winRate: trades ? roundTo(sliced.wins / trades, 4) : null,
-      profitFactor: sliced.grossLoss > 0 ? roundTo(sliced.grossWin / sliced.grossLoss, 4) : null,
+      profitFactor: sliced.netLoss > 0 ? roundTo(sliced.netWin / sliced.netLoss, 4) : null,
       avgPoints: trades ? roundTo(sliced.gross / trades, 4) : null,
       avgHoldMinutes: trades ? roundTo(sliced.hold / trades, 2) : null,
       maxDrawdownPoints: roundTo(sliced.maxDrawdown, 2),

@@ -227,6 +227,25 @@ export function decodeDaily(bytes) {
   }
 }
 
+// Per-trade points are not stored. A session's winning trades are one bucket:
+// gross win points minus the cost times the win count. If that stays positive,
+// those trades stay wins. If not, the bucket is a loss and none of them count.
+// Losing and scratch trades add their gross loss plus the cost.
+export function netOfCost(grossWin, grossLoss, trades, wins, cost) {
+  const costCenti = Math.round((Number(cost) || 0) * SCALE);
+  const t = u16(trades);
+  const w = Math.min(u16(wins), t);
+  let netWin = centi(grossWin) - costCenti * w;
+  let netLoss = centi(grossLoss) + costCenti * (t - w);
+  let netWins = w;
+  if (netWin < 0) {
+    netLoss -= netWin;
+    netWin = 0;
+    netWins = 0;
+  }
+  return { netWin: netWin / SCALE, netLoss: netLoss / SCALE, netWins };
+}
+
 export function readDay(decoded, combo, index) {
   const row = decoded.combos.get(combo);
   if (!row || index < 0 || index >= decoded.days.length) return null;
@@ -303,6 +322,8 @@ export function sliceDays(decoded, combo, fromIso, toIso, cost, range, maxEquity
   let grossCenti = 0;
   let winCenti = 0;
   let lossCenti = 0;
+  let netWin = 0;
+  let netLoss = 0;
   let hold = 0;
   let cumTrades = 0;
   let cum = 0;
@@ -320,11 +341,14 @@ export function sliceDays(decoded, combo, fromIso, toIso, cost, range, maxEquity
     const gw = view.getInt32(offset + 8, true);
     const gl = view.getInt32(offset + 12, true);
     const h = view.getUint16(offset + 16, true);
+    const net = netOfCost(gw / SCALE, gl / SCALE, t, w, cost);
     trades += t;
-    wins += w;
+    wins += net.netWins;
     grossCenti += gCenti;
     winCenti += gw;
     lossCenti += gl;
+    netWin += net.netWin;
+    netLoss += net.netLoss;
     hold += h;
     cumTrades += t;
     const seen = i - lo + 1;
@@ -342,7 +366,7 @@ export function sliceDays(decoded, combo, fromIso, toIso, cost, range, maxEquity
       years.set(year, bucket);
     }
     bucket.trades += t;
-    bucket.wins += w;
+    bucket.wins += net.netWins;
     bucket.grossCenti += gCenti;
     if (keep[i - lo]) {
       equity.push({ date: indexToDate(days[i]), points: cum, trades: cumTrades });
@@ -361,6 +385,8 @@ export function sliceDays(decoded, combo, fromIso, toIso, cost, range, maxEquity
     gross: grossCenti / SCALE,
     grossWin: winCenti / SCALE,
     grossLoss: lossCenti / SCALE,
+    netWin,
+    netLoss,
     hold,
     maxDrawdown: drawdown,
     equity,

@@ -9,7 +9,7 @@ import { atrSupertrend } from '../strategies/atr-supertrend.js';
 import { barDate, barMinutes, resampleMinutes } from '../engine/intraday.js';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import { decodeYear, encodeYear, objectKey } from '../../hsi-lab/engine/archive.js';
-import { decodeDaily, encodeBundle, readDay } from '../../hsi-lab/engine/daily.js';
+import { decodeDaily, encodeBundle, netOfCost, readDay } from '../../hsi-lab/engine/daily.js';
 import { bundleKey, bundleKeys, gridJobs, indexToDate, validateLookup } from '../../hsi-lab/engine/grid.js';
 import { computeEntryGroup, prepareDayBars, requestedRanges } from '../../hsi-lab/engine/precompute.js';
 import { scoreStored } from '../../hsi-lab/engine/results.js';
@@ -736,6 +736,10 @@ test('auth is one hook and the route does not publish bars', async () => {
   assert.match(html, /No risk-free rate/);
   assert.match(app, /No risk-free rate/);
   assert.match(app, /daily resolution/);
+  assert.match(app, /Sharpe \(ann\.\)/);
+  assert.match(html, /Sharpe \(ann\.\)/);
+  assert.match(app, /square root of 252/);
+  assert.match(html, /winning trades are one bucket/);
   assert.match(html, /data-site-header/);
   assert.match(html, /\/assets\/js\/site\.js/);
 });
@@ -847,7 +851,20 @@ test('a precomputed year matches a direct run and costs are applied on lookup', 
   assert.equal(pub.metrics.grossPoints, direct.result.metrics.grossPoints);
   assert.equal(pub.metrics.sessionDays, direct.result.metrics.sessionDays);
   assert.equal(pub.metrics.netPoints, direct.result.metrics.netPoints);
-  assert.equal(pub.metrics.winRate, direct.result.metrics.winRate);
+  let netWins = 0;
+  let netWin = 0;
+  let netLoss = 0;
+  for (let i = 0; i < decoded.days.length; i++) {
+    if (!indexToDate(decoded.days[i]).startsWith('2024')) continue;
+    const row = readDay(decoded, combo, i);
+    const net = netOfCost(row.gw, row.gl, row.t, row.w, 6);
+    netWins += net.netWins;
+    netWin += net.netWin;
+    netLoss += net.netLoss;
+  }
+  assert.equal(pub.metrics.winRate, pub.metrics.trades ? Number((netWins / pub.metrics.trades).toFixed(4)) : null);
+  assert.equal(pub.metrics.profitFactor, netLoss > 0 ? Number((netWin / netLoss).toFixed(4)) : null);
+  assert.equal(pub.byYear[0].winRate, pub.metrics.winRate);
   assert.equal(pub.metrics.avgHoldMinutes, direct.result.metrics.avgHoldMinutes);
   assert.equal(pub.params.resolution, 'daily');
   assert.ok(pub.equity.length <= 250);
@@ -938,6 +955,85 @@ function dailyBundle(days, gross, trades) {
     rows: { '5:14:clock:09:30:reenter': row },
   };
 }
+
+test('returned sharpe is annualised by the square root of 252', () => {
+  const clock = new Date('2026-10-22T00:00:00Z');
+  const decoded = decodeDaily(encodeBundle(dailyBundle(['2024-03-04', '2024-03-05'], [1, 3], [0, 0])));
+  const pub = scoreStored(decoded, validateLookup({
+    entryTimeframe: 5,
+    atrLength: 14,
+    exitTimeframe: 5,
+    exitAtrLength: 14,
+    entryRule: 'clock',
+    clock: '09:30',
+    exitRule: 'reenter',
+    from: '2024-03-04',
+    to: '2024-03-05',
+    costs: false,
+  }, clock));
+  const dailyRatio = 2 / Math.sqrt(2);
+  assert.equal(pub.metrics.sharpe, sampleSharpe([1, 3]));
+  assert.ok(Math.abs(pub.metrics.sharpe / dailyRatio - Math.sqrt(252)) < 1e-3);
+  assert.notEqual(pub.metrics.sharpe, Number(dailyRatio.toFixed(4)));
+});
+
+test('profit factor and win rate are net of the per-trade cost', () => {
+  const clock = new Date('2026-10-22T00:00:00Z');
+  const days = ['2024-03-04', '2024-03-05'];
+  const bundle = {
+    entryTimeframe: 5,
+    atrLength: 14,
+    days,
+    rows: {
+      '5:14:clock:09:30:reenter': {
+        g: [10, 5],
+        t: [8, 1],
+        w: [2, 1],
+        gw: [30, 5],
+        gl: [20, 0],
+        h: [8, 1],
+        mn: [0, 0],
+        hours: { all: [[9, 4, 2, 10]], years: {} },
+      },
+    },
+  };
+  const base = {
+    entryTimeframe: 5,
+    atrLength: 14,
+    exitTimeframe: 5,
+    exitAtrLength: 14,
+    entryRule: 'clock',
+    clock: '09:30',
+    exitRule: 'reenter',
+    from: days[0],
+    to: days[1],
+    costs: true,
+    costPoints: 6,
+  };
+  const pub = scoreStored(decodeDaily(encodeBundle(bundle)), validateLookup(base, clock));
+  assert.equal(pub.metrics.grossPoints, 15);
+  assert.equal(pub.metrics.netPoints, -39);
+  assert.ok(pub.metrics.netPoints < 0);
+  assert.equal(pub.metrics.profitFactor, 0.3158);
+  assert.notEqual(pub.metrics.profitFactor, Number((35 / 20).toFixed(4)));
+  assert.equal(pub.metrics.winRate, Number((2 / 9).toFixed(4)));
+  assert.equal(pub.byYear[0].winRate, pub.metrics.winRate);
+  const gross = scoreStored(decodeDaily(encodeBundle(bundle)), validateLookup({
+    ...base,
+    costs: false,
+    costPoints: 0,
+  }, clock));
+  assert.equal(gross.metrics.profitFactor, 1.75);
+  assert.equal(gross.metrics.winRate, Number((3 / 9).toFixed(4)));
+  const whole = scoreStored(decodeDaily(encodeBundle(bundle)), validateLookup({
+    ...base,
+    range: 'all',
+    from: undefined,
+    to: undefined,
+  }, clock));
+  assert.equal(whole.byEntryHour[0].winRate, 0.5);
+  assert.notEqual(whole.byEntryHour[0].winRate, whole.metrics.winRate);
+});
 
 test('sharpe counts flat sessions and is net of the chosen cost', () => {
   const clock = new Date('2026-10-22T00:00:00Z');
