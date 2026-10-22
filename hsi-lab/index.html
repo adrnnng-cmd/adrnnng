@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>HSI Strategy Lab · ADRRR</title>
+  <meta name="description" content="Run an ATR SuperTrend rule on Hang Seng futures. The tape stays private. The page shows points, drawdown, and the equity curve.">
+  <meta name="theme-color" content="#000000">
+  <meta property="og:title" content="HSI Strategy Lab · ADRRR">
+  <meta property="og:description" content="Set the rule. The server returns the score in points. Prices stay off the page.">
+  <meta property="og:url" content="https://adrnnng.com/hsi-lab/">
+  <link rel="icon" href="/assets/brand/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/assets/brand/apple-touch-icon.png">
+  <meta property="og:image" content="https://adrnnng.com/assets/brand/og-image.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;700&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap">
+  <link rel="stylesheet" href="/assets/css/theme.css">
+  <link rel="stylesheet" href="/hsi-lab/hsi-lab.css">
+</head>
+<body class="lab-page">
+  <header class="mast" data-site-header>
+    <div class="wrap mast-in"><a class="logo" href="/" aria-label="ADRRR home"><img class="mark" src="/assets/brand/adrrr-wordmark-white.svg" alt="ADRRR" height="17"></a></div>
+  </header>
+
+  <main>
+    <header class="page-head wrap">
+      <p class="kicker">Futures <span class="sep">/</span> Hang Seng</p>
+      <h1>Strategy Lab <span class="zh">恒指實驗室</span></h1>
+      <p class="lab-dek">Set the rule. The server runs it on the private HSI tape and returns the score only: points, from zero. Opens on the 5-minute study that takes the 09:30 direction and re-enters the same way.</p>
+    </header>
+    <div class="wrap"><hr class="lab-rule"></div>
+
+    <div class="lab wrap">
+      <form class="lab-controls" id="lab-form" autocomplete="off" onsubmit="return false">
+        <fieldset>
+          <legend>Strategy</legend>
+          <label class="field"><span>Rule</span>
+            <select class="select" id="strategy" name="strategy">
+              <option value="atr-supertrend">ATR SuperTrend</option>
+            </select>
+          </label>
+          <p class="lab-help" id="strategy-help">EMA-smoothed close against a ratcheting ATR band. Bullish is long, bearish is short.</p>
+        </fieldset>
+
+        <fieldset>
+          <legend>Indicator</legend>
+          <div class="lab-grid">
+            <label class="field"><span>Factor</span><input class="input num" id="factor" name="factor" type="number" min="0.1" max="10" step="0.1" value="2.5" required></label>
+            <label class="field"><span>Smoothing</span><input class="input num" id="smoothing" name="smoothing" type="number" min="1" max="50" step="1" value="2" required></label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Timeframes</legend>
+          <div class="lab-grid">
+            <div class="field"><span class="field-label">Entry</span><div class="seg" id="entry-tf" role="group" aria-label="Entry timeframe"><button type="button" data-tf="1" aria-pressed="false">1m</button><button type="button" data-tf="5" aria-pressed="true">5m</button></div></div>
+            <label class="field"><span>Entry ATR</span><input class="input num" id="atr-length" name="atrLength" type="number" min="2" max="100" step="1" value="14" required></label>
+            <div class="field"><span class="field-label">Exit</span><div class="seg" id="exit-tf" role="group" aria-label="Exit timeframe"><button type="button" data-tf="1" aria-pressed="false">1m</button><button type="button" data-tf="5" aria-pressed="true">5m</button></div></div>
+            <label class="field"><span>Exit ATR</span><input class="input num" id="exit-atr-length" name="exitAtrLength" type="number" min="2" max="100" step="1" value="14" required></label>
+          </div>
+          <p class="lab-help">Each timeframe keeps its own ATR length. Factor and smoothing are shared. A 5-minute flip fills at the first 1-minute open of the next 5-minute bar.</p>
+        </fieldset>
+
+        <fieldset>
+          <legend>Entry</legend>
+          <div class="lab-grid">
+            <label class="field wide"><span>Rule</span>
+              <select class="select" id="entry-rule" name="entryRule">
+                <option value="flip">Any flip</option>
+                <option value="clock" selected>Clock state</option>
+                <option value="firstFlip">First flip after the clock</option>
+              </select>
+            </label>
+            <label class="field" id="clock-field"><span>Clock</span><input class="input" id="clock" name="clock" type="time" step="60" value="09:30" required></label>
+          </div>
+          <p class="lab-help" id="entry-help"></p>
+        </fieldset>
+
+        <fieldset>
+          <legend>Exit</legend>
+          <label class="field"><span>After the opposite flip</span>
+            <select class="select" id="exit-rule" name="exitRule">
+              <option value="flat">Then flat for the day</option>
+              <option value="reenter" selected>Re-enter the same direction only</option>
+              <option value="reverse">Reverse</option>
+            </select>
+          </label>
+          <p class="lab-help" id="exit-help"></p>
+        </fieldset>
+
+        <fieldset>
+          <legend>Session</legend>
+          <div class="lab-grid">
+            <label class="field"><span>From</span><input class="input" id="from" name="from" type="date"></label>
+            <label class="field"><span>To</span><input class="input" id="to" name="to" type="date"></label>
+            <label class="field"><span>Window start</span><input class="input" id="window-start" name="windowStart" type="time" step="60" value="09:15" required></label>
+            <label class="field"><span>Window end</span><input class="input" id="window-end" name="windowEnd" type="time" step="60" value="16:30" required></label>
+          </div>
+          <p class="lab-help">Day session only. Leave the dates empty for the full archive. A position is flattened at the window end, or at the session end when the window runs to 16:30.</p>
+        </fieldset>
+
+        <fieldset>
+          <legend>Costs</legend>
+          <div class="cost-row">
+            <label class="check"><input type="checkbox" id="costs" name="costs" checked> Subtract round-trip cost</label>
+            <label class="field"><span>Points / RT</span><input class="input num" id="cost-points" name="costPoints" type="number" min="0" max="100" step="0.5" value="6"></label>
+          </div>
+          <p class="lab-help">Default is 8 points when the exit is 1-minute and 6 when it is 5-minute, until you type your own.</p>
+        </fieldset>
+
+        <button type="submit" class="btn btn-primary" id="run">Run</button>
+        <p class="lab-help">Research only. Not a trading system. One index unit, points, not contracts.</p>
+      </form>
+
+      <section class="lab-results" id="results" aria-live="polite">
+        <p class="lab-empty" id="empty">Pick the settings and run. You will see trades, the point curve, and the split by year and by entry hour. You will not see a price.</p>
+      </section>
+    </div>
+
+    <section class="wrap method-block">
+      <details class="panel method" id="method">
+        <summary><h2 class="panel-title">How a fill is decided</h2><span class="panel-sub">No lookahead, day session, points only</span></summary>
+        <div class="panel-body method-body">
+          <div>
+            <h3>Execution</h3>
+            <ul>
+              <li>The tape never leaves the server. This page sends settings and receives points.</li>
+              <li>Day session only: bar opens in 09:15–12:00 and 13:00–16:30 Hong Kong time. Auction, lunch, and the night session are dropped.</li>
+              <li>A flip is known when its bar closes and is filled at the next bar’s open, on that same date. The last bar of the window does not open a new trade.</li>
+              <li>A 5-minute flip fills at the first 1-minute open of the next 5-minute bar. The 11:55 bar’s flip fills at 13:00.</li>
+              <li>A clock entry uses the trend of the last completed bar at that open. It does not need a flip.</li>
+              <li>The first flip after the clock uses the signal bar’s time, not the fill bar’s time.</li>
+              <li>Opposite flip, then flat: one exit, and nothing else that day. Same-direction re-entry waits for the entry timeframe to flip back. Reverse takes the next entry-timeframe flip either way; when both timeframes match, that is this same bar.</li>
+              <li>Whatever is still open flattens at the last bar inside the window, at that bar’s close.</li>
+            </ul>
+          </div>
+          <div>
+            <h3>Score</h3>
+            <dl class="defs">
+              <dt>Points</dt><dd>One index unit. Long is exit minus entry. Short is the opposite. Gross is before the round-trip cost. Net subtracts the cost once per closed trade.</dd>
+              <dt>Win rate and profit factor</dt><dd>Counted on gross points. A scratch is not a win. Profit factor is blank when there is no losing trade.</dd>
+              <dt>Hold</dt><dd>1-minute bars from the fill to the exit, plus one when the exit is that bar’s close. Lunch has no bars, so it is not counted.</dd>
+              <dt>Max drawdown</dt><dd>Marked on every 1-minute close while the run is inside the dates. The curve itself is the cumulative result at each session’s flatten, starting from zero.</dd>
+              <dt>Trades per day</dt><dd>Closed trades divided by day-session dates in the range, including dates with no trade.</dd>
+            </dl>
+          </div>
+        </div>
+      </details>
+    </section>
+  </main>
+
+  <footer data-site-footer></footer>
+  <script type="module" src="/assets/js/site.js"></script>
+  <script type="module" src="/hsi-lab/app.js"></script>
+</body>
+</html>

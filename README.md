@@ -9,6 +9,7 @@ static JSON/CSV.
 | --- | --- | --- |
 | `/` | Landing page (`index.html`, `assets/js/home.js`) | this repo |
 | `/backtest/` | Backtest tool | this repo; prices refreshed by `backtest-prices.yml` |
+| `/hsi-lab/` | HSI futures strategy lab | this repo. Bars stay in a private R2 bucket; a Pages Function returns points only |
 | `/politician-tracker/` | Politician Tracker | this repo; page rebuilt by `politician-tracker.yml` |
 | `/news/` | Morning Report | **News Analyst agent** (direct Wrangler upload, ~08:15 HKT). Not in this repo. |
 
@@ -34,6 +35,9 @@ backtest/
   data/prices/                 daily CSVs + manifest.json (written by the scheduled fetch)
   tests/                       node --test unit tests; tests/reference = independent Python cross-check
 politician-tracker/            built page + data.json + img/ (committed by its workflow)
+hsi-lab/                       public lab page, engine, and request handler
+functions/api/hsi-lab/         Cloudflare Pages Function (GET the registry, POST a run)
+scripts/pack-hsi-r2.mjs        private packer: cleaned parquet/CSV → R2 year objects
 .github/<tool>/                data builders run by Actions (Python stdlib, no pip installs)
 .github/workflows/             scheduled refreshes, publish ping, site check
 scripts/                       check-site, new-tool scaffolder + template, assemble-deploy
@@ -163,6 +167,41 @@ node backtest/runners/hsi-supertrend-phase1.js --data /path/to/HSImain_1m.parque
 
 `HSI_BARS_PATH` is the same path when `--data` is omitted. Output defaults to `backtest/output/hsi-supertrend-phase1/` (gitignored): `summary.csv`, `summary.json`, and `runs/<id>.json`. The reader is not a browser provider and the site does not serve the bars.
 
+### HSI Strategy Lab
+
+`/hsi-lab/` is the public page for that study. There is no login. Adrian sets the rule and the server returns the score: trades, trades per day, win rate, profit factor, average points, average hold, max drawdown, gross and net points, an equity curve in cumulative points, and breakdowns by year and by entry hour. The response has no prices, no entry or exit levels, and no per-trade timestamps.
+
+The page calls `POST /api/hsi-lab`. `GET /api/hsi-lab` returns the strategy registry and the input bounds. There is no `/api/bars`. `functions/api/hsi-lab/_middleware.js` is the only auth hook: `authorize()` in `hsi-lab/server/auth.js` currently allows every request, and a later login replaces that function.
+
+ATR SuperTrend is the only strategy. The registry is `hsi-lab/engine/registry.js`. A flip is known at the signal bar's close and fills at the next 1-minute open, on the same date. A 5-minute flip fills at the first 1-minute open of the next 5-minute bucket. Clock entries use the last completed bar's trend. The position flattens at the last bar inside the trading window (the day session only). Costs default to 8 points per round trip when the exit is 1-minute and 6 when it is 5-minute. The endpoint allows 30 runs a minute per IP on each isolate, and it rejects out-of-range inputs before it reads the archive.
+
+Bars are not in git. A Pages Function reads them from a private R2 binding named `HSI_BARS`.
+
+Object layout, little-endian:
+
+| | |
+| --- | --- |
+| Key | `v1/1m/YYYY.bin` |
+| Header, 16 bytes | `HSI1`, version `1` uint8, flags `0` uint8, year uint16, count uint32, reserved uint32 |
+| Record, 40 bytes | days since 1970-01-01 uint16, minute of the bar open uint16, open/high/low/close float64, volume uint32 |
+
+`time_key` is the bar open in Asia/Hong_Kong. Prices are float64 so the pack is exact. The worker loads the years the request needs, plus the previous year so the indicator can warm up, and ignores `v1/1m/manifest.json`.
+
+Pack and upload, from a machine that already has the cleaned file. Do not commit the output.
+
+```bash
+node scripts/pack-hsi-r2.mjs \
+  --data /secure/HK_HSImain_1m.parquet \
+  --out /secure/hsi-r2
+
+# Private bucket. Do not enable a public r2.dev domain.
+# Pages project → Settings → Bindings → R2 bucket → Variable name HSI_BARS.
+npx wrangler r2 object put <bucket>/v1/1m/2020.bin \
+  --file /secure/hsi-r2/v1/1m/2020.bin --remote
+```
+
+Repeat the put for every `v1/1m/YYYY.bin`. The manifest is for inspection; the worker does not read it. Parquet needs pyarrow, polars, or duckdb. The script refuses to write inside this repository. `assemble-deploy.sh` already ships `functions/` and `hsi-lab/` with the rest of the site. The binding is what makes Run work; without it the endpoint returns 503 and no bars.
+
 ### Add a strategy
 
 Create `backtest/strategies/my-strategy.js`:
@@ -259,7 +298,7 @@ report. The only copy in this repo is `scripts/preview/latest.json`, and `assemb
 does not upload `scripts/`.
 
 This repo owns the site root outside `news/`: `index.html`, `404.html`, `_headers`, `_redirects`,
-`assets/`, `backtest/` (without `backtest/tests/`), and `politician-tracker/`. `404.html` must be
+`assets/`, `backtest/` (without `backtest/tests/`), `hsi-lab/`, `functions/`, and `politician-tracker/`. `404.html` must be
 in every upload. Without it, Pages treats the site as a single-page app and serves `index.html`
 with status 200 for unknown paths, including `/backtest/tests/`. `_redirects` only aliases
 `/backtesting` to `/backtest/`. The News Analyst merges the `/latest` redirect rules at upload
