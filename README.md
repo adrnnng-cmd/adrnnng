@@ -49,7 +49,7 @@ from `tools.json`).
 
 ```bash
 npm run serve        # http://127.0.0.1:8788  (any static server works; no install needed)
-npm test             # engine unit tests (node --test) + price fetcher tests (Python)
+npm test             # engine unit tests, price-fetcher tests, politician-tracker photo tests
 npm run verify:backtest   # engine vs an independent Python implementation on real SPY data
 npm run check        # registry, page wiring, local links/imports, reserved paths, price manifest
 ```

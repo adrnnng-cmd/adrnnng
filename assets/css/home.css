@@ -137,7 +137,7 @@ body.has-story-hero .dek a:hover { text-decoration: underline; text-underline-of
 .door-photo picture { display: block; flex: 0 0 auto; }
 .door-photo > div { min-width: 0; }
 .door-photo img {
-  display: block; width: 56px; height: 70px; object-fit: cover;
+  display: block; width: 56px; height: 70px; object-fit: cover; background: var(--bg-2);
   filter: grayscale(1); transition: filter 0.2s ease;
 }
 .door:hover .door-photo img { filter: none; }

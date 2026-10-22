@@ -6,8 +6,9 @@ ticker on Adrian's Watchlist. Each row shows the politician, ticker/company, Buy
 trade date, filing date, **lag days** (filing − trade) and a link to the official filing.
 
 The builder is plain Python 3.10+ standard library: no `pip install`, no API keys, no paid services.
-It writes two files, `index.html` (fully rendered, works without JS) and `data.json`, into
-`<site root>/politician-tracker/`. No build step runs on the host; the built files are committed.
+It writes `index.html` (fully rendered, works without JS), `data.json`, and official portraits
+under `img/<bioguide>.jpg` for every member in the trades, into `<site root>/politician-tracker/`.
+Portraits already on disk are left alone. No build step runs on the host; the built files are committed.
 
 ## Run locally
 
@@ -29,6 +30,7 @@ with a "stale" notice, so a flaky source never blanks the page.
 | [House Clerk](https://disclosures-clerk.house.gov) FD index (official) | Maps House rows to the official PTR PDF (`ptr-pdfs/<year>/<DocID>.pdf`). |
 | [Quiver Quantitative](https://www.quiverquant.com/congresstrading/) public pages | House transactions: the all-members recent feed (~3 weeks) for Watchlist overlap, plus each VIP's profile page for history. |
 | [@unitedstates/congress-legislators](https://github.com/unitedstates/congress-legislators) | Party, state/district, and "former member" detection. |
+| [unitedstates.io](https://theunitedstates.io/images/congress/225x275/) portraits, then [Bioguide](https://bioguide.congress.gov/) | Official photo for every bioguide in the trades, saved as `img/<bioguide>.jpg`. Bioguide is the fallback. Files already present are skipped. |
 
 Rows from different sources are merged. Where the same trade appears twice, the earliest filing and the
 most official source win, and genuine repeat trades inside one filing are kept. Amended filings keep the
