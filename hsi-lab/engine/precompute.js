@@ -1,16 +1,17 @@
 // Build the precomputed grid from day-session bars. One simulation covers
-// 2020 through the current year; each calendar year is sliced from that run.
-// ALL is the same run, not a stitch of the years. No prices are written.
+// the whole tape. Each combo keeps one number per session day, and the
+// lookup slices a year or a custom pair of dates from that series.
+// No prices are written.
 
-import { filterDaySession } from '../../backtest/engine/intraday.js';
+import { barDate, filterDaySession } from '../../backtest/engine/intraday.js';
 import { buildSignals } from './signals.js';
 import { simulateHsi } from './simulate.js';
 import {
   ATR_LENGTHS,
+  DATA_START,
   ENTRY_CHOICES,
   EXIT_CHOICES,
   FACTOR,
-  FIRST_YEAR,
   SMOOTHING,
   TIMEFRAMES,
   WINDOW_END_MIN,
@@ -19,7 +20,6 @@ import {
   comboKey,
   currentYear,
 } from './grid.js';
-import { compactCell, emptyCell } from './results.js';
 
 export function studySpec(now = new Date()) {
   const end = currentYear(now);
@@ -30,10 +30,9 @@ export function studySpec(now = new Date()) {
     clockMin: null,
     windowStartMin: WINDOW_START_MIN,
     windowEndMin: WINDOW_END_MIN,
-    from: `${FIRST_YEAR}-01-01`,
+    from: DATA_START,
     to: `${end}-12-31`,
-    trackCosts: true,
-    splitYears: true,
+    trackDays: true,
   };
 }
 
@@ -69,17 +68,64 @@ function jobsForEntry(entryTimeframe, atrLength) {
   return jobs;
 }
 
-function cellFor(raw, range) {
-  if (range !== 'all' && !raw.years?.[String(range)]) return emptyCell(0);
-  return compactCell(raw, range);
+function hourList(map) {
+  if (!map || !map.size) return [];
+  return [...map.entries()].sort((a, b) => a[0] - b[0]).map(([hour, row]) => [hour, row.t, row.w, row.g]);
+}
+
+export function sessionDates(dayBars, now = new Date()) {
+  const from = DATA_START;
+  const to = `${currentYear(now)}-12-31`;
+  const dates = [];
+  let prev = '';
+  for (let i = 0; i < dayBars.length; i++) {
+    const date = barDate(dayBars[i].time);
+    if (!date || date === prev) continue;
+    prev = date;
+    if (date >= from && date <= to) dates.push(date);
+  }
+  return dates;
+}
+
+function blankRow(count) {
+  return {
+    g: new Array(count).fill(0),
+    t: new Array(count).fill(0),
+    w: new Array(count).fill(0),
+    gw: new Array(count).fill(0),
+    gl: new Array(count).fill(0),
+    h: new Array(count).fill(0),
+    mn: new Array(count).fill(0),
+    hours: { all: [], years: {} },
+  };
+}
+
+function fillRow(count, raw, index) {
+  const row = blankRow(count);
+  for (const day of raw.days || []) {
+    const at = index.get(day.date);
+    if (at == null) continue;
+    row.g[at] = day.g;
+    row.t[at] = day.t;
+    row.w[at] = day.w;
+    row.gw[at] = day.gw;
+    row.gl[at] = day.gl;
+    row.h[at] = day.h;
+    row.mn[at] = day.mn;
+  }
+  const years = {};
+  for (const [year, map] of raw.hours?.years || []) years[year] = hourList(map);
+  row.hours = { all: hourList(raw.hours?.all), years };
+  return row;
 }
 
 /**
  * Simulate every exit and rule for one entry timeframe and ATR.
- * `ranges` is a list of 'all' and/or year strings. The tape is still read
- * across the whole window, because ALL is one continuous run.
+ * The bundle is the full daily series. Callers gzip one key per entry pair.
  */
-export function computeEntryGroup(dayBars, { entryTimeframe, atrLength, ranges, now = new Date() }) {
+export function computeEntryGroup(dayBars, { entryTimeframe, atrLength, now = new Date() }) {
+  const dates = sessionDates(dayBars, now);
+  const index = new Map(dates.map((date, at) => [date, at]));
   const entry = buildSignals(dayBars, entryTimeframe, { atrLength, factor: FACTOR, smoothing: SMOOTHING });
   const signals = new Map([[`${entryTimeframe}:${atrLength}`, entry]]);
   const signalFor = (tf, atr) => {
@@ -89,23 +135,17 @@ export function computeEntryGroup(dayBars, { entryTimeframe, atrLength, ranges, 
     }
     return signals.get(key);
   };
-  const bundles = {};
-  for (const range of ranges) {
-    bundles[range] = {
-      v: 1,
-      entryTimeframe,
-      atrLength,
-      range: String(range),
-      rows: {},
-    };
-  }
+  const rows = {};
   for (const job of jobsForEntry(entryTimeframe, atrLength)) {
     const exit = signalFor(job.exitTimeframe, job.exitAtrLength);
     const raw = simulateHsi(dayBars, entry, exit, specFor(job, now));
-    const id = comboKey(job);
-    for (const range of ranges) bundles[range].rows[id] = cellFor(raw, range);
+    rows[comboKey(job)] = fillRow(dates.length, raw, index);
   }
-  return { entryTimeframe, atrLength, bundles };
+  return {
+    entryTimeframe,
+    atrLength,
+    bundle: { v: 2, entryTimeframe, atrLength, days: dates, rows },
+  };
 }
 
 export function prepareDayBars(bars) {

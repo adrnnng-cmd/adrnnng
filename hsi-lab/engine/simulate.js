@@ -69,6 +69,29 @@ export function simulateHsi(dayBars, entry, exit, spec) {
   let closed = 0;
   const trackCosts = spec.trackCosts === true;
   const splitYears = spec.splitYears === true;
+  const trackDays = spec.trackDays === true;
+  const dayRows = trackDays ? [] : null;
+  const hourAll = trackDays ? new Map() : null;
+  const hourYears = trackDays ? new Map() : null;
+  let dayBase = 0;
+  let dayMin = 0;
+  let dayGross = 0;
+  let dayTrades = 0;
+  let dayWins = 0;
+  let dayGw = 0;
+  let dayGl = 0;
+  let dayHold = 0;
+
+  const bumpHour = (map, hour, points) => {
+    let row = map.get(hour);
+    if (!row) {
+      row = { t: 0, w: 0, g: 0 };
+      map.set(hour, row);
+    }
+    row.t += 1;
+    if (points > 0) row.w += 1;
+    row.g += points;
+  };
   let real6 = 0;
   let real8 = 0;
   let peak6 = 0;
@@ -79,6 +102,8 @@ export function simulateHsi(dayBars, entry, exit, spec) {
 
   const closeAt = (j, px, reason) => {
     const points = pos * (px - ep);
+    const holdMinutes = (j - ej) + (reason === 'eod' ? 1 : 0);
+    const entryHour = Math.floor(mins[ej] / 60);
     real += points;
     if (trackCosts) {
       real6 += points - 6;
@@ -87,10 +112,27 @@ export function simulateHsi(dayBars, entry, exit, spec) {
     closed += 1;
     trades.push({
       points,
-      holdMinutes: (j - ej) + (reason === 'eod' ? 1 : 0),
+      holdMinutes,
       year: date[ej].slice(0, 4),
-      entryHour: Math.floor(mins[ej] / 60),
+      entryHour,
     });
+    if (trackDays && inRange[j]) {
+      dayGross += points;
+      dayTrades += 1;
+      dayHold += holdMinutes;
+      if (points > 0) {
+        dayWins += 1;
+        dayGw += points;
+      } else if (points < 0) dayGl -= points;
+      bumpHour(hourAll, entryHour, points);
+      const year = date[j].slice(0, 4);
+      let yearHours = hourYears.get(year);
+      if (!yearHours) {
+        yearHours = new Map();
+        hourYears.set(year, yearHours);
+      }
+      bumpHour(yearHours, entryHour, points);
+    }
     pos = 0;
   };
 
@@ -108,6 +150,16 @@ export function simulateHsi(dayBars, entry, exit, spec) {
       clockTaken = false;
       orig = 0;
       opened = false;
+      if (trackDays) {
+        dayBase = real;
+        dayMin = Infinity;
+        dayGross = 0;
+        dayTrades = 0;
+        dayWins = 0;
+        dayGw = 0;
+        dayGl = 0;
+        dayHold = 0;
+      }
     }
     const tradable = inRange[j] && mins[j] >= windowStart && mins[j] < windowEnd;
     let yearRow = null;
@@ -186,9 +238,25 @@ export function simulateHsi(dayBars, entry, exit, spec) {
           if (rel8 - yearRow.peak8 < yearRow.dd8) yearRow.dd8 = rel8 - yearRow.peak8;
         }
       }
+      if (trackDays) {
+        const rel = eq - dayBase;
+        if (rel < dayMin) dayMin = rel;
+      }
       if (lastInRange[j]) {
         equity.push({ date: date[j], points: eq, trades: closed });
         if (yearRow) yearRow.equity.push({ date: date[j], points: eq - yearRow.base, trades: closed - yearRow.closed0 });
+        if (trackDays) {
+          dayRows.push({
+            date: date[j],
+            g: dayGross,
+            t: dayTrades,
+            w: dayWins,
+            gw: dayGw,
+            gl: dayGl,
+            h: dayHold,
+            mn: dayMin === Infinity ? 0 : dayMin,
+          });
+        }
       }
     }
   }
@@ -197,6 +265,10 @@ export function simulateHsi(dayBars, entry, exit, spec) {
   if (trackCosts) {
     result.maxDrawdownAt6 = dd6;
     result.maxDrawdownAt8 = dd8;
+  }
+  if (trackDays) {
+    result.days = dayRows;
+    result.hours = { all: hourAll, years: hourYears };
   }
   if (yearMap) {
     const years = {};

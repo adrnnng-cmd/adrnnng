@@ -11,9 +11,11 @@
 //     --out /secure/hsi-results \
 //     --years 2026
 //
-// --years refreshes those calendar years plus ALL. Other year files already
-// in --out are left in place. ALL is one continuous run, so the full tape is
-// still read.
+// Every run writes the ten ALL daily bundles. A year and a custom date
+// window are sliced at lookup, so there is no per-year file. --years checks
+// that those years are inside 2020..current; the full tape is still read,
+// because the daily series is one continuous run. Old per-year files in
+// --out are removed so the folder matches the manifest.
 //
 // Upload each written key to Workers KV namespace hsi-bars
 // (id f6577e29d4b249dea5a81b4f00443082), bound on Pages as HSI_BARS:
@@ -22,13 +24,14 @@
 //     v1/results/5m-14/all.json.gz \
 //     --path /secure/hsi-results/v1/results/5m-14/all.json.gz --remote
 
-import { readdirSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
+import { readdirSync, mkdirSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { availableParallelism } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { Worker } from 'node:worker_threads';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
-import { bundleKey } from '../hsi-lab/engine/grid.js';
+import { encodeBundle } from '../hsi-lab/engine/daily.js';
+import { DATA_START, MAX_KV_VALUE_BYTES, bundleKey, utcDate } from '../hsi-lab/engine/grid.js';
 import { entryGroups, requestedRanges } from '../hsi-lab/engine/precompute.js';
 import { assertOutDir } from './pack-hsi-r2.mjs';
 
@@ -38,8 +41,8 @@ const NAMESPACE_ID = 'f6577e29d4b249dea5a81b4f00443082';
 function usage() {
   return `Usage: node scripts/hsi-lab-precompute.mjs (--data <csv-or-parquet> | --bins <dir>) --out <dir> [--years 2026] [--threads N]
 
-Writes v1/results/<tf>m-<atr>/<year|all>.json.gz and v1/results/manifest.json.
-Prints keys, row counts, and byte sizes only.
+Writes v1/results/<tf>m-<atr>/all.json.gz and v1/results/manifest.json.
+Prints keys, row counts, session counts, and byte sizes only.
 `;
 }
 
@@ -62,7 +65,7 @@ function parseArgs(argv) {
   return out;
 }
 
-function runPool({ data, bins, groups, ranges, threads, now }) {
+function runPool({ data, bins, groups, threads, now }) {
   const n = Math.max(1, Math.min(threads, groups.length));
   return new Promise((resolve, reject) => {
     let cursor = 0;
@@ -80,7 +83,7 @@ function runPool({ data, bins, groups, ranges, threads, now }) {
       if (cursor >= groups.length) return;
       const group = groups[cursor];
       cursor += 1;
-      worker.postMessage({ ...group, ranges, now });
+      worker.postMessage({ ...group, now });
     };
     for (let i = 0; i < n; i++) {
       const worker = new Worker(new URL('../hsi-lab/engine/precompute-worker.mjs', import.meta.url), {
@@ -118,7 +121,7 @@ function listResultKeys(outDir) {
     const dir = join(root, entry);
     if (!statSync(dir).isDirectory()) continue;
     for (const name of readdirSync(dir)) {
-      if (name.endsWith('.json.gz')) keys.push(`v1/results/${entry}/${name}`);
+      if (name === 'all.json.gz') keys.push(`v1/results/${entry}/${name}`);
     }
   }
   keys.sort();
@@ -136,46 +139,59 @@ function main() {
   const outDir = assertOutDir(args.out);
   const now = new Date();
   const years = args.years ? args.years.split(',').map((part) => part.trim()).filter(Boolean) : [];
-  const ranges = requestedRanges(years, now);
+  if (years.length) requestedRanges(years, now);
   const threads = Number.isInteger(args.threads) && args.threads > 0 ? args.threads : Math.max(1, availableParallelism() - 1);
   return runPool({
     data: args.data,
     bins: args.bins,
     groups: entryGroups(),
-    ranges,
     threads,
     now: now.toISOString(),
   }).then((groups) => {
     const written = [];
+    let totalBytes = 0;
+    let sessions = 0;
     for (const group of groups) {
-      for (const range of ranges) {
-        const bundle = group.bundles[range];
-        const key = bundleKey(group.entryTimeframe, group.atrLength, range);
-        const path = join(outDir, key);
-        mkdirSync(dirname(path), { recursive: true });
-        const body = gzipSync(Buffer.from(JSON.stringify(bundle)));
-        writeFileSync(path, body);
-        written.push(key);
-        process.stdout.write(`${key}  rows=${Object.keys(bundle.rows).length}  bytes=${body.length}\n`);
+      const bundle = group.bundle;
+      const key = bundleKey(group.entryTimeframe, group.atrLength, 'all');
+      const path = join(outDir, key);
+      mkdirSync(dirname(path), { recursive: true });
+      const encoded = encodeBundle(bundle);
+      const body = gzipSync(Buffer.from(encoded.buffer, encoded.byteOffset, encoded.byteLength));
+      if (body.length > MAX_KV_VALUE_BYTES) {
+        throw new Error(`${key} is ${body.length} bytes, over the 25MB KV value limit.`);
       }
+      writeFileSync(path, body);
+      const dir = dirname(path);
+      for (const name of readdirSync(dir)) {
+        if (name.endsWith('.json.gz') && name !== 'all.json.gz') unlinkSync(join(dir, name));
+      }
+      written.push(key);
+      totalBytes += body.length;
+      sessions = bundle.days.length;
+      process.stdout.write(`${key}  rows=${Object.keys(bundle.rows).length}  days=${bundle.days.length}  bytes=${body.length}\n`);
     }
     const keys = listResultKeys(outDir);
     const manifest = {
       format: 'hsi-lab-results',
-      version: 1,
+      version: 2,
       binding: 'HSI_BARS',
       namespace: NAMESPACE,
       namespaceId: NAMESPACE_ID,
       factor: 2.5,
       smoothing: 2,
       generated: now.toISOString(),
-      ranges,
+      dateStart: DATA_START,
+      dateEnd: utcDate(now),
+      resolution: 'daily',
+      sessions,
       keys,
+      totalBytes,
     };
     const manifestPath = join(outDir, 'v1/results/manifest.json');
     mkdirSync(dirname(manifestPath), { recursive: true });
     writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-    process.stdout.write(`v1/results/manifest.json  keys=${keys.length}  wrote=${written.length}\n`);
+    process.stdout.write(`v1/results/manifest.json  keys=${keys.length}  totalBytes=${totalBytes}  wrote=${written.length}\n`);
   });
 }
 

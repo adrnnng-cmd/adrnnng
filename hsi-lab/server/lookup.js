@@ -1,9 +1,8 @@
-// Lookup-only lab. One KV read returns the gzip bundle for an entry ATR and
-// a range. Parsed bundles stay in isolate memory. Costs are applied here.
+// Lookup-only lab. One KV read returns the gzip daily bundle for an entry
+// ATR. The date window is sliced here. Parsed bundles stay in isolate memory.
 
 import { ArchiveError } from '../engine/archive.js';
-import { comboKey } from '../engine/grid.js';
-import { applyCost, decodeBundle } from '../engine/results.js';
+import { decodeBundle, scoreStored } from '../engine/results.js';
 import { ARCHIVE_CACHE_MS, ArchiveUnconfigured } from './load-bars.js';
 import { openArchive } from './store.js';
 
@@ -56,8 +55,9 @@ async function bundleFor(binding, key, now) {
 }
 
 export async function lookupResult(binding, spec, now = Date.now()) {
+  if (!openArchive(binding)) throw new ArchiveUnconfigured();
   const bundle = await bundleFor(binding, spec.key, now);
-  const cell = bundle.rows?.[spec.combo] || bundle.rows?.[comboKey(spec)];
-  if (!cell) throw new ResultMissing();
-  return applyCost(cell, spec);
+  const scored = scoreStored(bundle, spec);
+  if (!scored) throw new ResultMissing();
+  return scored;
 }

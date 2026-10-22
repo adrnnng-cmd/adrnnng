@@ -172,11 +172,13 @@ node backtest/runners/hsi-supertrend-phase1.js --data /path/to/HSImain_1m.parque
 
 `/hsi-lab/` is the public page for that study. There is no login. The free plan allows about 10ms of CPU and 128MB per request, so the page does not run the backtest. Adrian picks a cell in a precomputed grid and the server looks up the score: trades, trades per day, win rate, profit factor, average points, average hold, max drawdown, gross and net points, an equity curve of at most 250 cumulative points, and breakdowns by year and by entry hour. The response has no prices, no entry or exit levels, and no per-trade timestamps.
 
-The grid is entry timeframe 1m or 5m, entry ATR 10 through 14, exit timeframe 1m or 5m, and exit ATR 10 through 14. When the timeframes match, both sides share one ATR. Then five entry rules (any flip, the 09:15 state, the 09:30 state, the first flip after 09:15, the first flip after 09:30) and three exits (flat, re-enter the same way, reverse). Factor is 2.5, smoothing is 2, and the window is the day session 09:15–16:30. Ranges are each calendar year from 2020 through the current year, plus ALL. That is 900 studies. A full archive is 80 gzip bundles plus a manifest, under the 150-key budget.
+The grid is entry timeframe 1m or 5m, entry ATR 10 through 14, exit timeframe 1m or 5m, and exit ATR 10 through 14. When the timeframes match, both sides share one ATR. Then five entry rules (any flip, the 09:15 state, the 09:30 state, the first flip after 09:15, the first flip after 09:30) and three exits (flat, re-enter the same way, reverse). Factor is 2.5, smoothing is 2, and the window is the day session 09:15–16:30. That is 900 studies. The date control is By year (one calendar year, or all years) or Custom dates, any start and end from 2020-01-02 through today.
 
-Net points are gross minus the round-trip cost times the number of trades. Win rate and profit factor stay on gross points. Max drawdown at a cost of 0, 6, or 8 is the marked path. Any other cost is a straight line through those three. Costs default to 8 points when the exit is 1-minute and 6 when it is 5-minute.
+Each study stores one row per session day: gross points, trade count, wins, gross win points, gross loss points, hold minutes, and the session’s lowest mark in points from that session’s start. The worker adds the days inside the window. Net points are gross minus the round-trip cost times the trade count. Win rate and profit factor stay on gross points. Max drawdown is the peak-to-trough of that end-of-day curve, so the figure on the page is daily, not every minute. Costs default to 8 points when the exit is 1-minute and 6 when it is 5-minute. Entry hour is shown for a whole stored year or for every stored year. A custom window still gets the year table.
 
-The page calls `POST /api/hsi-lab`. `GET /api/hsi-lab` returns the grid. There is no `/api/bars`. `functions/api/hsi-lab/_middleware.js` is the only auth hook: `authorize()` in `hsi-lab/server/auth.js` currently allows every request, and a later login replaces that function. The endpoint allows 30 lookups a minute per IP on each isolate. A missing `HSI_BARS` binding returns 503. Parsed bundles stay in isolate memory for 10 minutes.
+The archive is 10 gzip bundles, one per entry timeframe and ATR, plus a manifest: 11 KV keys. A synthetic bundle of 1,776 weekday sessions and 90 studies is 3.7 MB raw and about 840 KB gzipped, so the ten bundles are about 8.2 MB. Each value stays under the 25 MB limit. Real session counts are lower once holidays are dropped. By year and custom dates both read that one key.
+
+The page calls `POST /api/hsi-lab`. `GET /api/hsi-lab` returns the grid and does not touch KV. There is no `/api/bars`. `functions/api/hsi-lab/_middleware.js` is the only auth hook: `authorize()` in `hsi-lab/server/auth.js` currently allows every request, and a later login replaces that function. The endpoint allows 30 lookups a minute per IP on each isolate. A missing `HSI_BARS` binding returns 503. Parsed bundles stay in isolate memory for 10 minutes, at most eight at a time.
 
 A flip is known at the signal bar's close and fills at the next 1-minute open, on the same date. A 5-minute flip fills at the first 1-minute open of the next 5-minute bucket. Clock entries use the last completed bar's trend. The position flattens at the last bar of the day session.
 
@@ -187,14 +189,15 @@ node scripts/hsi-lab-precompute.mjs \
   --data /secure/HK_HSImain_1m.parquet \
   --out /secure/hsi-results
 
-# Nightly: recompute the current year and ALL. Other year files in --out stay put.
+# Nightly refresh. --years checks the year, then rewrites the same ten
+# daily bundles. The full tape is still read. There is no per-year file.
 node scripts/hsi-lab-precompute.mjs \
   --data /secure/HK_HSImain_1m.parquet \
   --out /secure/hsi-results \
   --years 2026
 ```
 
-Each bundle is `v1/results/<entryTf>m-<entryAtr>/<year|all>.json.gz`. `v1/results/manifest.json` lists the keys and has no prices. Upload them to the Workers KV namespace `hsi-bars` (id `f6577e29d4b249dea5a81b4f00443082`).
+Each bundle is `v1/results/<entryTf>m-<entryAtr>/all.json.gz`. `v1/results/manifest.json` lists the 10 keys, the total byte count, and no prices. Upload them to the Workers KV namespace `hsi-bars` (id `f6577e29d4b249dea5a81b4f00443082`).
 
 ```bash
 # Pages project adrnnng → Settings → Bindings → Add → KV namespace.
@@ -208,7 +211,7 @@ npx wrangler kv key put --namespace-id f6577e29d4b249dea5a81b4f00443082 \
   --path /secure/hsi-results/v1/results/manifest.json --remote
 ```
 
-Repeat the put for every `v1/results/...json.gz`, or upload the same key and file from the KV dashboard. A full grid is 80 bundles. `--years 2026` rewrites 20 bundles (10 entry cells × 2026 and ALL) plus the manifest, inside the free plan's 1,000 writes a day. The worker reads one bundle with `env.HSI_BARS.get(key, 'arrayBuffer')`. Without the binding, Run returns 503 and no bars.
+Repeat the put for every `v1/results/<tf>m-<atr>/all.json.gz`, or upload the same key and file from the KV dashboard. A full grid is 10 bundles plus the manifest, 11 writes, inside the free plan's 1,000 writes a day. The worker reads one bundle with `env.HSI_BARS.get(key, 'arrayBuffer')`. Without the binding, Run returns 503 and no bars.
 
 The same bytes can be stored in an R2 bucket bound as `HSI_BARS`. The adapter still accepts `get(key).arrayBuffer()`. KV is the binding to configure. `assemble-deploy.sh` already ships `functions/` and `hsi-lab/`.
 

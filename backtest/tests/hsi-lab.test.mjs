@@ -7,11 +7,12 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { atrSupertrend } from '../strategies/atr-supertrend.js';
 import { barDate, barMinutes, resampleMinutes } from '../engine/intraday.js';
-import { gzipSync } from 'node:zlib';
+import { gunzipSync, gzipSync } from 'node:zlib';
 import { decodeYear, encodeYear, objectKey } from '../../hsi-lab/engine/archive.js';
-import { bundleKey, bundleKeys, gridJobs, validateLookup } from '../../hsi-lab/engine/grid.js';
+import { decodeDaily, encodeBundle, readDay } from '../../hsi-lab/engine/daily.js';
+import { bundleKey, bundleKeys, gridJobs, indexToDate, validateLookup } from '../../hsi-lab/engine/grid.js';
 import { computeEntryGroup, prepareDayBars, requestedRanges } from '../../hsi-lab/engine/precompute.js';
-import { applyCost } from '../../hsi-lab/engine/results.js';
+import { scoreStored } from '../../hsi-lab/engine/results.js';
 import { resetLookupCache } from '../../hsi-lab/server/lookup.js';
 import { buildSignals } from '../../hsi-lab/engine/signals.js';
 import { simulateHsi } from '../../hsi-lab/engine/simulate.js';
@@ -535,7 +536,10 @@ function post(body, origin = 'https://adrnnng.com') {
 }
 
 function resultKv(files) {
-  const objects = new Map(Object.entries(files).map(([key, bundle]) => [key, gzipSync(Buffer.from(JSON.stringify(bundle)))]));
+  const objects = new Map(Object.entries(files).map(([key, bundle]) => {
+    const raw = bundle instanceof Uint8Array ? bundle : encodeBundle(bundle);
+    return [key, gzipSync(Buffer.from(raw.buffer, raw.byteOffset, raw.byteLength))];
+  }));
   const gets = [];
   return {
     gets,
@@ -559,11 +563,10 @@ test('the endpoint returns scores, rate-limits, and never echoes bars', async ()
   const group = computeEntryGroup(prepareDayBars(bars), {
     entryTimeframe: 5,
     atrLength: 14,
-    ranges: ['2024', 'all'],
     now: clock,
   });
-  const key = bundleKey(5, 14, '2024');
-  const store = resultKv({ [key]: group.bundles['2024'] });
+  const key = bundleKey(5, 14, 'all');
+  const store = resultKv({ [key]: group.bundle });
   const limiter = createLimiter({ limit: 5 });
   const res = await handle(post({
     entryTimeframe: 5,
@@ -586,8 +589,28 @@ test('the endpoint returns scores, rate-limits, and never echoes bars', async ()
   assert.equal(typeof body.metrics.trades, 'number');
   assert.equal(Array.isArray(body.trades), false);
   assert.equal(body.metrics.netPoints, Number((body.metrics.grossPoints - 6 * body.metrics.trades).toFixed(2)));
+  assert.equal(body.params.resolution, 'daily');
   assert.ok(body.equity.length <= 250);
   assert.ok(body.equity.every((p) => p.date.startsWith('2024')));
+  const custom = await handle(post({
+    entryTimeframe: 5,
+    atrLength: 14,
+    exitTimeframe: 5,
+    exitAtrLength: 14,
+    entryRule: 'clock',
+    clock: '09:30',
+    exitRule: 'reenter',
+    from: '2024-03-04',
+    to: '2024-03-04',
+    costs: true,
+    costPoints: 6,
+  }), { HSI_BARS: store }, { limiter, clock });
+  const customBody = await custom.json();
+  assert.equal(custom.status, 200);
+  assert.equal(customBody.params.range, 'custom');
+  assert.equal(customBody.byEntryHour.length, 0);
+  assert.equal(customBody.metrics.sessionDays, body.metrics.sessionDays);
+  assert.equal(JSON.stringify(customBody).includes(String(planted)), false);
   assert.deepEqual(store.gets.map((call) => call[0]), [key]);
   assert.equal(store.gets.some((call) => String(call[0]).includes('.bin')), false);
 
@@ -646,6 +669,8 @@ test('the endpoint returns scores, rate-limits, and never echoes bars', async ()
   assert.ok(registry.grid.atrLengths.includes(10));
   assert.ok(registry.grid.ranges.includes('all'));
   assert.ok(registry.grid.ranges.includes('2020'));
+  assert.equal(registry.grid.dateStart, '2020-01-02');
+  assert.equal(registry.grid.resolution, 'daily');
   walk(registry);
 });
 
@@ -704,6 +729,10 @@ test('auth is one hook and the route does not publish bars', async () => {
   assert.match(html, /Factor <b>2\.5<\/b>/);
   assert.match(html, /value="reenter" selected/);
   assert.match(html, /id="range"/);
+  assert.match(html, /id="range-mode"/);
+  assert.match(html, /data-mode="custom"/);
+  assert.match(html, /id="from"[^>]*type="date"/);
+  assert.match(html, /min="2020-01-02"/);
   assert.match(html, /data-site-header/);
   assert.match(html, /\/assets\/js\/site\.js/);
 });
@@ -753,13 +782,24 @@ test('input bounds reject a timeframe, a clock outside the window, and a wide ra
   assert.throws(() => validateLookup({ factor: 2.5 }, clock), /Unknown field/);
   assert.throws(() => validateLookup({ entryTimeframe: 5, exitTimeframe: 5, atrLength: 14, exitAtrLength: 10 }, clock), /one ATR/);
   assert.throws(() => validateLookup({ range: '2019' }, clock), /Range/);
-  assert.equal(validateLookup({ range: '2024' }, clock).key, 'v1/results/5m-14/2024.json.gz');
+  assert.equal(validateLookup({ range: '2024' }, clock).key, 'v1/results/5m-14/all.json.gz');
+  assert.equal(validateLookup({ range: '2024' }, clock).from, '2024-01-01');
+  assert.equal(validateLookup({ range: '2024' }, clock).to, '2024-12-31');
+  assert.equal(validateLookup({ range: '2020' }, clock).from, '2020-01-02');
+  assert.equal(validateLookup({ range: '2026' }, clock).to, '2026-10-22');
+  assert.equal(validateLookup({}, clock).from, '2020-01-02');
+  assert.equal(validateLookup({ from: '2024-03-01', to: '2024-03-31' }, clock).range, 'custom');
+  assert.throws(() => validateLookup({ from: '2020-01-01', to: '2020-02-01' }, clock), /2020-01-02/);
+  assert.throws(() => validateLookup({ from: '2026-10-23', to: '2026-10-23' }, clock), /2020-01-02/);
+  assert.throws(() => validateLookup({ from: '2024-05-02', to: '2024-05-01' }, clock), /start date/);
+  assert.throws(() => validateLookup({ range: '2024', from: '2024-01-02', to: '2024-02-01' }, clock), /not both/);
+  assert.throws(() => validateLookup({ to: '2024-02-01' }, clock), /start and an end/);
   assert.equal(gridJobs().length, 900);
   assert.ok(gridJobs().filter((job) => job.entryTimeframe === job.exitTimeframe).every((job) => job.atrLength === job.exitAtrLength));
   const years = requestedRanges([], clock);
   assert.deepEqual(years, ['2020', '2021', '2022', '2023', '2024', '2025', '2026', 'all']);
-  assert.equal(bundleKeys(years).length, 80);
-  assert.ok(bundleKeys(years).length <= 150);
+  assert.equal(bundleKeys().length, 10);
+  assert.ok(bundleKeys().length <= 150);
   assert.deepEqual(requestedRanges(['2026'], clock), ['2026', 'all']);
 });
 
@@ -767,8 +807,9 @@ test('a precomputed year matches a direct run and costs are applied on lookup', 
   const clock = new Date('2026-10-22T00:00:00Z');
   const bars = zigzagSeries(['2023-12-28', '2024-03-04', '2024-03-05'], { base: 18000 });
   const day = prepareDayBars(bars);
-  const group = computeEntryGroup(day, { entryTimeframe: 5, atrLength: 14, ranges: ['2024', 'all'], now: clock });
-  const cell = group.bundles['2024'].rows['5:14:clock:09:30:reenter'];
+  const group = computeEntryGroup(day, { entryTimeframe: 5, atrLength: 14, now: clock });
+  const decoded = decodeDaily(encodeBundle(group.bundle));
+  const combo = '5:14:clock:09:30:reenter';
   const direct = runLab(bars, {
     atrLength: 14,
     exitAtrLength: 14,
@@ -786,9 +827,6 @@ test('a precomputed year matches a direct run and costs are applied on lookup', 
     costs: true,
     costPoints: 6,
   });
-  assert.equal(cell.t, direct.result.metrics.trades);
-  assert.equal(cell.g, direct.result.metrics.grossPoints);
-  assert.equal(cell.d, direct.result.metrics.sessionDays);
   const looked = validateLookup({
     entryTimeframe: 5,
     atrLength: 14,
@@ -801,40 +839,161 @@ test('a precomputed year matches a direct run and costs are applied on lookup', 
     costs: true,
     costPoints: 6,
   }, clock);
-  const pub = applyCost(cell, looked);
-  assert.equal(pub.metrics.netPoints, direct.result.metrics.netPoints);
+  const pub = scoreStored(decoded, looked);
+  assert.equal(pub.metrics.trades, direct.result.metrics.trades);
   assert.equal(pub.metrics.grossPoints, direct.result.metrics.grossPoints);
-  const gross = applyCost(cell, { ...looked, costs: false, costPoints: 0 });
-  assert.equal(gross.metrics.maxDrawdownPoints, direct.result.metrics.maxDrawdownPoints);
+  assert.equal(pub.metrics.sessionDays, direct.result.metrics.sessionDays);
+  assert.equal(pub.metrics.netPoints, direct.result.metrics.netPoints);
+  assert.equal(pub.metrics.winRate, direct.result.metrics.winRate);
+  assert.equal(pub.metrics.avgHoldMinutes, direct.result.metrics.avgHoldMinutes);
+  assert.equal(pub.params.resolution, 'daily');
   assert.ok(pub.equity.length <= 250);
+  assert.ok(pub.equity.every((point) => point.date.startsWith('2024')));
   assert.equal(JSON.stringify(pub).includes('18000'), false);
+  let cum = 0;
+  let peak = 0;
+  let dd = 0;
+  for (let i = 0; i < decoded.days.length; i++) {
+    if (!indexToDate(decoded.days[i]).startsWith('2024')) continue;
+    const row = readDay(decoded, combo, i);
+    cum += row.g;
+    if (cum > peak) peak = cum;
+    if (cum - peak < dd) dd = cum - peak;
+    assert.equal(typeof row.mn, 'number');
+  }
+  const gross = scoreStored(decoded, { ...looked, costs: false, costPoints: 0 });
+  assert.equal(gross.metrics.maxDrawdownPoints, Number(dd.toFixed(2)));
+  assert.ok(gross.byEntryHour.length > 0);
+  const both = scoreStored(decoded, validateLookup({
+    entryTimeframe: 5,
+    atrLength: 14,
+    exitTimeframe: 5,
+    exitAtrLength: 14,
+    entryRule: 'clock',
+    clock: '09:30',
+    exitRule: 'reenter',
+    from: '2024-03-04',
+    to: '2024-03-05',
+    costs: true,
+    costPoints: 6,
+  }, clock));
+  assert.equal(both.metrics.trades, pub.metrics.trades);
+  assert.equal(both.metrics.netPoints, pub.metrics.netPoints);
+  assert.equal(both.byEntryHour.length, 0);
+  const one = scoreStored(decoded, validateLookup({
+    entryTimeframe: 5,
+    atrLength: 14,
+    exitTimeframe: 5,
+    exitAtrLength: 14,
+    entryRule: 'clock',
+    clock: '09:30',
+    exitRule: 'reenter',
+    from: '2024-03-05',
+    to: '2024-03-05',
+    costs: false,
+  }, clock));
+  assert.equal(one.metrics.sessionDays, 1);
+  assert.ok(one.metrics.trades <= pub.metrics.trades);
+  const stored = readDay(decoded, combo, 0);
+  const again = readDay(decodeDaily(encodeBundle(group.bundle)), combo, 0);
+  assert.equal(again.g, stored.g);
+  assert.equal(again.mn, stored.mn);
+  assert.equal(again.t, stored.t);
 });
+
+function weekdayDates(from, to) {
+  const days = [];
+  let t = Date.parse(`${from}T00:00:00Z`);
+  const end = Date.parse(`${to}T00:00:00Z`);
+  while (t <= end) {
+    const date = new Date(t);
+    const weekday = date.getUTCDay();
+    if (weekday !== 0 && weekday !== 6) days.push(date.toISOString().slice(0, 10));
+    t += 86400000;
+  }
+  return days;
+}
+
+function lcg(seed) {
+  let x = seed >>> 0;
+  return () => {
+    x = (Math.imul(1664525, x) + 1013904223) >>> 0;
+    return x;
+  };
+}
 
 test('one lookup stays fast on a realistic bundle', async () => {
   resetLookupCache();
+  const days = weekdayDates('2020-01-02', '2026-10-22');
+  assert.ok(days.length > 1500, `sessions ${days.length}`);
+  const rnd = lcg(7);
   const rows = {};
-  const eq = [];
-  for (let i = 0; i < 250; i++) {
-    const day = String((i % 27) + 1).padStart(2, '0');
-    const month = String((i % 12) + 1).padStart(2, '0');
-    eq.push([`2024-${month}-${day}`, i - 40, i]);
-  }
-  for (let i = 0; i < 90; i++) {
-    rows[`x:${i}:flip:-:flat`] = { t: 250, d: 250, w: 100, gw: 400, gl: 200, g: 200, h: 5000, dd: -80, dd6: -90, dd8: -100, eq, y: [[2024, 250, 100, 200]], hr: [[9, 250, 100, 200]] };
+  for (let c = 0; c < 90; c++) {
+    const g = new Array(days.length);
+    const t = new Array(days.length);
+    const w = new Array(days.length);
+    const gw = new Array(days.length);
+    const gl = new Array(days.length);
+    const h = new Array(days.length);
+    const mn = new Array(days.length);
+    let trades = 0;
+    let wins = 0;
+    let gross = 0;
+    for (let i = 0; i < days.length; i++) {
+      const roll = rnd();
+      const tradesToday = roll % 7 === 0 ? 0 : 1 + (roll % 3);
+      const points = tradesToday ? (roll % 800) - 400 : 0;
+      g[i] = points;
+      t[i] = tradesToday;
+      w[i] = points > 0 ? Math.min(tradesToday, 1) : 0;
+      gw[i] = points > 0 ? points : 0;
+      gl[i] = points < 0 ? -points : 0;
+      h[i] = tradesToday * 20;
+      mn[i] = Math.min(0, points);
+      trades += tradesToday;
+      if (points > 0) wins += 1;
+      gross += points;
+    }
+    rows[`x:${c}:flip:-:flat`] = {
+      g, t, w, gw, gl, h, mn,
+      hours: { all: [[9, trades, wins, gross]], years: { 2024: [[9, 40, 20, 100]] } },
+    };
   }
   rows['5:14:clock:09:30:reenter'] = rows['x:0:flip:-:flat'];
-  const store = resultKv({ 'v1/results/5m-14/all.json.gz': { v: 1, rows } });
+  const encoded = encodeBundle({ entryTimeframe: 5, atrLength: 14, days, rows });
+  const gz = gzipSync(Buffer.from(encoded.buffer, encoded.byteOffset, encoded.byteLength));
+  assert.ok(gz.length < 25 * 1024 * 1024, `one bundle is ${gz.length} bytes`);
+  assert.equal(bundleKeys().length, 10);
+  const store = resultKv({ 'v1/results/5m-14/all.json.gz': encoded });
+  const clock = new Date('2026-10-22T00:00:00Z');
   const started = performance.now();
-  const res = await handle(post({}), { HSI_BARS: store }, { limiter: createLimiter(), clock: new Date('2026-10-22T00:00:00Z') });
+  const res = await handle(post({}), { HSI_BARS: store }, { limiter: createLimiter(), clock });
   const elapsed = performance.now() - started;
   const text = await res.text();
   assert.equal(res.status, 200, text);
   assert.ok(elapsed < 80, `lookup took ${elapsed.toFixed(1)}ms`);
-  assert.equal(text.includes('18000'), false);
+  const body = JSON.parse(text);
+  walk(body);
+  assert.equal(body.metrics.netPoints, Number((body.metrics.grossPoints - body.params.costPoints * body.metrics.trades).toFixed(2)));
+  assert.ok(body.equity.length <= 250);
+  assert.ok(body.equity.length > 1);
+  assert.equal(body.params.from, '2020-01-02');
+  assert.equal(body.params.to, '2026-10-22');
   const reads = store.gets.length;
-  const again = await handle(post({}), { HSI_BARS: store }, { limiter: createLimiter(), clock: new Date('2026-10-22T00:00:00Z') });
+  const warmStart = performance.now();
+  const again = await handle(post({}), { HSI_BARS: store }, { limiter: createLimiter(), clock });
+  const warm = performance.now() - warmStart;
   assert.equal(again.status, 200);
+  assert.ok(warm < 10, `warm lookup took ${warm.toFixed(1)}ms`);
   assert.equal(store.gets.length, reads);
+  const custom = await handle(post({ from: '2024-06-03', to: '2024-06-28' }), { HSI_BARS: store }, { limiter: createLimiter(), clock });
+  assert.equal(custom.status, 200);
+  assert.equal(store.gets.length, reads);
+  const sliced = await custom.json();
+  assert.equal(sliced.params.range, 'custom');
+  assert.equal(sliced.byEntryHour.length, 0);
+  assert.ok(sliced.metrics.sessionDays < body.metrics.sessionDays);
+  assert.ok(sliced.metrics.sessionDays > 0);
 });
 
 test('year bins above the spread limit still concatenate', async () => {
@@ -873,11 +1032,20 @@ test('precompute script writes result keys with worker threads and no prices', (
   assert.equal(packed.stdout.includes('19000'), false);
   const manifest = JSON.parse(readFileSync(join(out, 'v1/results/manifest.json'), 'utf8'));
   assert.equal(manifest.namespaceId, 'f6577e29d4b249dea5a81b4f00443082');
+  assert.equal(manifest.version, 2);
   assert.equal(JSON.stringify(manifest).includes(price), false);
-  assert.ok(manifest.keys.includes('v1/results/5m-14/2026.json.gz'));
   assert.ok(manifest.keys.includes('v1/results/5m-14/all.json.gz'));
+  assert.equal(manifest.keys.some((key) => key.includes('/2026.json.gz')), false);
   assert.equal(manifest.keys.some((key) => key.includes('/2024.json.gz')), false);
-  assert.ok(manifest.keys.length <= 150);
+  assert.equal(manifest.keys.length, 10);
+  assert.ok(manifest.keys.every((key) => key.endsWith('/all.json.gz')));
+  assert.ok(manifest.totalBytes > 0);
+  assert.ok(manifest.totalBytes < 25 * 1024 * 1024 * 10);
+  const saved = gunzipSync(readFileSync(join(out, 'v1/results/5m-14/all.json.gz')));
+  assert.equal(saved.includes(Buffer.from(price)), false);
+  const decoded = decodeDaily(saved);
+  assert.equal(decoded.days.length, 2);
+  assert.equal(decoded.combos.size, 90);
   const refused = spawnSync('node', ['scripts/hsi-lab-precompute.mjs', '--data', csv, '--out', join(root, 'hsi-lab'), '--years', '2026', '--threads', '1'], {
     encoding: 'utf8',
     cwd: root,

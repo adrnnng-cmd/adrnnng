@@ -65,6 +65,11 @@ function entryChoice() {
   return { entryRule: value.slice(0, at), clock: value.slice(at + 1) };
 }
 
+function rangeMode() {
+  const on = document.querySelector('#range-mode button[aria-pressed="true"]');
+  return on?.dataset.mode || 'year';
+}
+
 function payload() {
   const entry = entryChoice();
   const entryTimeframe = selectedTf('entry-tf');
@@ -78,12 +83,29 @@ function payload() {
     exitTimeframe,
     entryRule: entry.entryRule,
     exitRule: $('exit-rule').value,
-    range: $('range').value,
     costs: $('costs').checked,
   };
+  if (rangeMode() === 'custom') {
+    body.from = $('from').value;
+    body.to = $('to').value;
+  } else {
+    body.range = $('range').value;
+  }
   if (entry.clock) body.clock = entry.clock;
   if (body.costs) body.costPoints = num('cost-points');
   return body;
+}
+
+function syncRangeMode() {
+  const custom = rangeMode() === 'custom';
+  $('range-year').hidden = custom;
+  $('range-custom').hidden = !custom;
+}
+
+function syncDates() {
+  const from = $('from');
+  const to = $('to');
+  if (from.value && to.value && from.value > to.value) to.value = from.value;
 }
 
 function syncTimeframes() {
@@ -153,6 +175,7 @@ function render(result) {
   const m = result.metrics;
   const net = m.netPoints;
   const cls = net > 0 ? 'up' : net < 0 ? 'down' : '';
+  const span = result.params.from && result.params.to ? `${result.params.from} – ${result.params.to}` : '';
   const costLine = result.params.costs
     ? `after ${fmtPoints(result.params.costPoints, 2).replace('+', '')} pts × ${m.trades.toLocaleString('en-US')} round trips · gross ${fmtPoints(m.grossPoints, 1)}`
     : `costs off · gross ${fmtPoints(m.grossPoints, 1)}`;
@@ -202,17 +225,17 @@ function render(result) {
   $('results').innerHTML = `
     <p class="kicker lab-kicker">Net points</p>
     <p class="lab-net num ${cls}">${esc(fmtPoints(net, 1))}</p>
-    <p class="lab-net-sub">${esc(costLine)} · ${esc(m.sessionDays)} session days</p>
+    <p class="lab-net-sub">${esc(costLine)} · ${esc(m.sessionDays)} session days${span ? ` · ${esc(span)}` : ''}</p>
     <div class="stat-grid">${stats.map(([k, v]) => `<div><span>${esc(k)}</span><b>${esc(v)}</b></div>`).join('')}</div>
     <div class="curve">
       <h2>Equity</h2>
-      <p class="panel-sub">Cumulative points from zero.</p>
+      <p class="panel-sub">Cumulative points from zero, one point per session.</p>
       ${equity.length ? curveSvg(equity) : '<p class="lab-help">No session days in this range.</p>'}
       ${equity.length ? `<div class="eq-dates"><span>${esc(equity[0].date)}</span><span>${esc(equity[equity.length - 1].date)}</span></div>` : ''}
     </div>
     <div class="split">
       <div><h2>By year</h2>${years}</div>
-      <div><h2>By entry hour</h2>${hours}</div>
+      <div><h2>By entry hour</h2>${(result.byEntryHour || []).length ? hours : '<p class="lab-help">Shown for a whole year, or for all stored years.</p>'}</div>
     </div>
     <p class="notice lab-note">Win rate and profit factor are on gross points. Net is after the round-trip cost. No prices are in this result.</p>`;
 }
@@ -265,6 +288,21 @@ function fillRanges(ranges) {
   if ([...sel.options].some((option) => option.value === current)) sel.value = current;
 }
 
+let datesDirty = false;
+
+function fillDates(grid) {
+  if (!grid?.dateStart || !grid?.dateEnd) return;
+  const from = $('from');
+  const to = $('to');
+  from.min = grid.dateStart;
+  from.max = grid.dateEnd;
+  to.min = grid.dateStart;
+  to.max = grid.dateEnd;
+  if (datesDirty) return;
+  from.value = grid.dateStart;
+  to.value = grid.dateEnd;
+}
+
 function boot() {
   wireSeg('entry-tf', () => syncTimeframes());
   wireSeg('exit-tf', (tf) => {
@@ -274,6 +312,20 @@ function boot() {
   $('atr-length').addEventListener('change', syncTimeframes);
   $('entry-rule').addEventListener('change', syncEntry);
   $('exit-rule').addEventListener('change', syncExit);
+  $('range-mode').addEventListener('click', (event) => {
+    const btn = event.target.closest('button');
+    if (!btn) return;
+    for (const el of $('range-mode').querySelectorAll('button')) el.setAttribute('aria-pressed', String(el === btn));
+    syncRangeMode();
+  });
+  $('from').addEventListener('input', () => {
+    datesDirty = true;
+    syncDates();
+  });
+  $('to').addEventListener('input', () => {
+    datesDirty = true;
+    syncDates();
+  });
   $('costs').addEventListener('change', syncCosts);
   $('cost-points').addEventListener('input', () => {
     costDirty = true;
@@ -286,6 +338,7 @@ function boot() {
   syncExit();
   syncCosts();
   syncTimeframes();
+  syncRangeMode();
   fetch('/api/hsi-lab')
     .then((res) => (res.ok ? res.json() : null))
     .then((body) => {
@@ -297,6 +350,7 @@ function boot() {
       const chosen = body.strategies.find((s) => s.id === sel.value);
       if (chosen?.summary) $('strategy-help').textContent = chosen.summary;
       fillRanges(body.grid?.ranges);
+      fillDates(body.grid);
     })
     .catch(() => {});
 }

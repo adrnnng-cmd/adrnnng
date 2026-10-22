@@ -48,6 +48,10 @@
 .lab-controls .btn-primary:disabled { opacity: 0.55; cursor: progress; }
 .cost-row { display: flex; align-items: end; gap: 12px; }
 .cost-row .field { flex: 1; }
+.range-switch { margin: 0 0 12px; }
+.date-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.date-row .input { width: 100%; }
+#range-year[hidden], #range-custom[hidden] { display: none; }
 
 .lab-results { min-height: 420px; }
 .lab-empty {
@@ -131,4 +135,5 @@
 @media (max-width: 520px) {
   .lab-grid { grid-template-columns: 1fr; }
   .lab-grid .wide { grid-column: auto; }
+  .date-row { grid-template-columns: 1fr; }
 }

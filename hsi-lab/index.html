@@ -104,19 +104,31 @@
 
         <fieldset>
           <legend>Session</legend>
-          <label class="field"><span>Range</span>
-            <select class="select" id="range" name="range">
-              <option value="all" selected>All years</option>
-              <option value="2020">2020</option>
-              <option value="2021">2021</option>
-              <option value="2022">2022</option>
-              <option value="2023">2023</option>
-              <option value="2024">2024</option>
-              <option value="2025">2025</option>
-              <option value="2026">2026</option>
-            </select>
-          </label>
-          <p class="lab-help">Day session only, 09:15–16:30 Hong Kong time. One year, or every precomputed year together. A position flattens at the session end.</p>
+          <div class="seg range-switch" id="range-mode" role="group" aria-label="Date range">
+            <button type="button" data-mode="year" aria-pressed="true">By year</button>
+            <button type="button" data-mode="custom" aria-pressed="false">Custom dates</button>
+          </div>
+          <div id="range-year">
+            <label class="field"><span>Year</span>
+              <select class="select" id="range" name="range">
+                <option value="all" selected>All years</option>
+                <option value="2020">2020</option>
+                <option value="2021">2021</option>
+                <option value="2022">2022</option>
+                <option value="2023">2023</option>
+                <option value="2024">2024</option>
+                <option value="2025">2025</option>
+                <option value="2026">2026</option>
+              </select>
+            </label>
+          </div>
+          <div id="range-custom" hidden>
+            <div class="date-row">
+              <label class="field"><span>Start</span><input class="input" id="from" name="from" type="date" min="2020-01-02" max="2026-10-22" value="2020-01-02" required></label>
+              <label class="field"><span>End</span><input class="input" id="to" name="to" type="date" min="2020-01-02" max="2026-10-22" value="2026-10-22" required></label>
+            </div>
+          </div>
+          <p class="lab-help" id="range-help">Day session only, 09:15–16:30 Hong Kong time. By year is one calendar year, or every stored year. Custom dates run from 2020-01-02 through today. The curve is one point per session.</p>
         </fieldset>
 
         <fieldset>
@@ -153,6 +165,7 @@
               <li>Opposite flip, then flat: one exit, and nothing else that day. Same-direction re-entry waits for the entry timeframe to flip back. Reverse takes the next entry-timeframe flip either way; when both timeframes match, that is this same bar.</li>
               <li>Whatever is still open flattens at the last bar of the day session, at that bar’s close.</li>
               <li>The page offers the precomputed grid only: ATR 10–14, factor 2.5, smoothing 2, and the five entry rules at 09:15 or 09:30. The score is looked up. It is not run on the request.</li>
+              <li>By year, or any start and end from 2020-01-02 through today. The worker adds the stored daily points inside that window.</li>
             </ul>
           </div>
           <div>
@@ -161,7 +174,7 @@
               <dt>Points</dt><dd>One index unit. Long is exit minus entry. Short is the opposite. Gross is before the round-trip cost. Net subtracts the cost once per closed trade.</dd>
               <dt>Win rate and profit factor</dt><dd>Counted on gross points. A scratch is not a win. Profit factor is blank when there is no losing trade.</dd>
               <dt>Hold</dt><dd>1-minute bars from the fill to the exit, plus one when the exit is that bar’s close. Lunch has no bars, so it is not counted.</dd>
-              <dt>Max drawdown</dt><dd>Marked on every 1-minute close. At a round-trip cost of 0, 6, or 8 points the figure is that path. Any other cost is a straight line between those three. The curve is cumulative points from zero, sampled to at most 250 sessions.</dd>
+              <dt>Max drawdown</dt><dd>The peak-to-trough of the end-of-day point curve, after the round-trip cost. One point per session, not every minute. The curve shows at most 250 of those sessions. Each stored day also keeps that session’s lowest mark, in points from the session’s start.</dd>
               <dt>Trades per day</dt><dd>Closed trades divided by day-session dates in the range, including dates with no trade.</dd>
             </dl>
           </div>
