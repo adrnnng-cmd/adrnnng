@@ -1,3 +1,4 @@
+# Cache
 /backtest/data/*
   Cache-Control: public, max-age=1800, must-revalidate
 
@@ -6,3 +7,82 @@
 
 /assets/vendor/*
   Cache-Control: public, max-age=604800
+
+# Indexing.
+# Cloudflare joins X-Robots-Tag from every matching rule with a comma, and a
+# joined value that still contains noindex blocks the URL. Detach the header
+# on public pages so a publish.sh `/*` noindex rule cannot stick. Do not set
+# a second X-Robots-Tag here. /api keeps noindex. publish.sh must stop
+# emitting `/*` + `X-Robots-Tag: noindex, nofollow`.
+
+/
+  ! X-Robots-Tag
+
+/index.html
+  ! X-Robots-Tag
+
+/backtest
+  ! X-Robots-Tag
+
+/backtest/
+  ! X-Robots-Tag
+
+/backtest/*
+  ! X-Robots-Tag
+
+/politician-tracker
+  ! X-Robots-Tag
+
+/politician-tracker/
+  ! X-Robots-Tag
+
+/politician-tracker/*
+  ! X-Robots-Tag
+
+/hsi-lab
+  ! X-Robots-Tag
+
+/hsi-lab/
+  ! X-Robots-Tag
+
+/hsi-lab/*
+  ! X-Robots-Tag
+
+/news
+  ! X-Robots-Tag
+
+/news/
+  ! X-Robots-Tag
+
+/news/*
+  ! X-Robots-Tag
+
+/robots.txt
+  ! X-Robots-Tag
+
+/llms.txt
+  ! X-Robots-Tag
+
+/sitemap.xml
+  ! X-Robots-Tag
+
+/sitemap-pages.xml
+  ! X-Robots-Tag
+
+/sitemap-news.xml
+  ! X-Robots-Tag
+
+/news-sitemap.xml
+  ! X-Robots-Tag
+
+/ae5543efbf2a5168fc9df6644b06bc38.txt
+  ! X-Robots-Tag
+
+/api
+  X-Robots-Tag: noindex, nofollow
+
+/api/
+  X-Robots-Tag: noindex, nofollow
+
+/api/*
+  X-Robots-Tag: noindex, nofollow

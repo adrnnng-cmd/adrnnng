@@ -6,7 +6,7 @@
     "archive_url": "/news/",
     "timezone": "Asia/Hong_Kong",
     "retention_days": 120,
-    "noindex": true
+    "noindex": false
   },
   "vip": [
     {

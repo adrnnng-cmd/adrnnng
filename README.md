@@ -16,6 +16,10 @@ static JSON/CSV.
 
 ```
 index.html                     landing page
+robots.txt                     crawlers allowed; /api/ disallowed; sitemap pointer
+llms.txt                       section guide for AI crawlers
+sitemap.xml                    sitemap index (regenerated for the upload)
+_headers                       cache rules; X-Robots-Tag noindex on /api/* only
 assets/
   tools.json                   TOOL REGISTRY: drives the header nav, footer and landing cards
   css/theme.css                design system (tokens + components) shared by every tool
@@ -35,7 +39,7 @@ backtest/
 politician-tracker/            built page + data.json + img/ (committed by its workflow)
 .github/<tool>/                data builders run by Actions (Python stdlib, no pip installs)
 .github/workflows/             scheduled refreshes, publish ping, site check
-scripts/                       check-site, new-tool scaffolder + template, assemble-deploy
+scripts/                       check-site, sitemap, IndexNow ping, new-tool scaffolder, assemble-deploy
 _headers                       Cloudflare Pages cache headers
 ```
 
@@ -215,16 +219,22 @@ upload replaces the entire deployment, so every upload must contain both this re
 `news/`:
 
 ```bash
-git -C adrnnng pull origin main                       # latest site, no build needed
-adrnnng/scripts/assemble-deploy.sh /tmp/site --news ./news-output
+git -C adrnnng pull origin main
+adrnnng/scripts/assemble-deploy.sh /tmp/site --news ./news-output   # writes sitemap.xml
 npx wrangler pages deploy /tmp/site --project-name adrnnng --branch main
+node adrnnng/scripts/ping-indexnow.mjs --site /tmp/site || true      # after the upload is live
 ```
 
 `assemble-deploy.sh` copies the tracked site files (minus `.github/`, `scripts/`, tests, docs),
-then the News Analyst's folder into `news/`. `news/` is reserved: it is registered in
+then the News Analyst's folder into `news/`, then writes `/sitemap.xml` from the merged tree.
+That index lists every HTML page present (`/`, `/backtest/`, `/politician-tracker/`, static
+member pages, a future `/hsi-lab/`), plus `sitemap-news.xml` for `/news/YYYYMMDD/` editions.
+Editions from today or yesterday in Hong Kong also go in `news-sitemap.xml` (Google News), and
+the index includes that fragment only when one exists. `news/` is reserved: it is registered in
 `tools.json` with `owner: "news-analyst"`, and `npm run check` fails if the repo ever contains
-it. Uploading the raw repo checkout plus `news/` (the current flow) also keeps working, since
-there is still no build step.
+it. A hand upload of the repo checkout plus `news/` still works if you run
+`node scripts/build-sitemap.mjs --site <dir>` on that folder before Wrangler. The committed
+sitemap has no daily editions, because `news/` is not in the repo.
 
 The landing reads `news/latest.json` after load and uses `date`, `headline`, `summary`,
 `image_url`, `image_credit`, `source_name`, `source_url`, and `report_url`. `image_url` is the
@@ -233,9 +243,13 @@ including `image_url_original`, are ignored. The News Analyst publishes that fil
 report. The only copy in this repo is `scripts/preview/latest.json`, and `assemble-deploy.sh`
 does not upload `scripts/`.
 
-This repo owns the site root outside `news/`: `index.html`, `404.html`, `_headers`, `_redirects`,
-`assets/`, `backtest/` (without `backtest/tests/`), and `politician-tracker/`. `404.html` must be
-in every upload. Without it, Pages treats the site as a single-page app and serves `index.html`
+This repo owns the site root outside `news/`: `index.html`, `404.html`, `robots.txt`, `llms.txt`,
+the IndexNow key file, `_headers`, `_redirects`, `assets/`, `backtest/` (without `backtest/tests/`),
+and `politician-tracker/`. `publish.sh` still writes a `Disallow: /` robots.txt only when the repo
+has none, so the committed file wins. It must not append `X-Robots-Tag: noindex` on `/*`;
+`_headers` detaches that header on public pages and sets it only for `/api/`. After
+`wrangler pages deploy`, ping IndexNow with `node scripts/ping-indexnow.mjs --site <deploy_dir>`.
+`404.html` must be in every upload. Without it, Pages treats the site as a single-page app and serves `index.html`
 with status 200 for unknown paths, including `/backtest/tests/`. `_redirects` only aliases
 `/backtesting` to `/backtest/`. The News Analyst merges the `/latest` redirect rules at upload
 time and does not write a root `index.html`.

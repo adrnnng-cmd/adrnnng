@@ -5,6 +5,9 @@
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join, dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { indexingHeaderErrors } from './headers.mjs';
+import { findIndexNowKey } from './indexnow.mjs';
+import { sitemapDrift } from './sitemap.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SKIP_DIRS = new Set(['.git', 'node_modules', '.github', 'scripts']);
@@ -126,6 +129,56 @@ if (existsSync(mPath)) {
   const stale = m.symbols.filter((s) => s.stale).map((s) => s.symbol);
   notes.push(`price manifest: ${m.symbols.length} symbols, generated ${m.generated_at}${stale.length ? `, stale: ${stale.join(' ')}` : ''}`);
 } else err('backtest/data/prices/manifest.json missing');
+
+// ---- search indexing (robots, headers, sitemap, social tags)
+const robotsPath = join(ROOT, 'robots.txt');
+const robots = existsSync(robotsPath) ? readFileSync(robotsPath, 'utf8') : '';
+if (!robots) err('robots.txt missing');
+else {
+  if (!robots.includes('Sitemap: https://adrnnng.com/sitemap.xml')) err('robots.txt must point at https://adrnnng.com/sitemap.xml');
+  if (/^disallow:\s*\/\s*$/im.test(robots)) err('robots.txt must not Disallow: /');
+  if (!robots.includes('Disallow: /api/')) err('robots.txt must disallow /api/');
+  for (const agent of ['*', 'Googlebot', 'Bingbot', 'GPTBot', 'OAI-SearchBot', 'ChatGPT-User', 'PerplexityBot', 'ClaudeBot']) {
+    const escaped = agent.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (!new RegExp(`^user-agent:\\s*${escaped}\\s*$`, 'im').test(robots)) err(`robots.txt must name ${agent}`);
+  }
+}
+const key = findIndexNowKey(ROOT);
+if (!key) err('IndexNow key file missing at the site root (<hex>.txt whose contents are the key)');
+const headerText = existsSync(join(ROOT, '_headers')) ? readFileSync(join(ROOT, '_headers'), 'utf8') : '';
+for (const problem of indexingHeaderErrors(headerText, { keyFile: key?.file })) err(problem);
+const llmsPath = join(ROOT, 'llms.txt');
+if (!existsSync(llmsPath)) err('llms.txt missing');
+else {
+  const llms = readFileSync(llmsPath, 'utf8');
+  for (const needle of ['Backtest', 'Politician Tracker', 'Morning Report', '/hsi-lab/']) {
+    if (!llms.includes(needle)) err(`llms.txt must mention ${needle}`);
+  }
+}
+const indexable = [
+  ['index.html', 'https://adrnnng.com/'],
+  ['backtest/index.html', 'https://adrnnng.com/backtest/'],
+  ['politician-tracker/index.html', 'https://adrnnng.com/politician-tracker/'],
+];
+const titles = [];
+for (const [file, canonical] of indexable) {
+  const html = readFileSync(join(ROOT, file), 'utf8');
+  const title = (html.match(/<title>([^<]*)<\/title>/i) || [])[1] || '';
+  titles.push(title);
+  if (!title) err(`${file}: missing <title>`);
+  if (!/name="description" content="[^"]+"/.test(html)) err(`${file}: missing meta description`);
+  if (!html.includes(`rel="canonical" href="${canonical}"`)) err(`${file}: missing canonical ${canonical}`);
+  for (const prop of ['og:title', 'og:description', 'og:url', 'og:image']) {
+    if (!html.includes(`property="${prop}"`)) err(`${file}: missing ${prop}`);
+  }
+  for (const name of ['twitter:card', 'twitter:title', 'twitter:description', 'twitter:image']) {
+    if (!html.includes(`name="${name}"`)) err(`${file}: missing ${name}`);
+  }
+  if (/\bnoindex\b/i.test(html)) err(`${file}: must not set noindex`);
+}
+if (new Set(titles.filter(Boolean)).size !== titles.filter(Boolean).length) err(`page titles must be unique: ${titles.join(' | ')}`);
+if (existsSync(notFound) && !/\bnoindex\b/i.test(readFileSync(notFound, 'utf8'))) err('404.html should stay noindex');
+for (const problem of sitemapDrift(ROOT)) err(problem);
 
 for (const n of notes) console.log(`  · ${n}`);
 if (errors.length) {

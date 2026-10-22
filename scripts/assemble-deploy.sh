@@ -3,9 +3,10 @@
 #
 #   scripts/assemble-deploy.sh <out_dir> [--news <news_dir>]
 #
-# Copies the site's tracked files (no build step) into <out_dir>, leaving out repo-only files
+# Copies the site's tracked files into <out_dir>, leaving out repo-only files
 # (.github/, scripts/, tests, docs, package.json), then copies <news_dir> into <out_dir>/news/.
 # Fails if the repo itself contains news/ (that path belongs to the News Analyst).
+# Writes sitemap.xml from the merged tree (pages, /news/YYYYMMDD/ editions, and any new section).
 #
 # Then:  npx wrangler pages deploy <out_dir> --project-name adrnnng --branch main
 # A Pages direct upload replaces the whole deployment, so always upload the merged folder,
@@ -50,6 +51,12 @@ if [ ! -f "$out/404.html" ]; then
   echo "error: 404.html is missing from the upload; Pages would serve index.html with status 200" >&2
   exit 1
 fi
+
+# Sitemap index from the files actually being uploaded, including news/YYYYMMDD/
+# editions and any new section such as hsi-lab/. Overwrites a sitemap copied
+# from git so the upload is not stuck on the repo's news-less copy.
+node "$root/scripts/build-sitemap.mjs" --site "$out"
+echo "indexnow: after wrangler pages deploy, run: node \"$root/scripts/ping-indexnow.mjs\" --site \"$out\""
 
 files=$(find "$out" -type f | wc -l | tr -d ' ')
 size=$(du -sh "$out" | cut -f1)

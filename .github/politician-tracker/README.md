@@ -44,8 +44,8 @@ each build merges the previous `data.json`. Rows are kept for `retention_days` (
   (e.g. Ro Khanna, Gilbert Cisneros) off.
 - `watchlist.us` / `watchlist.hk`: Adrian's Watchlist. `watchlist.aliases` maps other listings of the
   same company (GOOG→GOOGL, BABA→9988.HK, TCEHY→0700.HK, LVMHF→LVMUY).
-- `site`: base URL, output path, archive link, timezone, retention, and `noindex` (on by default to match
-  the Morning Report pages; set it to `false` to let search engines index the page).
+- `site`: base URL, output path, archive link, timezone, retention, and `noindex`
+  (`false`: the page is indexable; set it to `true` only to opt the tracker back out).
 
 ## Publishing (GitHub → Cloudflare Pages)
 

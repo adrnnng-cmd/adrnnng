@@ -398,16 +398,34 @@ def render_page(cfg: dict, payload: dict, now: datetime) -> str:
 
     stale = '<span class="stale">Data may be stale — sources unavailable at last build</span>' if payload.get("stale") else ""
     robots = '<meta name="robots" content="noindex,nofollow,noarchive">' if site.get("noindex") else ""
+    title = "Politician Tracker · 政治人物持股動向 — ADRRR"
+    description = (
+        "STOCK Act disclosures from a VIP list of members of Congress, "
+        "plus any trade that hits Adrian's Watchlist. Updated daily."
+    )
+    image = f"{site['base_url']}/assets/brand/og-image.png"
+    seo = (
+        f"<title>{_e(title)}</title>\n"
+        f'<meta name="description" content="{_e(description)}">\n'
+        f'<link rel="canonical" href="{_e(canonical)}">\n'
+        f'<meta property="og:site_name" content="ADRRR">\n'
+        f'<meta property="og:title" content="{_e(title)}">\n'
+        f'<meta property="og:description" content="{_e(description)}">\n'
+        f'<meta property="og:url" content="{_e(canonical)}">\n'
+        f'<meta property="og:type" content="website">\n'
+        f'<meta property="og:image" content="{_e(image)}">\n'
+        f'<meta name="twitter:card" content="summary_large_image">\n'
+        f'<meta name="twitter:title" content="{_e(title)}">\n'
+        f'<meta name="twitter:description" content="{_e(description)}">\n'
+        f'<meta name="twitter:image" content="{_e(image)}">\n'
+    )
     empty_hidden = " hidden" if trades else ""
     weekday = WEEKDAYS[today.weekday()]
 
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 {robots}<meta name="referrer" content="no-referrer"><meta name="theme-color" content="#000000">
-<title>Politician Tracker · 政治人物持股動向 — ADRRR</title>
-<meta name="description" content="STOCK Act disclosures from a VIP list of members of Congress, plus any trade that hits Adrian's Watchlist. Updated daily.">
-<link rel="canonical" href="{_e(canonical)}">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+{seo}<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;700;900&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap">
 <style>{CSS}</style></head>
 <body data-today="{today.isoformat()}">
