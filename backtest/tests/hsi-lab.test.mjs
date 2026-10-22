@@ -733,6 +733,9 @@ test('auth is one hook and the route does not publish bars', async () => {
   assert.match(html, /data-mode="custom"/);
   assert.match(html, /id="from"[^>]*type="date"/);
   assert.match(html, /min="2020-01-02"/);
+  assert.match(html, /No risk-free rate/);
+  assert.match(app, /No risk-free rate/);
+  assert.match(app, /daily resolution/);
   assert.match(html, /data-site-header/);
   assert.match(html, /\/assets\/js\/site\.js/);
 });
@@ -899,6 +902,72 @@ test('a precomputed year matches a direct run and costs are applied on lookup', 
   assert.equal(again.g, stored.g);
   assert.equal(again.mn, stored.mn);
   assert.equal(again.t, stored.t);
+  const nets = [];
+  for (let i = 0; i < decoded.days.length; i++) {
+    if (!indexToDate(decoded.days[i]).startsWith('2024')) continue;
+    const row = readDay(decoded, combo, i);
+    nets.push(row.g - 6 * row.t);
+  }
+  assert.equal(pub.metrics.sharpe, sampleSharpe(nets));
+});
+
+function sampleSharpe(nets) {
+  if (nets.length < 2) return null;
+  const mean = nets.reduce((sum, value) => sum + value, 0) / nets.length;
+  const variance = nets.reduce((sum, value) => sum + (value - mean) ** 2, 0) / (nets.length - 1);
+  const sd = Math.sqrt(variance);
+  if (!(sd > 0)) return null;
+  return Number(((mean / sd) * Math.sqrt(252)).toFixed(4));
+}
+
+function dailyBundle(days, gross, trades) {
+  const row = {
+    g: gross,
+    t: trades,
+    w: gross.map((points, i) => (points > 0 ? trades[i] : 0)),
+    gw: gross.map((points) => (points > 0 ? points : 0)),
+    gl: gross.map((points) => (points < 0 ? -points : 0)),
+    h: trades.map((count) => count * 10),
+    mn: gross.map((points) => Math.min(0, points)),
+    hours: { all: [], years: {} },
+  };
+  return {
+    entryTimeframe: 5,
+    atrLength: 14,
+    days,
+    rows: { '5:14:clock:09:30:reenter': row },
+  };
+}
+
+test('sharpe counts flat sessions and is net of the chosen cost', () => {
+  const clock = new Date('2026-10-22T00:00:00Z');
+  const days = ['2024-03-04', '2024-03-05', '2024-03-06'];
+  const decoded = decodeDaily(encodeBundle(dailyBundle(days, [10, 0, -4], [1, 0, 1])));
+  const spec = {
+    entryTimeframe: 5,
+    atrLength: 14,
+    exitTimeframe: 5,
+    exitAtrLength: 14,
+    entryRule: 'clock',
+    clock: '09:30',
+    exitRule: 'reenter',
+    from: '2024-03-04',
+    to: '2024-03-06',
+    costs: true,
+    costPoints: 6,
+  };
+  const pub = scoreStored(decoded, validateLookup(spec, clock));
+  assert.equal(pub.metrics.sessionDays, 3);
+  assert.equal(pub.metrics.trades, 2);
+  assert.equal(pub.metrics.sharpe, sampleSharpe([4, 0, -10]));
+  assert.notEqual(pub.metrics.sharpe, sampleSharpe([4, -10]));
+  const one = scoreStored(decoded, validateLookup({ ...spec, from: '2024-03-05', to: '2024-03-05' }, clock));
+  assert.equal(one.metrics.sessionDays, 1);
+  assert.equal(one.metrics.sharpe, null);
+  const flat = decodeDaily(encodeBundle(dailyBundle(days.slice(0, 2), [0, 0], [0, 0])));
+  const flatScore = scoreStored(flat, validateLookup({ ...spec, to: '2024-03-05', costs: false }, clock));
+  assert.equal(flatScore.metrics.sharpe, null);
+  assert.equal(JSON.stringify(pub).includes('18000'), false);
 });
 
 function weekdayDates(from, to) {
@@ -979,6 +1048,7 @@ test('one lookup stays fast on a realistic bundle', async () => {
   assert.ok(body.equity.length > 1);
   assert.equal(body.params.from, '2020-01-02');
   assert.equal(body.params.to, '2026-10-22');
+  assert.equal(typeof body.metrics.sharpe, 'number');
   const reads = store.gets.length;
   const warmStart = performance.now();
   const again = await handle(post({}), { HSI_BARS: store }, { limiter: createLimiter(), clock });

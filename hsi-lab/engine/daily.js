@@ -308,6 +308,8 @@ export function sliceDays(decoded, combo, fromIso, toIso, cost, range, maxEquity
   let cum = 0;
   let peak = 0;
   let drawdown = 0;
+  let sharpeMean = 0;
+  let sharpeM2 = 0;
   const equity = [];
   const years = new Map();
   for (let i = lo; i < hi; i++) {
@@ -325,6 +327,11 @@ export function sliceDays(decoded, combo, fromIso, toIso, cost, range, maxEquity
     lossCenti += gl;
     hold += h;
     cumTrades += t;
+    const seen = i - lo + 1;
+    const dayNet = gCenti / SCALE - cost * t;
+    const delta = dayNet - sharpeMean;
+    sharpeMean += delta / seen;
+    sharpeM2 += delta * (dayNet - sharpeMean);
     cum = grossCenti / SCALE - cost * cumTrades;
     if (cum > peak) peak = cum;
     if (cum - peak < drawdown) drawdown = cum - peak;
@@ -369,5 +376,13 @@ export function sliceDays(decoded, combo, fromIso, toIso, cost, range, maxEquity
       wins: w,
       gross: gCenti / SCALE,
     })),
+    sharpe: sharpeRatio(count, sharpeMean, sharpeM2),
   };
+}
+
+function sharpeRatio(days, mean, m2) {
+  if (days < 2) return null;
+  const sd = Math.sqrt(m2 / (days - 1));
+  if (!(sd > 0)) return null;
+  return (mean / sd) * Math.sqrt(252);
 }

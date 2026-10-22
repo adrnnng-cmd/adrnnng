@@ -98,6 +98,49 @@
   font-size: 18px;
   letter-spacing: 0;
 }
+.stat-note {
+  display: block;
+  margin-top: 4px;
+  font-style: normal;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.tip {
+  position: relative;
+  margin-left: 6px;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  font: 600 9px/12px var(--font-sans);
+  letter-spacing: 0;
+  text-transform: none;
+  vertical-align: 1px;
+  cursor: help;
+}
+.tip:hover::after,
+.tip:focus::after {
+  content: attr(data-tip);
+  position: absolute;
+  z-index: 5;
+  left: 50%;
+  top: calc(100% + 8px);
+  transform: translateX(-50%);
+  width: min(240px, 70vw);
+  padding: 8px 10px;
+  background: #111;
+  color: #fff;
+  font: 400 12px/1.45 var(--font-sans);
+  letter-spacing: 0;
+  text-transform: none;
+  text-align: left;
+  white-space: normal;
+}
 
 .curve { margin-top: 28px; }
 .curve h2, .split h2 {

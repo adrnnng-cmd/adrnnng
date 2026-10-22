@@ -54,6 +54,13 @@ function fmtHold(n) {
   return n.toFixed(0);
 }
 
+function fmtSharpe(n) {
+  if (typeof n !== 'number' || !Number.isFinite(n)) return '—';
+  return n.toFixed(2);
+}
+
+const SHARPE_TIP = 'Mean of daily net points divided by their sample standard deviation, times the square root of 252. In points, after the cost you chose. No risk-free rate. Sessions with no trade count as zero.';
+
 function num(id) {
   return Number($(id).value);
 }
@@ -180,14 +187,15 @@ function render(result) {
     ? `after ${fmtPoints(result.params.costPoints, 2).replace('+', '')} pts × ${m.trades.toLocaleString('en-US')} round trips · gross ${fmtPoints(m.grossPoints, 1)}`
     : `costs off · gross ${fmtPoints(m.grossPoints, 1)}`;
   const stats = [
-    ['Trades', m.trades.toLocaleString('en-US')],
-    ['Trades/day', m.tradesPerDay == null ? '—' : m.tradesPerDay.toFixed(2)],
-    ['Win rate', fmtPct(m.winRate)],
-    ['Profit factor', fmtPf(m)],
-    ['Avg pts', fmtPoints(m.avgPoints, 2)],
-    ['Avg hold', m.avgHoldMinutes == null ? '—' : `${fmtHold(m.avgHoldMinutes)} min`],
-    ['Max DD', fmtPoints(m.maxDrawdownPoints, 1)],
-    ['Gross', fmtPoints(m.grossPoints, 1)],
+    { label: 'Trades', value: m.trades.toLocaleString('en-US') },
+    { label: 'Trades/day', value: m.tradesPerDay == null ? '—' : m.tradesPerDay.toFixed(2) },
+    { label: 'Win rate', value: fmtPct(m.winRate) },
+    { label: 'Profit factor', value: fmtPf(m) },
+    { label: 'Avg pts', value: fmtPoints(m.avgPoints, 2) },
+    { label: 'Avg hold', value: m.avgHoldMinutes == null ? '—' : `${fmtHold(m.avgHoldMinutes)} min` },
+    { label: 'Max DD', value: fmtPoints(m.maxDrawdownPoints, 1), note: 'daily resolution' },
+    { label: 'Sharpe', value: fmtSharpe(m.sharpe), tip: SHARPE_TIP },
+    { label: 'Gross', value: fmtPoints(m.grossPoints, 1) },
   ];
   const equity = (result.equity || []).filter((p) => /^\d{4}-\d{2}-\d{2}$/.test(p.date) && typeof p.points === 'number');
   const years = table(
@@ -226,7 +234,11 @@ function render(result) {
     <p class="kicker lab-kicker">Net points</p>
     <p class="lab-net num ${cls}">${esc(fmtPoints(net, 1))}</p>
     <p class="lab-net-sub">${esc(costLine)} · ${esc(m.sessionDays)} session days${span ? ` · ${esc(span)}` : ''}</p>
-    <div class="stat-grid">${stats.map(([k, v]) => `<div><span>${esc(k)}</span><b>${esc(v)}</b></div>`).join('')}</div>
+    <div class="stat-grid">${stats.map((stat) => {
+      const note = stat.note ? `<i class="stat-note">${esc(stat.note)}</i>` : '';
+      const tip = stat.tip ? `<button type="button" class="tip" data-tip="${esc(stat.tip)}" aria-label="${esc(stat.tip)}">i</button>` : '';
+      return `<div><span>${esc(stat.label)}${note}${tip}</span><b>${esc(stat.value)}</b></div>`;
+    }).join('')}</div>
     <div class="curve">
       <h2>Equity</h2>
       <p class="panel-sub">Cumulative points from zero, one point per session.</p>

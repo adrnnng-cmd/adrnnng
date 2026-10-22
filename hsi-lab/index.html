@@ -174,7 +174,8 @@
               <dt>Points</dt><dd>One index unit. Long is exit minus entry. Short is the opposite. Gross is before the round-trip cost. Net subtracts the cost once per closed trade.</dd>
               <dt>Win rate and profit factor</dt><dd>Counted on gross points. A scratch is not a win. Profit factor is blank when there is no losing trade.</dd>
               <dt>Hold</dt><dd>1-minute bars from the fill to the exit, plus one when the exit is that bar’s close. Lunch has no bars, so it is not counted.</dd>
-              <dt>Max drawdown</dt><dd>The peak-to-trough of the end-of-day point curve, after the round-trip cost. One point per session, not every minute. The curve shows at most 250 of those sessions. Each stored day also keeps that session’s lowest mark, in points from the session’s start.</dd>
+              <dt>Max drawdown</dt><dd>Daily resolution. The peak-to-trough of the end-of-day point curve, after the round-trip cost. One point per session, not every minute. The curve shows at most 250 of those sessions. Each stored day also keeps that session’s lowest mark, in points from the session’s start.</dd>
+              <dt>Sharpe</dt><dd>Mean of daily net points divided by their sample standard deviation, times the square root of 252. In points, after the cost you chose. No risk-free rate. A session with no trade counts as zero.</dd>
               <dt>Trades per day</dt><dd>Closed trades divided by day-session dates in the range, including dates with no trade.</dd>
             </dl>
           </div>

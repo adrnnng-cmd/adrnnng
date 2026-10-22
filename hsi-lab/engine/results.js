@@ -57,6 +57,7 @@ export function scoreStored(decoded, spec) {
       avgPoints: trades ? roundTo(sliced.gross / trades, 4) : null,
       avgHoldMinutes: trades ? roundTo(sliced.hold / trades, 2) : null,
       maxDrawdownPoints: roundTo(sliced.maxDrawdown, 2),
+      sharpe: roundTo(sliced.sharpe, 4),
       grossPoints: roundTo(sliced.gross, 2),
       netPoints: roundTo(sliced.gross - cost * trades, 2),
     },
