@@ -2,3 +2,4 @@ __pycache__/
 *.pyc
 .DS_Store
 backtest/output/
+hsi-r2/

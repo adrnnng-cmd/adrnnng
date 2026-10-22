@@ -28,6 +28,25 @@
       "chrome": "shared"
     },
     {
+      "id": "hsi-lab",
+      "title": "HSI Lab",
+      "zh": "恒指實驗室",
+      "href": "/hsi-lab/",
+      "status": "new",
+      "category": "Research",
+      "icon": "backtest",
+      "accent": "#111111",
+      "summary": "Run an ATR SuperTrend rule on Hang Seng futures. The tape stays private; the page shows points, drawdown, and the equity curve.",
+      "highlights": [
+        "1m and 5m, set apart",
+        "Clock, flip, or first flip",
+        "Points after costs"
+      ],
+      "nav": true,
+      "owner": "repo",
+      "chrome": "shared"
+    },
+    {
       "id": "politician-tracker",
       "title": "Politician Tracker",
       "zh": "政治人物持股動向",

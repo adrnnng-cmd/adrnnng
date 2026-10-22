@@ -9,6 +9,7 @@ static JSON/CSV.
 | --- | --- | --- |
 | `/` | Landing page (`index.html`, `assets/js/home.js`) | this repo |
 | `/backtest/` | Backtest tool | this repo; prices refreshed by `backtest-prices.yml` |
+| `/hsi-lab/` | HSI futures strategy lab | this repo. Precomputed scores stay in Workers KV; a Pages Function returns points only |
 | `/politician-tracker/` | Politician Tracker | this repo; page rebuilt by `politician-tracker.yml` |
 | `/news/` | Morning Report | **News Analyst agent** (direct Wrangler upload, ~08:15 HKT). Not in this repo. |
 
@@ -34,6 +35,10 @@ backtest/
   data/prices/                 daily CSVs + manifest.json (written by the scheduled fetch)
   tests/                       node --test unit tests; tests/reference = independent Python cross-check
 politician-tracker/            built page + data.json + img/ (committed by its workflow)
+hsi-lab/                       public lab page, engine, and request handler
+functions/api/hsi-lab/         Cloudflare Pages Function (GET the registry, POST a run)
+scripts/pack-hsi-r2.mjs        private packer: cleaned parquet/CSV → year bins
+scripts/hsi-lab-precompute.mjs private grid: tape → gzipped result bundles for KV
 .github/<tool>/                data builders run by Actions (Python stdlib, no pip installs)
 .github/workflows/             scheduled refreshes, publish ping, site check
 scripts/                       check-site, new-tool scaffolder + template, assemble-deploy
@@ -163,6 +168,53 @@ node backtest/runners/hsi-supertrend-phase1.js --data /path/to/HSImain_1m.parque
 
 `HSI_BARS_PATH` is the same path when `--data` is omitted. Output defaults to `backtest/output/hsi-supertrend-phase1/` (gitignored): `summary.csv`, `summary.json`, and `runs/<id>.json`. The reader is not a browser provider and the site does not serve the bars.
 
+### HSI Strategy Lab
+
+`/hsi-lab/` is the public page for that study. There is no login. The free plan allows about 10ms of CPU and 128MB per request, so the page does not run the backtest. Adrian picks a cell in a precomputed grid and the server looks up the score: trades, trades per day, win rate, profit factor, average points, average hold, max drawdown, gross and net points, an equity curve of at most 250 cumulative points, and breakdowns by year and by entry hour. The response has no prices, no entry or exit levels, and no per-trade timestamps.
+
+The grid is entry timeframe 1m or 5m, entry ATR 10 through 14, exit timeframe 1m or 5m, and exit ATR 10 through 14. When the timeframes match, both sides share one ATR. Then five entry rules (any flip, the 09:15 state, the 09:30 state, the first flip after 09:15, the first flip after 09:30) and three exits (flat, re-enter the same way, reverse). Factor is 2.5, smoothing is 2, and the window is the day session 09:15–16:30. That is 900 studies. The date control is By year (one calendar year, or all years) or Custom dates, any start and end from 2020-01-02 through today.
+
+Each study stores one row per session day: gross points, trade count, wins, gross win points, gross loss points, hold minutes, and the session’s lowest mark in points from that session’s start. The worker adds the days inside the window. Net points are gross minus the round-trip cost times the trade count. Win rate and profit factor use the same cost. A session’s winning trades are one bucket: gross win points minus the cost times that count. If the bucket stays positive, those trades stay wins and the remainder is profit. If it does not, the bucket is a loss and none of them count as wins. Losing and scratch trades add their gross loss plus the cost. One trade’s points are not stored, so a small winner beside a large one can still count. The hour table still counts a gross winner. Max drawdown is the peak-to-trough of that end-of-day curve, labelled daily resolution. Sharpe, labelled Sharpe (ann.), is the mean of those daily net points divided by their sample standard deviation, times the square root of 252. It is in points, after the chosen cost, with no risk-free rate, and a session with no trade counts as zero. Costs default to 8 points when the exit is 1-minute and 6 when it is 5-minute. Entry hour is shown for a whole stored year or for every stored year. A custom window still gets the year table.
+
+The archive is 10 gzip bundles, one per entry timeframe and ATR, plus a manifest: 11 KV keys. A synthetic bundle of 1,776 weekday sessions and 90 studies is 3.7 MB raw and about 840 KB gzipped, so the ten bundles are about 8.2 MB. Each value stays under the 25 MB limit. Real session counts are lower once holidays are dropped. By year and custom dates both read that one key.
+
+The page calls `POST /api/hsi-lab`. `GET /api/hsi-lab` returns the grid and does not touch KV. There is no `/api/bars`. `functions/api/hsi-lab/_middleware.js` is the only auth hook: `authorize()` in `hsi-lab/server/auth.js` currently allows every request, and a later login replaces that function. The endpoint allows 30 lookups a minute per IP on each isolate. A missing `HSI_BARS` binding returns 503. Parsed bundles stay in isolate memory for 10 minutes, at most eight at a time.
+
+A flip is known at the signal bar's close and fills at the next 1-minute open, on the same date. A 5-minute flip fills at the first 1-minute open of the next 5-minute bucket. Clock entries use the last completed bar's trend. The position flattens at the last bar of the day session.
+
+Bars are not in git and never go to KV for the page. The engineer precomputes on a private machine. `--data` reads the cleaned parquet or CSV (`time_key`, `open`, `high`, `low`, `close`, `volume`, Hong Kong time). `--bins` reads packed year files from `scripts/pack-hsi-r2.mjs`. Parquet needs pyarrow, polars, or duckdb. The script uses worker threads, refuses to write inside this repository, and does not print prices.
+
+```bash
+node scripts/hsi-lab-precompute.mjs \
+  --data /secure/HK_HSImain_1m.parquet \
+  --out /secure/hsi-results
+
+# Nightly refresh. --years checks the year, then rewrites the same ten
+# daily bundles. The full tape is still read. There is no per-year file.
+node scripts/hsi-lab-precompute.mjs \
+  --data /secure/HK_HSImain_1m.parquet \
+  --out /secure/hsi-results \
+  --years 2026
+```
+
+Each bundle is `v1/results/<entryTf>m-<entryAtr>/all.json.gz`. `v1/results/manifest.json` lists the 10 keys, the total byte count, and no prices. Upload them to the Workers KV namespace `hsi-bars` (id `f6577e29d4b249dea5a81b4f00443082`).
+
+```bash
+# Pages project adrnnng → Settings → Bindings → Add → KV namespace.
+# Variable name: HSI_BARS. Namespace: hsi-bars. Do not add a wrangler.toml.
+npx wrangler kv key put --namespace-id f6577e29d4b249dea5a81b4f00443082 \
+  v1/results/5m-14/all.json.gz \
+  --path /secure/hsi-results/v1/results/5m-14/all.json.gz --remote
+
+npx wrangler kv key put --namespace-id f6577e29d4b249dea5a81b4f00443082 \
+  v1/results/manifest.json \
+  --path /secure/hsi-results/v1/results/manifest.json --remote
+```
+
+Repeat the put for every `v1/results/<tf>m-<atr>/all.json.gz`, or upload the same key and file from the KV dashboard. A full grid is 10 bundles plus the manifest, 11 writes, inside the free plan's 1,000 writes a day. The worker reads one bundle with `env.HSI_BARS.get(key, 'arrayBuffer')`. Without the binding, Run returns 503 and no bars.
+
+The same bytes can be stored in an R2 bucket bound as `HSI_BARS`. The adapter still accepts `get(key).arrayBuffer()`. KV is the binding to configure. `assemble-deploy.sh` already ships `functions/` and `hsi-lab/`.
+
 ### Add a strategy
 
 Create `backtest/strategies/my-strategy.js`:
@@ -259,7 +311,7 @@ report. The only copy in this repo is `scripts/preview/latest.json`, and `assemb
 does not upload `scripts/`.
 
 This repo owns the site root outside `news/`: `index.html`, `404.html`, `_headers`, `_redirects`,
-`assets/`, `backtest/` (without `backtest/tests/`), and `politician-tracker/`. `404.html` must be
+`assets/`, `backtest/` (without `backtest/tests/`), `hsi-lab/`, `functions/`, and `politician-tracker/`. `404.html` must be
 in every upload. Without it, Pages treats the site as a single-page app and serves `index.html`
 with status 200 for unknown paths, including `/backtest/tests/`. `_redirects` only aliases
 `/backtesting` to `/backtest/`. The News Analyst merges the `/latest` redirect rules at upload
