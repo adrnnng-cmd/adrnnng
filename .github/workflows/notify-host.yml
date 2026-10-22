@@ -49,3 +49,36 @@ jobs:
           code=$(ping "Bearer $key")
           echo "host replied HTTP $code: $(head -c 300 /tmp/resp)"
           case "$code" in 2??) echo "pinged host for $SHA" ;; *) echo "::error::publish ping failed (HTTP $code)"; exit 1 ;; esac
+
+      - uses: actions/checkout@v4
+        continue-on-error: true
+        with:
+          ref: ${{ inputs.sha || github.sha }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        continue-on-error: true
+        with:
+          node-version: "22"
+
+      # Best-effort. The host deploy is asynchronous, so a ping here can run
+      # before the new key file is live. publish.sh should ping again after
+      # `wrangler pages deploy` (see scripts/ping-indexnow.mjs).
+      - name: Ping IndexNow
+        continue-on-error: true
+        env:
+          BEFORE: ${{ github.event.before }}
+          SHA: ${{ inputs.sha || github.sha }}
+        run: |
+          if [ ! -f scripts/ping-indexnow.mjs ]; then
+            echo "indexnow script not in this checkout"
+            exit 0
+          fi
+          if [ -n "$BEFORE" ] && [ "$BEFORE" != "0000000000000000000000000000000000000000" ]; then
+            git diff --name-only "$BEFORE" "$SHA" > /tmp/changed.txt
+          elif git rev-parse --verify "${SHA}^" >/dev/null 2>&1; then
+            git diff --name-only "${SHA}^" "$SHA" > /tmp/changed.txt
+          else
+            git show --pretty= --name-only --format= "$SHA" > /tmp/changed.txt
+          fi
+          node scripts/ping-indexnow.mjs --paths /tmp/changed.txt --retries 3 --retry-delay-ms 20000
