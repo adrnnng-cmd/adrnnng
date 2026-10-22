@@ -19,6 +19,7 @@
       "summary": "Test a rule on real daily history. Price with trade signals, a profit curve against buy-and-hold, and a statistics side panel.",
       "highlights": [
         "TD Sequential 9 / 13",
+        "ATR SuperTrend",
         "Sharpe · Sortino · CAGR",
         "47 US, HK & crypto tickers"
       ],

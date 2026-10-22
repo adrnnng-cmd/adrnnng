@@ -11,6 +11,7 @@
     "check": "node scripts/check-site.mjs",
     "serve": "python3 -m http.server 8788",
     "new-tool": "node scripts/new-tool.mjs",
-    "verify:backtest": "node backtest/tests/reference/run-engine.mjs SPY > /tmp/engine-SPY.json && python3 backtest/tests/reference/reference_check.py SPY /tmp/engine-SPY.json"
+    "verify:backtest": "node backtest/tests/reference/run-engine.mjs SPY > /tmp/engine-SPY.json && python3 backtest/tests/reference/reference_check.py SPY /tmp/engine-SPY.json",
+    "backtest:hsi-supertrend": "node backtest/runners/hsi-supertrend-phase1.js"
   }
 }
