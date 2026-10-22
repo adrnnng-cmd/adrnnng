@@ -1,4 +1,5 @@
-// Private R2 object format for 1-minute HSI bars.
+// Private year-object format for 1-minute HSI bars.
+// The value is a Workers KV entry (or, alternatively, an R2 object) at the key below.
 //
 // Key:    v1/1m/YYYY.bin
 // Header: 16 bytes, little-endian

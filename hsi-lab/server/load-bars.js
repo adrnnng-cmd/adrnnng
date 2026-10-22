@@ -1,8 +1,21 @@
 // Read private year objects from the HSI_BARS binding. Returns bar records
 // for the engine. Nothing in here is sent to the client.
+//
+// Decoded years stay in isolate memory so a repeat run does not read KV again.
+// The free plan allows 100,000 reads a day. A replaced object is picked up
+// after ARCHIVE_CACHE_MS, or sooner when the isolate recycles.
 
 import { decodeYear, objectKey } from '../engine/archive.js';
 import { ValidationError } from '../engine/validate.js';
+import { openArchive } from './store.js';
+
+export class ArchiveUnconfigured extends Error {
+  constructor() {
+    super('Bar archive is not configured.');
+    this.name = 'ArchiveUnconfigured';
+    this.status = 503;
+  }
+}
 
 export class ArchiveEmpty extends Error {
   constructor() {
@@ -12,27 +25,47 @@ export class ArchiveEmpty extends Error {
   }
 }
 
-const KEY_RE = /^v1\/1m\/(\d{4})\.bin$/;
+export const ARCHIVE_CACHE_MS = 10 * 60 * 1000;
 
-export async function listYears(bucket) {
-  const years = [];
-  let cursor;
-  for (;;) {
-    const page = await bucket.list({ prefix: 'v1/1m/', cursor, limit: 1000 });
-    for (const obj of page.objects || []) {
-      const match = KEY_RE.exec(obj.key);
-      if (match) years.push(Number(match[1]));
-    }
-    if (!page.truncated) break;
-    cursor = page.cursor;
-    if (!cursor) break;
-  }
-  years.sort((a, b) => a - b);
-  return years;
+const decoded = new Map();
+let index = null;
+let indexAt = 0;
+
+export function resetArchiveCache() {
+  decoded.clear();
+  index = null;
+  indexAt = 0;
 }
 
-export async function loadBars(bucket, spec) {
-  const years = await listYears(bucket);
+function fresh(at, now) {
+  return now - at < ARCHIVE_CACHE_MS;
+}
+
+async function availableYears(store, now) {
+  if (index && fresh(indexAt, now)) return index;
+  index = await store.listYears();
+  indexAt = now;
+  return index;
+}
+
+async function yearBars(store, year, now) {
+  const key = objectKey(year);
+  const hit = decoded.get(key);
+  if (hit && fresh(hit.at, now)) return hit.bars;
+  const bytes = await store.getBytes(key);
+  if (!bytes) {
+    decoded.set(key, { bars: null, at: now });
+    return null;
+  }
+  const bars = decodeYear(bytes);
+  decoded.set(key, { bars, at: now });
+  return bars;
+}
+
+export async function loadBars(binding, spec, now = Date.now()) {
+  const store = openArchive(binding);
+  if (!store) throw new ArchiveUnconfigured();
+  const years = await availableYears(store, now);
   if (!years.length) throw new ArchiveEmpty();
   let fromY = years[0];
   let toY = years[years.length - 1];
@@ -45,10 +78,8 @@ export async function loadBars(bucket, spec) {
   const bars = [];
   for (let year = fromY; year <= toY; year++) {
     if (!available.has(year)) continue;
-    const obj = await bucket.get(objectKey(year));
-    if (!obj) continue;
-    const bytes = new Uint8Array(await obj.arrayBuffer());
-    bars.push(...decodeYear(bytes));
+    const chunk = await yearBars(store, year, now);
+    if (chunk) bars.push(...chunk);
   }
   return bars;
 }

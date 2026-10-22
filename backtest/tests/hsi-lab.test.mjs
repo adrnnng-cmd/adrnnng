@@ -14,6 +14,7 @@ import { runLab, toPublicResult } from '../../hsi-lab/engine/run.js';
 import { DEFAULTS, validateInput } from '../../hsi-lab/engine/validate.js';
 import { applyAuth } from '../../hsi-lab/server/auth.js';
 import { handle, originAllowed } from '../../hsi-lab/server/handle.js';
+import { ARCHIVE_CACHE_MS, loadBars, resetArchiveCache } from '../../hsi-lab/server/load-bars.js';
 import { createLimiter } from '../../hsi-lab/server/rate-limit.js';
 import { assertOutDir } from '../../scripts/pack-hsi-r2.mjs';
 
@@ -450,6 +451,56 @@ test('archive round-trips a year and rejects a bad object', () => {
   assert.throws(() => encodeYear(bars, 2023));
 });
 
+function bytesOf(bytes) {
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+}
+
+function kvStore(parts, { paginate = false } = {}) {
+  const objects = new Map(Object.entries(parts).map(([year, bars]) => [objectKey(Number(year)), encodeYear(bars, Number(year))]));
+  const gets = [];
+  const lists = [];
+  return {
+    gets,
+    lists,
+    async getWithMetadata() {
+      return { value: null, metadata: null };
+    },
+    async get(key, type) {
+      gets.push([key, type]);
+      const bytes = objects.get(key);
+      if (!bytes || type !== 'arrayBuffer') return null;
+      return bytesOf(bytes);
+    },
+    async list({ cursor } = {}) {
+      lists.push(cursor ?? null);
+      const names = [...objects.keys()].sort();
+      if (!paginate) return { keys: names.map((name) => ({ name })), list_complete: true };
+      if (!cursor) return { keys: [{ name: names[0] }, { name: 'v1/1m/manifest.json' }], list_complete: false, cursor: 'next' };
+      return { keys: names.slice(1).map((name) => ({ name })), list_complete: true };
+    },
+  };
+}
+
+function r2Store(parts) {
+  const objects = new Map(Object.entries(parts).map(([year, bars]) => [objectKey(Number(year)), encodeYear(bars, Number(year))]));
+  const gets = [];
+  return {
+    gets,
+    async head() {
+      return null;
+    },
+    async get(key, options) {
+      gets.push(options);
+      const bytes = objects.get(key);
+      if (!bytes) return null;
+      return { async arrayBuffer() { return bytesOf(bytes); } };
+    },
+    async list() {
+      return { objects: [...objects.keys()].sort().map((key) => ({ key })), truncated: false };
+    },
+  };
+}
+
 function bucket(parts, { paginate = false } = {}) {
   const objects = new Map(Object.entries(parts).map(([year, bars]) => [objectKey(Number(year)), encodeYear(bars, Number(year))]));
   const gets = [];
@@ -479,6 +530,7 @@ function post(body, origin = 'https://adrnnng.com') {
 }
 
 test('the endpoint returns scores, rate-limits, and never echoes bars', async () => {
+  resetArchiveCache();
   const planted = 54321.25;
   const bars = zigzagSeries(['2023-12-28', '2024-01-02'], { base: planted });
   const store = bucket({
@@ -529,6 +581,7 @@ test('the endpoint returns scores, rate-limits, and never echoes bars', async ()
   const local = await handle(post('{}', 'http://127.0.0.1:8788'), {}, { limiter: createLimiter() });
   assert.equal(local.status, 503);
 
+  resetArchiveCache();
   const empty = {
     async get() { return null; },
     async list() { return { objects: [], truncated: false }; },
@@ -537,6 +590,7 @@ test('the endpoint returns scores, rate-limits, and never echoes bars', async ()
   assert.equal(vacant.status, 503);
   assert.match(await vacant.text(), /empty/i);
 
+  resetArchiveCache();
   const corrupt = {
     async get() { return { async arrayBuffer() { return new Uint8Array([9, 9, 9, 9]).buffer; } }; },
     async list() { return { objects: [{ key: 'v1/1m/2024.bin' }], truncated: false }; },
@@ -566,6 +620,65 @@ test('the endpoint returns scores, rate-limits, and never echoes bars', async ()
   assert.equal(registry.strategies[0].id, 'atr-supertrend');
   assert.equal(registry.defaults.atrLength, DEFAULTS.atrLength);
   walk(registry);
+});
+
+test('KV is the default read and a decoded year is not fetched again', async () => {
+  resetArchiveCache();
+  const secret = 22222.75;
+  const older = zigzagSeries(['2023-12-28'], { base: secret, step: 30, period: 12 });
+  const day = zigzagSeries(['2024-03-04'], { base: secret });
+  const store = kvStore({
+    2023: older,
+    2024: day,
+  }, { paginate: true });
+  const body = {
+    strategy: 'atr-supertrend',
+    atrLength: 8,
+    factor: 1,
+    smoothing: 1,
+    entryTimeframe: 1,
+    exitTimeframe: 5,
+    entryRule: 'flip',
+    exitRule: 'flat',
+    from: '2024-03-04',
+    to: '2024-03-04',
+    costs: true,
+    costPoints: 6,
+  };
+  const first = await handle(post(body), { HSI_BARS: store }, { limiter: createLimiter() });
+  const text = await first.text();
+  assert.equal(first.status, 200, text);
+  assert.equal(text.includes(String(secret)), false);
+  assert.equal(text.includes('T09'), false);
+  walk(JSON.parse(text));
+  assert.deepEqual(store.gets.map((call) => call[0]).sort(), ['v1/1m/2023.bin', 'v1/1m/2024.bin']);
+  assert.ok(store.gets.every((call) => call[1] === 'arrayBuffer'));
+  assert.equal(store.gets.some((call) => String(call[0]).includes('manifest')), false);
+  assert.deepEqual(store.lists, [null, 'next']);
+  const reads = store.gets.length;
+  const pages = store.lists.length;
+  const second = await handle(post(body), { HSI_BARS: store }, { limiter: createLimiter() });
+  assert.equal(second.status, 200);
+  assert.equal(store.gets.length, reads);
+  assert.equal(store.lists.length, pages);
+
+  resetArchiveCache();
+  const timed = kvStore({ 2024: day });
+  const spec = validateInput(body);
+  const t0 = 1_700_000_000_000;
+  await loadBars(timed, spec, t0);
+  const warm = timed.gets.length;
+  await loadBars(timed, spec, t0 + ARCHIVE_CACHE_MS - 1);
+  assert.equal(timed.gets.length, warm);
+  await loadBars(timed, spec, t0 + ARCHIVE_CACHE_MS);
+  assert.ok(timed.gets.length > warm);
+
+  resetArchiveCache();
+  const r2 = r2Store({ 2024: day });
+  const bars = await loadBars(r2, spec, t0);
+  assert.equal(bars.length, day.length);
+  assert.ok(r2.gets.length > 0);
+  assert.ok(r2.gets.every((options) => options === undefined));
 });
 
 test('auth is one hook and the route does not publish bars', async () => {

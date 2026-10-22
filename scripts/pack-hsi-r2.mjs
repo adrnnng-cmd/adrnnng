@@ -1,15 +1,15 @@
 #!/usr/bin/env node
-// Pack a private cleaned HSI file into the R2 object layout.
+// Pack a private cleaned HSI file into year objects for Workers KV.
 //
-//   node scripts/pack-hsi-r2.mjs --data /secure/HK_HSImain_1m.parquet --out /secure/hsi-r2
+//   node scripts/pack-hsi-r2.mjs --data /secure/HK_HSImain_1m.parquet --out /secure/hsi-bars
 //
 // Input columns: time_key (bar open, Asia/Hong_Kong), open, high, low, close, volume.
 // CSV is read directly. Parquet needs pyarrow, polars, or duckdb already installed.
 // Writes v1/1m/YYYY.bin and v1/1m/manifest.json. Does not upload and does not
 // print prices. Refuses to write inside this repository.
 //
-// Upload (bucket stays private; Pages binding name is HSI_BARS):
-//   npx wrangler r2 object put <bucket>/v1/1m/2020.bin --file /secure/hsi-r2/v1/1m/2020.bin --remote
+// Upload (KV namespace bound to the Pages project as HSI_BARS):
+//   npx wrangler kv key put --namespace-id <id> v1/1m/2020.bin --path /secure/hsi-bars/v1/1m/2020.bin --remote
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve, sep } from 'node:path';
@@ -23,7 +23,7 @@ function usage() {
   return `Usage: node scripts/pack-hsi-r2.mjs --data <csv-or-parquet> --out <dir-outside-this-repo>
 
 Writes one private object per calendar year plus a manifest. Prints keys and
-counts only. Upload those files to the R2 bucket bound as HSI_BARS.
+counts only. Upload those files to the Workers KV namespace bound as HSI_BARS.
 `;
 }
 
@@ -90,6 +90,7 @@ function main() {
     format: ARCHIVE.format,
     version: ARCHIVE.version,
     binding: 'HSI_BARS',
+    storage: 'kv',
     prefix: ARCHIVE.prefix,
     timezone: ARCHIVE.timezone,
     priceEncoding: ARCHIVE.priceEncoding,

@@ -9,7 +9,7 @@ static JSON/CSV.
 | --- | --- | --- |
 | `/` | Landing page (`index.html`, `assets/js/home.js`) | this repo |
 | `/backtest/` | Backtest tool | this repo; prices refreshed by `backtest-prices.yml` |
-| `/hsi-lab/` | HSI futures strategy lab | this repo. Bars stay in a private R2 bucket; a Pages Function returns points only |
+| `/hsi-lab/` | HSI futures strategy lab | this repo. Bars stay in a private Workers KV namespace; a Pages Function returns points only |
 | `/politician-tracker/` | Politician Tracker | this repo; page rebuilt by `politician-tracker.yml` |
 | `/news/` | Morning Report | **News Analyst agent** (direct Wrangler upload, ~08:15 HKT). Not in this repo. |
 
@@ -37,7 +37,7 @@ backtest/
 politician-tracker/            built page + data.json + img/ (committed by its workflow)
 hsi-lab/                       public lab page, engine, and request handler
 functions/api/hsi-lab/         Cloudflare Pages Function (GET the registry, POST a run)
-scripts/pack-hsi-r2.mjs        private packer: cleaned parquet/CSV → R2 year objects
+scripts/pack-hsi-r2.mjs        private packer: cleaned parquet/CSV → KV year values
 .github/<tool>/                data builders run by Actions (Python stdlib, no pip installs)
 .github/workflows/             scheduled refreshes, publish ping, site check
 scripts/                       check-site, new-tool scaffolder + template, assemble-deploy
@@ -175,7 +175,7 @@ The page calls `POST /api/hsi-lab`. `GET /api/hsi-lab` returns the strategy regi
 
 ATR SuperTrend is the only strategy. The registry is `hsi-lab/engine/registry.js`. A flip is known at the signal bar's close and fills at the next 1-minute open, on the same date. A 5-minute flip fills at the first 1-minute open of the next 5-minute bucket. Clock entries use the last completed bar's trend. The position flattens at the last bar inside the trading window (the day session only). Costs default to 8 points per round trip when the exit is 1-minute and 6 when it is 5-minute. The endpoint allows 30 runs a minute per IP on each isolate, and it rejects out-of-range inputs before it reads the archive.
 
-Bars are not in git. A Pages Function reads them from a private R2 binding named `HSI_BARS`.
+Bars are not in git. A Pages Function reads them from a private Workers KV namespace bound as `HSI_BARS`. The same binding name can point at an R2 bucket later; the worker accepts either shape, and KV is the one to configure.
 
 Object layout, little-endian:
 
@@ -185,22 +185,25 @@ Object layout, little-endian:
 | Header, 16 bytes | `HSI1`, version `1` uint8, flags `0` uint8, year uint16, count uint32, reserved uint32 |
 | Record, 40 bytes | days since 1970-01-01 uint16, minute of the bar open uint16, open/high/low/close float64, volume uint32 |
 
-`time_key` is the bar open in Asia/Hong_Kong. Prices are float64 so the pack is exact. The worker loads the years the request needs, plus the previous year so the indicator can warm up, and ignores `v1/1m/manifest.json`.
+`time_key` is the bar open in Asia/Hong_Kong. Prices are float64 so the pack is exact. A year file is about 9 MB, under the KV value limit of 25 MB. The worker reads with `env.HSI_BARS.get(key, 'arrayBuffer')`, loads the years the request needs plus the previous year so the indicator can warm up, and ignores `v1/1m/manifest.json`. Decoded years are cached in the isolate for 10 minutes so repeat runs do not spend the free plan's 100,000 KV reads a day.
 
 Pack and upload, from a machine that already has the cleaned file. Do not commit the output.
 
 ```bash
 node scripts/pack-hsi-r2.mjs \
   --data /secure/HK_HSImain_1m.parquet \
-  --out /secure/hsi-r2
+  --out /secure/hsi-bars
 
-# Private bucket. Do not enable a public r2.dev domain.
-# Pages project → Settings → Bindings → R2 bucket → Variable name HSI_BARS.
-npx wrangler r2 object put <bucket>/v1/1m/2020.bin \
-  --file /secure/hsi-r2/v1/1m/2020.bin --remote
+# Workers & Pages → KV → Create a namespace. Copy its namespace id.
+# Pages project adrnnng → Settings → Bindings → Add → KV namespace.
+# Variable name: HSI_BARS. Do not add a wrangler.toml for this.
+npx wrangler kv key put --namespace-id <id> v1/1m/2020.bin \
+  --path /secure/hsi-bars/v1/1m/2020.bin --remote
 ```
 
-Repeat the put for every `v1/1m/YYYY.bin`. The manifest is for inspection; the worker does not read it. Parquet needs pyarrow, polars, or duckdb. The script refuses to write inside this repository. `assemble-deploy.sh` already ships `functions/` and `hsi-lab/` with the rest of the site. The binding is what makes Run work; without it the endpoint returns 503 and no bars.
+Repeat the put for every `v1/1m/YYYY.bin`. The same upload can be done from the dashboard: KV → the namespace → Add entry → key `v1/1m/2020.bin` → upload the file. The manifest is for inspection; the worker does not read it. Parquet needs pyarrow, polars, or duckdb. The script refuses to write inside this repository. `assemble-deploy.sh` already ships `functions/` and `hsi-lab/` with the rest of the site. The binding is what makes Run work; without it the endpoint returns 503 and no bars.
+
+An R2 bucket bound as `HSI_BARS` still reads, via `get(key).arrayBuffer()`, if that binding is swapped back later. The upload for that path is `npx wrangler r2 object put <bucket>/v1/1m/2020.bin --file /secure/hsi-bars/v1/1m/2020.bin --remote`. Leave any such bucket private.
 
 ### Add a strategy
 
