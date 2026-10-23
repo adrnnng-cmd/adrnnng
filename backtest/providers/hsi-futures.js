@@ -1,8 +1,9 @@
 // HSI futures bars. Same shape as the daily catalog provider: load() returns
 // { symbol, name, currency, bars, source, sample }.
 //
-// The public files are not in this repo yet. Until they are, load() throws
-// BarsPending and the page says so. Dropping the packs in place needs no code change.
+// The year packs are not in git. A Pages Function reads the HSI_BARS KV binding
+// and serves them at this provider's default base, /backtest/data/hsi/. A 404
+// from that path still becomes BarsPending.
 //
 // Bind and env (never shown as a vendor on the page):
 //   HSI_BARS       Cloudflare binding name for the bar bucket (R2 or KV)

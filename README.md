@@ -119,21 +119,23 @@ charts.js / app.js → the one /backtest/ page
 
 `/hsi-lab/` redirects to `/backtest/` with the Fast Response recipe selected. There is not a second UI.
 
-HSI futures bars use the same `load()` shape as the daily files. Until the packs are published,
-the provider throws a bars-pending error and the page says so.
+HSI futures bars use the same `load()` shape as the daily files. The browser still fetches
+`/backtest/data/hsi/`. Pages Functions in `functions/backtest/data/hsi/` read those objects from
+the existing `HSI_BARS` KV binding and return them. The year packs are not in git. A missing key
+is a 404, and the page then says the bars are not on the site yet.
 
 | Name | Where it is set | What it points at |
 | --- | --- | --- |
-| `HSI_BARS` | Cloudflare binding | Bar bucket. Prefix `v1/1m/` |
+| `HSI_BARS` | Pages project binding, namespace `f6577e29d4b249dea5a81b4f00443082` | KV keys `v1/1m/manifest.json` and `v1/1m/YYYY.bin` |
 | `HSI_BARS_URL` | Worker or pack environment | Public base URL for that prefix |
 | `HSI_BARS_BASE` | `window.__HSI_BARS_BASE` or `<meta name="hsi-bars-base">` | Same base, read in the browser |
-| static fallback | `/backtest/data/hsi/` | `v1/1m/manifest.json`, `v1/1m/YYYY.bin`, optional `v1/1d/HSImain.csv` |
+| public paths | `/backtest/data/hsi/` | `v1/1m/manifest.json`, `v1/1m/YYYY.bin`, optional `v1/1d/HSImain.csv` |
 
+`_routes.json` sends only `/backtest/data/hsi/*` through a Function. The rest of the site stays static.
 Objects are `v1/1m/YYYY.bin` (magic `HSI1`). Every equity and index on the page has daily bars in
-the site files. HSI futures (`HSImain`) read `v1/1d/HSImain.csv` for daily, weekly, and monthly, and
-the 1-minute packs for 1-minute and 5-minute. Until those files are published the page says the bars
-are not on the site yet. 1-minute and 5-minute stay disabled for every other ticker, and choosing
-them locks the security to HSI futures. The page never names a data vendor.
+the site files. HSI futures (`HSImain`) use the 1-minute packs for 1-minute and 5-minute, and
+`v1/1d/HSImain.csv` when that daily file is published. 1-minute and 5-minute stay disabled for every
+other ticker, and choosing them locks the security to HSI futures. The page never names a data vendor.
 
 Phase 1 HSI score is index points for one unit (price movement). Basis-point commission is not applied.
 The optional cost field subtracts a flat number of points per closed trade. Until that field is edited it is 6 points on a 5-minute exit and 8 points on a 1-minute exit.

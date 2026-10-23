@@ -39,6 +39,8 @@ out=$(cd "$out" && pwd)
 case "$out" in "$root"|"$root"/*) echo "error: out_dir must be outside the repo" >&2; exit 1 ;; esac
 find "$out" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
 
+# functions/ and _routes.json are part of the upload. Pages serves the HSI
+# year packs from KV at /backtest/data/hsi/; those bins are not in git.
 git ls-files -z \
   | grep -zvE '^(\.github/|scripts/|backtest/tests/|\.gitignore$|package\.json$|.*\.md$)' \
   | tar --null -cf - -T - | tar -xf - -C "$out"
