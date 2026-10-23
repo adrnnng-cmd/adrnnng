@@ -116,23 +116,50 @@ charts.js / app.js → the one /backtest/ page
 
 `/hsi-lab/` redirects to `/backtest/` with the Fast Response recipe selected. There is not a second UI.
 
-HSI futures bars use the same `load()` shape as the daily files. The browser still fetches
-`/backtest/data/hsi/`. Pages Functions in `functions/backtest/data/hsi/` read those objects from
-the existing `HSI_BARS` KV binding and return them. The year packs are not in git. A missing key
-is a 404, and the page then says the bars are not on the site yet.
+HSI futures 1-minute and 5-minute ATR SuperTrend does not run the minute tape in the browser.
+The page looks up a stored daily score and draws that. Pages Functions in `functions/backtest/data/hsi/`
+read the objects from the existing `HSI_BARS` KV binding. The year packs and the result bundles stay
+out of git. A missing result says it is not computed yet. A missing daily file says the bars are not
+on the site yet.
 
 | Name | Where it is set | What it points at |
 | --- | --- | --- |
-| `HSI_BARS` | Pages project binding, namespace `f6577e29d4b249dea5a81b4f00443082` | KV keys `v1/1m/manifest.json` and `v1/1m/YYYY.bin` |
+| `HSI_BARS` | Pages project binding, namespace `f6577e29d4b249dea5a81b4f00443082` | KV keys `v1/1m/…` and `v1/results/…` |
 | `HSI_BARS_URL` | Worker or pack environment | Public base URL for that prefix |
 | `HSI_BARS_BASE` | `window.__HSI_BARS_BASE` or `<meta name="hsi-bars-base">` | Same base, read in the browser |
-| public paths | `/backtest/data/hsi/` | `v1/1m/manifest.json`, `v1/1m/YYYY.bin`, optional `v1/1d/HSImain.csv` |
+| bar paths | `/backtest/data/hsi/` | `v1/1m/manifest.json`, `v1/1m/YYYY.bin`, optional `v1/1d/HSImain.csv` |
+| result paths | `/backtest/data/hsi/` | `v1/results/{1\|5}m-{10\|11\|12\|13\|14}/all.json.gz` |
 
 `_routes.json` sends only `/backtest/data/hsi/*` through a Function. The rest of the site stays static.
-Objects are `v1/1m/YYYY.bin` (magic `HSI1`). Every equity and index on the page has daily bars in
-the site files. HSI futures (`HSImain`) use the 1-minute packs for 1-minute and 5-minute, and
-`v1/1d/HSImain.csv` when that daily file is published. 1-minute and 5-minute stay disabled for every
-other ticker, and choosing them locks the security to HSI futures. The page never names a data vendor.
+Minute objects are `v1/1m/YYYY.bin` (magic `HSI1`). Every equity and index on the page has daily bars
+in the site files. HSI futures daily, weekly, and monthly use `v1/1d/HSImain.csv` when that file is
+published. 1-minute and 5-minute stay disabled for every other ticker, and choosing them locks the
+security to HSI futures. The page never names a data vendor.
+
+### Stored HSI SuperTrend results
+
+The page requests one key and slices it. Fast Response is entry 5-minute, ATR 10, exit 5-minute,
+clock 09:30, re-enter:
+
+- Key and public path: `v1/results/5m-10/all.json.gz`
+- Combo inside the bundle: `5:10:clock:09:30:reenter`
+
+Key shape: `v1/results/{entryTf}m-{entryAtr}/all.json.gz` with `entryTf` of `1` or `5` and
+`entryAtr` of 10, 11, 12, 13, or 14. The body is gzip (magic `1f 8b`) of an HSID v1 daily bundle,
+the same bytes `encodeBundle()` in `backtest/providers/hsi-results.js` writes. The name ends in
+`.json.gz`; the payload is not JSON. A year file `v1/results/{entryTf}m-{entryAtr}/{year}.json.gz`
+is served if it is uploaded. The page reads the `all` bundle.
+
+Combo shape: `{exitTf}:{exitAtr}:{entryRule}:{clock}:{exitRule}`.
+
+- `exitTf` is `1` or `5`. `exitAtr` is 10–14, and equals `entryAtr` when the timeframes match.
+- `entryRule` is `flip`, `clock`, or `firstFlip`. `clock` is `-` for `flip`, otherwise `09:15` or `09:30`.
+- `exitRule` is `flat`, `reenter`, or `reverse`.
+
+Factor 2.5, EMA smoothing 2, the 09:15–16:30 Hong Kong session, flatten at the session close, and
+no separate daily confirm are fixed. They are not in the key. `year=all`, a single year, custom
+dates, and the round-trip point cost are applied when the page reads. A combo outside that grid
+shows “not computed yet” and does not run the tape. The chart is one point per session day.
 
 Phase 1 HSI score is index points for one unit (price movement). Basis-point commission is not applied.
 The optional cost field subtracts a flat number of points per closed trade. Until that field is edited it is 6 points on a 5-minute exit and 8 points on a 1-minute exit.

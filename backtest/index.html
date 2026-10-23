@@ -107,7 +107,7 @@
         <div class="panel chart-panel">
           <div class="panel-head">
             <div>
-              <h2 class="panel-title">Price &amp; signals</h2>
+              <h2 class="panel-title" id="price-title">Price &amp; signals</h2>
               <p class="panel-sub" id="price-sub">Markers are signals. Unless noted, the fill is the next bar’s open.</p>
             </div>
           </div>
@@ -117,7 +117,7 @@
           <div class="panel-head">
             <div>
               <h2 class="panel-title">Profit curve</h2>
-              <p class="panel-sub"><i class="sw sw-strat"></i>Strategy <i class="sw sw-bh"></i>Buy &amp; hold <i class="sw sw-pos"></i>In market</p>
+              <p class="panel-sub" id="equity-sub"><i class="sw sw-strat"></i>Strategy <i class="sw sw-bh"></i>Buy &amp; hold <i class="sw sw-pos"></i>In market</p>
             </div>
             <label class="check sm"><input type="checkbox" id="log-equity" checked> Log scale</label>
           </div>
@@ -127,7 +127,7 @@
           <div class="panel-head">
             <div>
               <h2 class="panel-title">Drawdown</h2>
-              <p class="panel-sub"><i class="sw sw-dd"></i>Strategy <i class="sw sw-bh"></i>Buy &amp; hold</p>
+              <p class="panel-sub" id="dd-sub"><i class="sw sw-dd"></i>Strategy <i class="sw sw-bh"></i>Buy &amp; hold</p>
             </div>
           </div>
           <div class="chart chart-dd" id="chart-dd"></div>
@@ -137,14 +137,14 @@
       <div class="bt-sheets">
         <div class="panel">
           <div class="panel-head">
-            <div><h2 class="panel-title">Monthly returns</h2><p class="panel-sub">Calendar months in %. Grey months were spent in cash.</p></div>
+            <div><h2 class="panel-title" id="heat-title">Monthly returns</h2><p class="panel-sub" id="heat-sub">Calendar months in %. Grey months were spent in cash.</p></div>
             <div class="seg" id="heat-which" role="group" aria-label="Series"><button type="button" data-v="strategy" aria-pressed="true">Strategy</button><button type="button" data-v="bh" aria-pressed="false">Buy &amp; hold</button></div>
           </div>
           <div class="panel-body"><div class="heat-wrap" id="heatmap"></div></div>
         </div>
         <div class="panel">
           <div class="panel-head">
-            <div><h2 class="panel-title">Trade returns</h2><p class="panel-sub">Each closed trade in order. Height is the return after costs.</p></div>
+            <div><h2 class="panel-title" id="tradebars-title">Trade returns</h2><p class="panel-sub" id="tradebars-sub">Each closed trade in order. Height is the return after costs.</p></div>
           </div>
           <div class="panel-body"><div class="trade-bars" id="trade-bars"></div></div>
         </div>

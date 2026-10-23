@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { encodeHsiYear, decodeHsiYear, hsiObjectKey, HSI_ARCHIVE } from '../providers/hsi-archive.js';
-import { loadHsiFutures, BarsPending, HSI_BARS_BINDING, HSI_BARS_ENV } from '../providers/hsi-futures.js';
+import { loadHsiFutures, loadHsiDaily, BarsPending, HSI_BARS_BINDING, HSI_BARS_ENV } from '../providers/hsi-futures.js';
 
 const bars = [
   { time: '2024-06-03T09:15:00', open: 18000, high: 18010, low: 17990, close: 18005, volume: 12 },
@@ -45,4 +45,18 @@ test('load reads a published year pack from the public base', async () => {
   assert.equal(loaded.bars[1].close, 18015);
   assert.equal(loaded.source.name, 'HSI futures');
   assert.equal(loaded.sample, false);
+});
+
+test('the daily loader fetches the daily file and no year pack', async () => {
+  const urls = [];
+  const csv = 'date,open,high,low,close,volume\n2024-01-02,18000,18010,17990,18005,12\n2024-01-03,18005,18020,18000,18015,8\n';
+  const fetchImpl = async (url) => {
+    urls.push(String(url));
+    if (String(url).endsWith('v1/1d/HSImain.csv')) return { status: 200, ok: true, text: async () => csv, arrayBuffer: async () => new ArrayBuffer(0) };
+    return { status: 404, ok: false, text: async () => '', arrayBuffer: async () => new ArrayBuffer(0) };
+  };
+  const loaded = await loadHsiDaily({ base: 'https://bars.example/', fetchImpl });
+  assert.equal(loaded.resolution, '1d');
+  assert.equal(loaded.bars.length, 2);
+  assert.deepEqual(urls, ['https://bars.example/v1/1d/HSImain.csv']);
 });

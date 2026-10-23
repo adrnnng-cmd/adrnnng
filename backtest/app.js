@@ -1,5 +1,6 @@
 import { PROVIDERS, getProvider } from './providers/index.js';
-import hsiFutures, { BarsPending } from './providers/hsi-futures.js';
+import hsiFutures, { BarsPending, loadHsiDaily } from './providers/hsi-futures.js';
+import { lookupHsiResult, ResultMissing } from './providers/hsi-results.js';
 import { STRATEGIES, getStrategy, defaultParams, normaliseParams } from './strategies/index.js';
 import { adjustForDividends, resample, indexAtOrAfter, indexAtOrBefore } from './engine/bars.js';
 import { filterDaySession, resampleMinutes, toDaily } from './engine/intraday.js';
@@ -362,6 +363,7 @@ function buildStaticControls() {
     if (!b) return;
     heatWhich = b.dataset.v;
     $('heat-which').querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    if (lastRun?.stored) return;
     if (lastRun) renderHeatmap();
   });
   $('csv-export').addEventListener('click', exportTrades);
@@ -410,6 +412,50 @@ function showCompose() {
 
 function sessionActive() {
   return showCompose() && isIntradayTimeframe(state.tf) && isHsiFutures(state.symbol);
+}
+
+function wantsHsiLookup() {
+  return isHsiFutures(state.symbol) && isIntradayTimeframe(state.tf);
+}
+
+function archiveEnd() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function storedShell() {
+  const today = archiveEnd();
+  return {
+    symbol: HSI_FUTURES.symbol,
+    name: HSI_FUTURES.name,
+    currency: HSI_FUTURES.currency,
+    exchange: HSI_FUTURES.exchange,
+    bars: [],
+    stored: true,
+    resolution: '1d',
+    intraday: false,
+    hasDividends: false,
+    source: {
+      name: 'HSI futures',
+      note: 'Stored session score for ATR SuperTrend. One point per session day.',
+      asOf: today,
+    },
+    sample: false,
+  };
+}
+
+const CHROME_IDS = ['price-title', 'price-sub', 'equity-sub', 'dd-sub', 'heat-title', 'heat-sub', 'tradebars-title', 'tradebars-sub'];
+
+function captureChrome() {
+  if (captureChrome.done) return;
+  captureChrome.done = true;
+  captureChrome.map = {};
+  for (const id of CHROME_IDS) captureChrome.map[id] = $(id).innerHTML;
+}
+
+function restoreChrome() {
+  captureChrome();
+  for (const [id, html] of Object.entries(captureChrome.map)) $(id).innerHTML = html;
+  $('heat-which').hidden = false;
 }
 
 function applyRecipe(id, { silent = false } = {}) {
@@ -552,8 +598,8 @@ function applyPreset() {
 
 function applyYear() {
   if (!dataset) return;
-  const first = dayOf(dataset.bars[0].time);
-  const last = dayOf(dataset.bars.at(-1).time);
+  const first = dataset.stored ? '2020-01-02' : dayOf(dataset.bars[0].time);
+  const last = dataset.stored ? archiveEnd() : dayOf(dataset.bars.at(-1).time);
   if (state.year === 'all' || !/^\d{4}$/.test(state.year)) {
     state.from = first;
     state.to = last;
@@ -573,12 +619,24 @@ function ensureYears() {
 }
 
 function fillYears() {
-  if (!dataset) {
+  if (!dataset || dataset.stored) {
     ensureYears();
     return;
   }
   const years = [...new Set(dataset.bars.map((b) => dayOf(b.time).slice(0, 4)))].filter(Boolean);
+  $('year').dataset.kind = 'bars';
   $('year').innerHTML = `<option value="all">All years</option>${years.map((y) => `<option value="${esc(y)}">${esc(y)}</option>`).join('')}`;
+}
+
+function fillHsiYears() {
+  const end = new Date().getUTCFullYear();
+  const years = [];
+  for (let y = 2020; y <= end; y++) years.push(String(y));
+  const sel = $('year');
+  const current = state.year;
+  sel.dataset.kind = 'hsi';
+  sel.innerHTML = `<option value="all">All years</option>${years.map((y) => `<option value="${esc(y)}">${esc(y)}</option>`).join('')}`;
+  if ([...sel.options].some((o) => o.value === current)) sel.value = current;
 }
 
 async function populateSymbols() {
@@ -593,16 +651,27 @@ async function populateSymbols() {
 async function loadData(file) {
   const p = getProvider(state.provider);
   $('results').classList.add('loading');
-  $('run-title').textContent = 'Loading prices…';
+  $('run-title').textContent = wantsHsiLookup() ? 'Loading result…' : 'Loading prices…';
   try {
-    if (p.kind !== 'file' && isHsiFutures(state.symbol)) dataset = await hsiFutures.load();
+    if (p.kind !== 'file' && isHsiFutures(state.symbol) && wantsHsiLookup()) {
+      dataset = storedShell();
+      fillHsiYears();
+      if (state.sessionMode === 'year') applyYear();
+      else if (!state.from) {
+        state.from = '2020-01-02';
+        state.to = archiveEnd();
+      }
+      await run();
+      return;
+    }
+    if (p.kind !== 'file' && isHsiFutures(state.symbol)) dataset = await loadHsiDaily();
     else dataset = await p.load(p.kind === 'file' ? file : state.symbol);
     fillYears();
     if (state.sessionMode === 'year') applyYear();
     else if (state.preset !== 'custom' || !state.from) applyPreset();
     const last = dayOf(dataset.bars.at(-1).time);
     if (!state.to || state.to > last) state.to = last;
-    run();
+    await run();
   } catch (e) {
     dataset = null;
     showError(e);
@@ -625,7 +694,58 @@ function viewBars(tf) {
   return resample(bars, tf === '1w' || tf === '1mo' ? tf : '1d');
 }
 
-function run() {
+let runToken = 0;
+
+function lookupInput() {
+  const sameTf = state.exitTf === state.tf;
+  return {
+    strategy: state.strategy,
+    entryTimeframe: state.tf,
+    exitTimeframe: state.exitTf,
+    atrLength: state.params.atrLength,
+    exitAtrLength: sameTf ? state.params.atrLength : state.exitAtr,
+    entryRule: state.entryRule,
+    clock: state.clock,
+    exitRule: state.exitRule,
+    factor: state.params.factor,
+    smoothing: state.params.smoothing,
+    confirm: state.confirm,
+    flattenEod: state.flattenEod,
+    sessionMode: state.sessionMode,
+    year: state.year,
+    from: state.from,
+    to: state.to,
+    costPoints: state.costPoints,
+  };
+}
+
+async function runStored(token) {
+  syncControls();
+  try {
+    const view = await lookupHsiResult(lookupInput());
+    if (token !== runToken) return;
+    lastRun = { stored: true, view, strategy: getStrategy('atr-supertrend'), params: { ...state.params } };
+    writeHash();
+    renderStored();
+  } catch (e) {
+    if (token !== runToken) return;
+    showError(e);
+  } finally {
+    if (token === runToken) $('results').classList.remove('loading');
+  }
+}
+
+async function run() {
+  const token = ++runToken;
+  if (wantsHsiLookup()) {
+    if (!dataset?.stored) {
+      dataset = storedShell();
+      fillHsiYears();
+      if (state.sessionMode === 'year') applyYear();
+    }
+    return runStored(token);
+  }
+  if (dataset?.stored) return loadData();
   if (!dataset) return;
   syncControls();
   try {
@@ -694,13 +814,15 @@ function run() {
       initialPending: pending,
       costPoints: session ? state.costPoints : 0,
     });
+    if (token !== runToken) return;
     lastRun = { bars, result, strategy, params };
     writeHash();
     render();
   } catch (e) {
+    if (token !== runToken) return;
     showError(e);
   } finally {
-    $('results').classList.remove('loading');
+    if (token === runToken) $('results').classList.remove('loading');
   }
 }
 
@@ -721,20 +843,31 @@ function clearWorkspace() {
 }
 
 function showError(e) {
-  console.error(e);
+  const pending = e?.code === 'bars-pending' || e?.name === 'BarsPending';
+  const missing = e?.code === 'results-pending' || e?.name === 'ResultMissing';
+  if (pending || missing) console.warn(e.message);
+  else console.error(e);
+  restoreChrome();
   $('results').classList.remove('loading');
   clearWorkspace();
-  const pending = e?.code === 'bars-pending' || e?.name === 'BarsPending';
-  $('notices').innerHTML = `<div class="notice ${pending ? 'notice-warn' : 'notice-error'}">${esc(e.message || e)}</div>`;
-  $('run-title').textContent = pending ? 'HSI futures bars are not on this site yet' : 'Could not run this backtest';
+  $('notices').innerHTML = `<div class="notice ${pending || missing ? 'notice-warn' : 'notice-error'}">${esc(e.message || e)}</div>`;
+  $('run-title').textContent = pending
+    ? 'HSI futures bars are not on this site yet'
+    : missing
+      ? e.message || 'This combination is not computed yet.'
+      : 'Could not run this backtest';
   $('run-sub').textContent = pending
     ? 'Daily strategies on the other symbols still run. 1-minute and 5-minute bars show up here when the public packs are published.'
-    : '';
+    : missing
+      ? 'All years stays available. Another control may already have a stored result.'
+      : '';
   if (pending) $('run-badges').innerHTML = '<span class="badge">Bars pending</span>';
+  if (missing) $('run-badges').innerHTML = '<span class="badge">Not computed yet</span>';
 }
 
 // ---------------------------------------------------------------- render
 function render() {
+  restoreChrome();
   renderHead();
   renderSummary();
   renderCharts();
@@ -994,8 +1127,146 @@ function focusTrade(t) {
   $('chart-price').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
+function renderStored() {
+  const view = lastRun.view;
+  const m = view.metrics;
+  const pts = (v) => (isNum(v) ? `${v > 0 ? '+' : ''}${v.toFixed(1)}` : '—');
+  const avgNet = (net, trades) => (trades ? net / trades : null);
+  const avg = avgNet(m.netPoints, m.trades);
+  const tf = TIMEFRAME_CHOICES.find((t) => t.id === state.tf)?.label || state.tf;
+  const exit = state.exitTf !== state.tf ? ` → ${state.exitTf} exit` : '';
+  const rule = `${ENTRY_RULES.find((r) => r.id === state.entryRule)?.label || state.entryRule}${state.entryRule === 'flip' ? '' : ' ' + state.clock} · ${EXIT_RULES.find((r) => r.id === state.exitRule)?.label || ''}`;
+  $('price-title').textContent = 'Points';
+  $('price-sub').textContent = 'Stored session score. One point per day, after the round-trip cost. This is not the futures price.';
+  $('equity-sub').textContent = 'The same daily points. Buy & hold is not in the stored result.';
+  $('dd-sub').textContent = 'Peak to trough of the daily point curve.';
+  $('heat-title').textContent = 'Results by year';
+  $('heat-sub').textContent = 'Net points after the round-trip cost. All years stays available.';
+  $('heat-which').hidden = true;
+  $('tradebars-title').textContent = 'Points by year';
+  $('tradebars-sub').textContent = 'Net points in each year. Individual fills are not in the stored result.';
+  $('run-title').textContent = `${lastRun.strategy.name} · ${dataset.symbol}`;
+  $('run-sub').textContent = `${dataset.name} · ${tf}${exit} · ${view.params.from} → ${view.params.to} · ${int(m.sessionDays)} session days · ${paramSummary()} · ${rule} · index points`;
+  $('run-badges').innerHTML = '<span class="badge">Stored result</span><span class="badge">Index points</span>';
+  $('log-equity').disabled = true;
+  $('log-equity').checked = false;
+  $('notices').innerHTML = '<div class="notice">Stored result. Statistics use every session day in the range. The chart is that daily curve.</div>';
+
+  const cell = (v, cls = '') => `<td class="r ${cls}">${v}</td>`;
+  $('summary').innerHTML = `<thead><tr><th></th><th class="r">Long</th><th class="r">Short</th><th class="r">Total</th></tr></thead><tbody>
+    <tr><td>Trades</td>${cell('—')}${cell('—')}${cell(int(m.trades))}</tr>
+    <tr><td>Points</td>${cell('—')}${cell('—')}${cell(pts(m.netPoints), tone(m.netPoints))}</tr>
+    <tr><td>Avg pts</td>${cell('—')}${cell('—')}${cell(pts(avg), tone(avg))}</tr>
+  </tbody>`;
+
+  const rows = [
+    ['Net points', pts(m.netPoints)],
+    ['Gross points', pts(m.grossPoints)],
+    ['Max drawdown (pts)', pts(m.maxDrawdownPoints)],
+    ['Sharpe (ann.)', ratio(m.sharpe)],
+    ['Session days', int(m.sessionDays)],
+  ];
+  const tradeRows = [
+    ['Closed trades', int(m.trades)],
+    ['Win rate', pct(m.winRate, 1, false)],
+    ['Profit factor', ratio(m.profitFactor)],
+    ['Average trade (pts)', pts(avg)],
+    ['Average hold (minutes)', ratio(m.avgHoldMinutes, 1)],
+  ];
+  $('stats').innerHTML = `<thead><tr><th>Performance</th><th class="r">Strategy</th><th class="r">Buy &amp; hold</th></tr></thead><tbody>${rows
+    .map((r) => `<tr><td>${r[0]}</td><td class="r">${r[1]}</td><td class="r muted">—</td></tr>`)
+    .join('')}</tbody>`;
+  $('stats-trades').innerHTML = `<thead><tr><th>Trades</th><th class="r">Strategy</th></tr></thead><tbody>${tradeRows
+    .map((r) => `<tr><td>${r[0]}</td><td class="r">${r[1]}</td></tr>`)
+    .join('')}</tbody>`;
+
+  const years = view.byYear || [];
+  const hourRows = view.byEntryHour || [];
+  const yearTable = years.length
+    ? `<table class="table stats"><thead><tr><th>Year</th><th class="r">Trades</th><th class="r">Win rate</th><th class="r">Gross</th><th class="r">Net</th><th class="r">Avg</th></tr></thead><tbody>${years
+        .map(
+          (row) => {
+            const avgRow = avgNet(row.netPoints, row.trades);
+            return `<tr><td>${esc(row.year)}</td><td class="r">${int(row.trades)}</td><td class="r">${pct(row.winRate, 1, false)}</td><td class="r ${tone(row.grossPoints)}">${pts(row.grossPoints)}</td><td class="r ${tone(row.netPoints)}">${pts(row.netPoints)}</td><td class="r ${tone(avgRow)}">${pts(avgRow)}</td></tr>`;
+          },
+        )
+        .join('')}</tbody></table>`
+    : '<p class="muted">No session days in this range.</p>';
+  const hourTable = hourRows.length
+    ? `<table class="table stats" style="margin-top:16px"><thead><tr><th>Hour</th><th class="r">Trades</th><th class="r">Win rate</th><th class="r">Net</th></tr></thead><tbody>${hourRows
+        .map((row) => {
+          const hour = `${String(row.hour).padStart(2, '0')}:00`;
+          return `<tr><td>${hour}</td><td class="r">${int(row.trades)}</td><td class="r">${pct(row.winRate, 1, false)}</td><td class="r ${tone(row.netPoints)}">${pts(row.netPoints)}</td></tr>`;
+        })
+        .join('')}</tbody></table>`
+    : '';
+  $('heatmap').innerHTML = yearTable + hourTable;
+
+  charts ??= new BacktestCharts({ price: $('chart-price'), equity: $('chart-equity'), drawdown: $('chart-dd') });
+  charts.renderCurve({
+    times: view.equity.map((point) => point.date),
+    values: view.equity.map((point) => point.points),
+  });
+  renderStoredYearBars(years);
+  $('trades-sub').textContent = 'One row per year. Individual fills are not in the stored result.';
+  $('trades').innerHTML = `<thead><tr><th>Year</th><th class="r">Trades</th><th class="r">Win rate</th><th class="r">Gross</th><th class="r">Net</th><th class="r">Avg</th></tr></thead><tbody>${years
+    .map(
+      (row) => {
+        const avgRow = avgNet(row.netPoints, row.trades);
+        return `<tr data-year="${esc(row.year)}"><td>${esc(row.year)}</td><td class="r">${int(row.trades)}</td><td class="r">${pct(row.winRate, 1, false)}</td><td class="r ${tone(row.grossPoints)}">${pts(row.grossPoints)}</td><td class="r ${tone(row.netPoints)}">${pts(row.netPoints)}</td><td class="r ${tone(avgRow)}">${pts(avgRow)}</td></tr>`;
+      },
+    )
+    .join('')}</tbody>`;
+  $('trades').querySelectorAll('tbody tr').forEach((tr) => tr.addEventListener('click', () => {
+    charts.focus(`${tr.dataset.year}-01-01`, `${tr.dataset.year}-12-31`);
+    $('chart-price').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }));
+}
+
+function renderStoredYearBars(rows) {
+  const el = $('trade-bars');
+  if (!rows.length) {
+    el.innerHTML = '<p class="muted" style="padding:50px 0;text-align:center;font-size:13px">No years in this range.</p>';
+    return;
+  }
+  const W = el.clientWidth || 800;
+  const H = el.clientHeight || 150;
+  const padL = 44;
+  const vals = rows.map((row) => row.netPoints || 0);
+  let maxAbs = 1;
+  for (const v of vals) if (Math.abs(v) > maxAbs) maxAbs = Math.abs(v);
+  const hi = Math.max(0, ...vals) || maxAbs * 0.1;
+  const lo = Math.min(0, ...vals) || -maxAbs * 0.1;
+  const y = (v) => 6 + ((hi - v) / (hi - lo || 1)) * (H - 12);
+  const step = (W - padL) / rows.length;
+  const bw = Math.max(1, Math.min(28, step * 0.7));
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${rows
+    .map((row, i) => {
+      const v = row.netPoints || 0;
+      const x = padL + i * step + (step - bw) / 2;
+      const top = y(Math.max(0, v));
+      const h = Math.max(1, Math.abs(y(v) - y(0)));
+      return `<rect data-year="${esc(row.year)}" x="${x}" y="${top}" width="${bw}" height="${h}" fill="${v >= 0 ? '#0b8a3e' : '#d0182a'}"><title>${esc(row.year)}: ${v.toFixed(1)} pts</title></rect>`;
+    })
+    .join('')}</svg>`;
+  el.querySelectorAll('rect').forEach((r) => r.addEventListener('click', () => {
+    charts.focus(`${r.dataset.year}-01-01`, `${r.dataset.year}-12-31`);
+  }));
+}
+
 function exportTrades() {
   if (!lastRun) return;
+  if (lastRun.stored) {
+    const rows = [['year', 'trades', 'win_rate', 'gross_points', 'net_points', 'avg_points']];
+    for (const row of lastRun.view.byYear || []) rows.push([row.year, row.trades, row.winRate, row.grossPoints, row.netPoints, row.avgPoints]);
+    const blob = new Blob([rows.map((r) => r.join(',')).join('\n')], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `backtest-${dataset.symbol}-${state.strategy}-${state.tf}-years.csv`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    return;
+  }
   const { trades, openTrade } = lastRun.result;
   const rows = [['n', 'side', 'entry_date', 'entry_price', 'exit_date', 'exit_price', 'bars', 'return_pct', 'pnl', 'exit_reason', 'open']];
   [...trades, ...(openTrade ? [openTrade] : [])].forEach((t, i) => rows.push([i + 1, t.side, t.entryTime, t.entryPrice, t.exitTime, t.exitPrice, t.bars, t.returnPct, t.pnl, t.reason, t.open ? 1 : 0]));
@@ -1010,6 +1281,7 @@ function exportTrades() {
 // ---------------------------------------------------------------- boot
 async function init() {
   buildStaticControls();
+  captureChrome();
   readHash();
   syncControls();
   try {
@@ -1022,7 +1294,11 @@ async function init() {
   let rw;
   window.addEventListener('resize', () => {
     clearTimeout(rw);
-    rw = setTimeout(() => lastRun && renderTradeBars(), 150);
+    rw = setTimeout(() => {
+      if (!lastRun) return;
+      if (lastRun.stored) renderStoredYearBars(lastRun.view.byYear || []);
+      else renderTradeBars();
+    }, 150);
   });
 }
 
