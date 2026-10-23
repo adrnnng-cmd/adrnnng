@@ -1,9 +1,8 @@
 {
  "generated_at": "2026-10-23T00:51:16+00:00",
  "source": {
-  "name": "Yahoo Finance",
-  "url": "https://finance.yahoo.com",
-  "note": "Daily OHLCV, cash dividends and splits from Yahoo Finance's public chart endpoint, fetched on a schedule. Prices are split-adjusted as delivered; dividend adjustment is applied in the browser."
+  "name": "Daily history",
+  "note": "Daily OHLCV, cash dividends and splits, refreshed on a schedule. Prices are split-adjusted as delivered; dividend adjustment is applied in the browser."
  },
  "columns": [
   "date",

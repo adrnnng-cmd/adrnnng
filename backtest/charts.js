@@ -59,6 +59,14 @@ function fmtAxis(p) {
   return p.toPrecision(3);
 }
 
+/** Daily stays a business-day string. Intraday wall-clock is drawn as labelled, so 09:15 reads 09:15. */
+function chartTime(t) {
+  const s = String(t);
+  if (s.length <= 10) return s;
+  const ms = Date.parse(s.endsWith('Z') ? s : `${s}Z`);
+  return Number.isFinite(ms) ? Math.floor(ms / 1000) : s;
+}
+
 const line = (times, values, from = 0) => {
   const out = [];
   for (let i = 0; i < times.length; i++) {
@@ -102,9 +110,12 @@ export class BacktestCharts {
    * @param ctx { bars (full history), result (runBacktest output), show: { tdCounts, overlays, logEquity } }
    */
   render({ bars, result, show }) {
-    const { start, end, times } = result;
-    const view = bars.slice(start, end + 1);
+    const { start, end } = result;
+    const points = result.accounting === 'points';
+    const times = result.times.map(chartTime);
+    const view = bars.slice(start, end + 1).map((b) => ({ ...b, time: chartTime(b.time) }));
     const sig = result.signal || {};
+    const logOk = show.logEquity && !points && result.equity.every((v) => v > 0) && result.benchmark.every((v) => v > 0);
 
     // ---- Price
     this.clear('price');
@@ -163,7 +174,7 @@ export class BacktestCharts {
       if (m.index < start || m.index > end || !tdKinds.has(m.kind)) continue;
       const small = m.kind === 'count';
       markers.push({
-        time: bars[m.index].time,
+        time: chartTime(bars[m.index].time),
         position: m.position === 'above' ? 'aboveBar' : 'belowBar',
         shape: m.shape || 'circle',
         color: m.color,
@@ -175,7 +186,7 @@ export class BacktestCharts {
     for (const t of allTrades) {
       const isLong = t.side === 'long';
       markers.push({
-        time: t.entryTime,
+        time: chartTime(t.entryTime),
         position: isLong ? 'belowBar' : 'aboveBar',
         shape: isLong ? 'arrowUp' : 'arrowDown',
         color: isLong ? C.long : C.short,
@@ -184,11 +195,11 @@ export class BacktestCharts {
       });
       if (!t.open) {
         markers.push({
-          time: t.exitTime,
+          time: chartTime(t.exitTime),
           position: isLong ? 'aboveBar' : 'belowBar',
           shape: 'square',
           color: t.pnl >= 0 ? C.up : C.down,
-          text: `${t.returnPct >= 0 ? '+' : ''}${t.returnPct.toFixed(1)}%`,
+          text: points ? `${t.pnl >= 0 ? '+' : ''}${t.pnl.toFixed(1)}` : `${t.returnPct >= 0 ? '+' : ''}${t.returnPct.toFixed(1)}%`,
           size: 0.8,
         });
       }
@@ -198,7 +209,10 @@ export class BacktestCharts {
 
     // ---- Equity vs buy & hold
     this.clear('equity');
-    this.equity.priceScale('right').applyOptions({ mode: show.logEquity ? PriceScaleMode.Logarithmic : PriceScaleMode.Normal });
+    this.equity.priceScale('right').applyOptions({ mode: logOk ? PriceScaleMode.Logarithmic : PriceScaleMode.Normal });
+    this.drawdown.applyOptions({
+      localization: { priceFormatter: (p) => (points ? p.toFixed(0) : `${(p * 100).toFixed(0)}%`) },
+    });
     const bh = this.equity.addSeries(LineSeries, { color: C.bh, lineWidth: 1.5, lineStyle: LineStyle.Solid, priceLineVisible: false, title: 'Buy & hold' });
     bh.setData(times.map((t, i) => ({ time: t, value: result.benchmark[i] })));
     const eq = this.equity.addSeries(AreaSeries, {
@@ -237,8 +251,8 @@ export class BacktestCharts {
 
   focus(fromTime, toTime, padBars = 25) {
     const ts = this.price.timeScale();
-    const a = ts.timeToIndex(fromTime, true);
-    const b = ts.timeToIndex(toTime, true);
+    const a = ts.timeToIndex(chartTime(fromTime), true);
+    const b = ts.timeToIndex(chartTime(toTime), true);
     if (a == null || b == null) return;
     ts.setVisibleLogicalRange({ from: a - padBars, to: b + padBars });
   }

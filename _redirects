@@ -1,2 +1,4 @@
 /backtesting/* /backtest/:splat 301
 /backtesting /backtest/ 301
+/hsi-lab /backtest/?strategy=atr-supertrend&symbol=HSImain&tf=5m&xtf=5m&entry=clock&clock=09:30&exit=reenter&recipe=fast-response&session=year&year=all 301
+/hsi-lab/ /backtest/?strategy=atr-supertrend&symbol=HSImain&tf=5m&xtf=5m&entry=clock&clock=09:30&exit=reenter&recipe=fast-response&session=year&year=all 301

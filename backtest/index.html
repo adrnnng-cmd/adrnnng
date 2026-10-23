@@ -4,18 +4,18 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Backtest · ADRRR</title>
-  <meta name="description" content="Backtest TD Sequential Setup 9 / Countdown 13 on real daily price history. Strategy analysis chart, profit curve, statistics, trades.">
+  <meta name="description" content="Backtest TD Sequential and ATR SuperTrend on daily history, and HSI futures on 1-minute and 5-minute bars. Strategy analysis chart, profit curve, statistics, trades.">
   <link rel="canonical" href="https://adrnnng.com/backtest/">
   <meta name="theme-color" content="#000000">
   <meta property="og:site_name" content="ADRRR">
   <meta property="og:title" content="Backtest · ADRRR">
-  <meta property="og:description" content="Backtest TD Sequential Setup 9 / Countdown 13 on real daily price history. Strategy analysis chart, profit curve, statistics, trades.">
+  <meta property="og:description" content="Backtest TD Sequential and ATR SuperTrend on daily history, and HSI futures on 1-minute and 5-minute bars. Strategy analysis chart, profit curve, statistics, trades.">
   <meta property="og:url" content="https://adrnnng.com/backtest/">
   <meta property="og:type" content="website">
   <meta property="og:image" content="https://adrnnng.com/assets/brand/og-image.png">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Backtest · ADRRR">
-  <meta name="twitter:description" content="Backtest TD Sequential Setup 9 / Countdown 13 on real daily price history. Strategy analysis chart, profit curve, statistics, trades.">
+  <meta name="twitter:description" content="Backtest TD Sequential and ATR SuperTrend on daily history, and HSI futures on 1-minute and 5-minute bars. Strategy analysis chart, profit curve, statistics, trades.">
   <meta name="twitter:image" content="https://adrnnng.com/assets/brand/og-image.png">
   <link rel="icon" href="/assets/brand/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/assets/brand/apple-touch-icon.png">
@@ -37,7 +37,7 @@
     <div class="bt-cmd-row">
       <label class="field cmd-symbol" id="symbol-field"><span>Security</span><select class="select" id="symbol"></select></label>
       <label class="field cmd-strat"><span>Strategy</span><select class="select" id="strategy"></select></label>
-      <div class="field"><span class="field-label">Period</span><div class="seg" id="timeframe" role="group" aria-label="Timeframe"></div></div>
+      <div class="field"><span class="field-label" id="tf-label">Period</span><div class="seg" id="timeframe" role="group" aria-label="Timeframe"></div></div>
       <div class="field"><span class="field-label">Range</span><div class="seg seg-wrap" id="presets" role="group" aria-label="Range presets"></div></div>
       <label class="field"><span>From</span><input class="input" type="date" id="from"></label>
       <label class="field"><span>To</span><input class="input" type="date" id="to"></label>
@@ -71,8 +71,23 @@
           <label class="field"><span>Max bars held</span><input class="input num" type="number" id="maxbars" min="0" max="5000" step="1" value="0" placeholder="off"></label>
         </div>
         <label class="check"><input type="checkbox" id="short"> Allow short selling</label>
-        <small class="hint">0 turns a risk rule off. Fills at the next open after a signal. Costs on each side.</small>
+        <small class="hint" id="exec-hint">0 turns a risk rule off. Fills at the next open after a signal. Costs on each side.</small>
       </fieldset>
+    </div>
+    <div class="bt-cmd-row bt-compose" id="compose-row" hidden>
+      <label class="field cmd-recipe"><span>Recipe</span><select class="select" id="recipe"></select></label>
+      <div class="field"><span class="field-label">Exit</span><div class="seg" id="exit-tf" role="group" aria-label="Exit timeframe"></div></div>
+      <label class="field"><span>Entry</span><select class="select" id="entry-rule"></select></label>
+      <label class="field" id="clock-field"><span>Clock</span><select class="select" id="clock"><option value="09:15">09:15</option><option value="09:30">09:30</option></select></label>
+      <label class="field"><span>After the flip</span><select class="select" id="exit-rule"></select></label>
+      <label class="field"><span>Confirm</span><select class="select" id="confirm"><option value="none">None</option><option value="daily">Daily agrees</option></select></label>
+      <div class="field"><span class="field-label">Session</span><div class="seg" id="session-mode" role="group" aria-label="Session"><button type="button" data-v="year">By year</button><button type="button" data-v="dates">Custom dates</button></div></div>
+      <label class="field" id="year-field"><span>Year</span><select class="select" id="year"></select></label>
+      <label class="field" id="entry-atr-field"><span>Entry ATR</span><input class="input num" type="number" id="entry-atr" min="1" max="200" step="1" value="10"></label>
+      <label class="field" id="exit-atr-field"><span>Exit ATR</span><input class="input num" type="number" id="exit-atr" min="1" max="200" step="1" value="10"></label>
+      <label class="check" id="flatten-wrap"><input type="checkbox" id="flatten" checked> Flatten at session close</label>
+      <label class="field"><span>Cost pts</span><input class="input num" type="number" id="cost-points" min="0" max="100" step="0.5" value="0"></label>
+      <p class="compose-hint" id="compose-hint"></p>
     </div>
   </form>
 
@@ -184,8 +199,9 @@
           </ul>
           <h4>Data</h4>
           <ul id="data-notes">
-            <li>Daily OHLCV, dividends and splits from Yahoo Finance. Weekly and monthly bars are built from the daily bars.</li>
+            <li>Daily OHLCV, dividends and splits, refreshed on a schedule. Weekly and monthly bars are built from the daily bars.</li>
             <li>Prices are split-adjusted. With dividends on, earlier prices are scaled by (1 − D ÷ previous close).</li>
+            <li>HSI futures add 1-minute and 5-minute bars. The day session is 09:15–12:00 and 13:00–16:30 Hong Kong time. A flip fills at the next bar’s open. A clock entry uses the direction of the last completed bar. Whatever is still open flattens at the session close. The score is index points for one unit.</li>
             <li>Index symbols (^GSPC, ^NDX, ^HSI) are not directly tradable and carry no dividends.</li>
           </ul>
         </div>

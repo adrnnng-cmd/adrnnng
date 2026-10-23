@@ -19,9 +19,8 @@ from . import yahoo
 
 HERE = Path(__file__).parent
 SOURCE = {
-    "name": "Yahoo Finance",
-    "url": "https://finance.yahoo.com",
-    "note": "Daily OHLCV, cash dividends and splits from Yahoo Finance's public chart endpoint, fetched on a schedule. "
+    "name": "Daily history",
+    "note": "Daily OHLCV, cash dividends and splits, refreshed on a schedule. "
     "Prices are split-adjusted as delivered; dividend adjustment is applied in the browser.",
 }
 HEADER = ["date", "open", "high", "low", "close", "volume", "dividend", "split"]
@@ -129,7 +128,7 @@ def main(argv: list[str] | None = None) -> int:
         recent = {k: recent.get(k) or old.get(k) for k in uni.get("featured", []) if recent.get(k) or old.get(k)}
         recent_path.write_text(json.dumps({
             "generated_at": manifest["generated_at"],
-            "note": "Latest daily bars (split-adjusted, not dividend-adjusted) [date, open, high, low, close] for the landing page. Source: Yahoo Finance.",
+            "note": "Latest daily bars (split-adjusted, not dividend-adjusted) [date, open, high, low, close] for the landing page.",
             "symbols": recent,
         }, separators=(",", ":")) + "\n", "utf-8")
     logging.info("wrote %s: %d symbols (%d fetched now)", manifest_path, len(entries), ok)

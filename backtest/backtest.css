@@ -21,6 +21,18 @@
 .cmd-strat { width: min(200px, 100%); }
 .bt-cmd-row input[type='date'] { width: 148px; }
 .cmd-actions { display: flex; gap: 8px; padding-bottom: 1px; }
+.bt-compose { border-top: 1px solid var(--line); padding-top: 10px; }
+.bt-compose[hidden] { display: none; }
+.cmd-recipe { width: min(260px, 100%); }
+.compose-hint { flex: 1 1 220px; margin: 0; color: var(--faint); font-size: 12px; line-height: 1.45; align-self: center; }
+.seg button:disabled,
+.seg button[aria-disabled='true'] { color: var(--faint); background: var(--bg-2); cursor: not-allowed; }
+.seg button:disabled:hover,
+.seg button[aria-disabled='true']:hover { color: var(--faint); }
+select option:disabled { color: var(--faint); }
+.bt-cmd .select:disabled,
+.bt-cmd .input:disabled { color: var(--faint); background: var(--bg); cursor: not-allowed; }
+.bt-cmd .check:has(input:disabled) { color: var(--faint); cursor: not-allowed; }
 .cmd-actions .btn { height: 34px; }
 .seg-wrap { flex-wrap: wrap; }
 

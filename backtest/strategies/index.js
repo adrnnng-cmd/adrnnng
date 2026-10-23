@@ -16,8 +16,9 @@
 // `run` must only use bars[0..i] to decide target[i]; the engine fills at bar i+1's open.
 
 import tdSequential from './td-sequential.js';
+import atrSupertrend from './atr-supertrend.js';
 
-export const STRATEGIES = [tdSequential];
+export const STRATEGIES = [tdSequential, atrSupertrend];
 
 export function getStrategy(id) {
   return STRATEGIES.find((s) => s.id === id) || STRATEGIES[0];
