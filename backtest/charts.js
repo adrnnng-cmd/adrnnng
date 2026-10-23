@@ -249,6 +249,63 @@ export class BacktestCharts {
     for (const ch of [this.price, this.equity, this.drawdown]) ch.timeScale().fitContent();
   }
 
+  /** Daily point curve from a stored result. One point per session day. */
+  renderCurve({ times, values }) {
+    this.clear('price');
+    this.clear('equity');
+    this.clear('drawdown');
+    if (this.markers) {
+      this.markers.detach();
+      this.markers = null;
+    }
+    const data = [];
+    const dd = [];
+    let peak = -Infinity;
+    for (let i = 0; i < times.length; i++) {
+      const time = chartTime(times[i]);
+      const value = values[i];
+      if (value == null || !Number.isFinite(value)) continue;
+      if (data.length && data[data.length - 1].time === time) continue;
+      data.push({ time, value });
+      if (value > peak) peak = value;
+      dd.push({ time, value: value - peak });
+    }
+    if (!data.length) return;
+    const price = this.price.addSeries(LineSeries, {
+      color: C.accent,
+      lineWidth: 2,
+      priceLineVisible: false,
+      title: 'Points',
+    });
+    price.setData(data);
+    this.series.price.push(price);
+    this.equity.priceScale('right').applyOptions({ mode: PriceScaleMode.Normal });
+    this.drawdown.applyOptions({ localization: { priceFormatter: (p) => p.toFixed(0) } });
+    const eq = this.equity.addSeries(AreaSeries, {
+      lineColor: C.accent,
+      lineWidth: 2,
+      topColor: 'rgba(17,17,17,0.12)',
+      bottomColor: 'rgba(17,17,17,0.0)',
+      priceLineVisible: false,
+      title: 'Strategy',
+    });
+    eq.setData(data);
+    this.series.equity.push(eq);
+    const drop = this.drawdown.addSeries(BaselineSeries, {
+      baseValue: { type: 'price', price: 0 },
+      bottomLineColor: C.down,
+      bottomFillColor1: 'rgba(208,24,42,0.04)',
+      bottomFillColor2: 'rgba(208,24,42,0.28)',
+      topLineColor: C.down,
+      lineWidth: 1.5,
+      priceLineVisible: false,
+      title: 'Strategy',
+    });
+    drop.setData(dd);
+    this.series.drawdown.push(drop);
+    for (const ch of [this.price, this.equity, this.drawdown]) ch.timeScale().fitContent();
+  }
+
   focus(fromTime, toTime, padBars = 25) {
     const ts = this.price.timeScale();
     const a = ts.timeToIndex(chartTime(fromTime), true);

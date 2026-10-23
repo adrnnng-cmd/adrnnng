@@ -11,7 +11,7 @@
 //   HSI_BARS_BASE  same, read in the browser from window.__HSI_BARS_BASE
 //                  or <meta name="hsi-bars-base" content="https://…/">
 //   prefix         v1/1m/   year packs v1/1m/YYYY.bin and v1/1m/manifest.json
-//   daily          v1/1d/HSImain.csv  optional, used when the 1-minute packs are absent
+//   daily          v1/1d/HSImain.csv  page load for daily, weekly, and monthly
 //   static fallback  /backtest/data/hsi/  (this provider's default base)
 
 import { parseCsv } from '../engine/bars.js';
@@ -100,6 +100,16 @@ export async function loadHsiFutures({ base, fetchImpl = globalThis.fetch } = {}
   return pack(daily, '1d', daily.at(-1).time.slice(0, 10));
 }
 
+/** Daily file only. The page uses this for HSImain daily, weekly, and monthly. */
+export async function loadHsiDaily({ base, fetchImpl = globalThis.fetch } = {}) {
+  const root = base || hsiBarsBase();
+  const dailyText = await fetchText(fetchImpl, joinUrl(root, 'v1/1d/HSImain.csv'));
+  if (!dailyText) throw new BarsPending('HSI futures bars are not on this site yet.');
+  const daily = parseCsv(dailyText);
+  if (daily.length < 2) throw new BarsPending('HSI futures bars are not on this site yet.');
+  return pack(daily, '1d', daily.at(-1).time.slice(0, 10));
+}
+
 function pack(bars, resolution, asOf) {
   return {
     symbol: HSI_FUTURES.symbol,
@@ -132,7 +142,7 @@ export default {
   id: 'hsi-futures',
   name: 'HSI futures',
   kind: 'catalog',
-  description: 'Hang Seng futures continuous bars. Daily from the 1-minute packs, or from a daily file when that is all the public store has.',
+  description: 'Hang Seng futures. 1-minute and 5-minute ATR SuperTrend reads a stored result. Daily bars come from v1/1d/HSImain.csv when that file is published.',
   async listSymbols() {
     return catalog.map((s) => ({ ...s }));
   },
