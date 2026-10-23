@@ -59,7 +59,7 @@ function dedupeByTime(bars) {
 
 /**
  * Back-adjust OHLC for cash dividends (total-return prices). Each ex-dividend day scales every
- * earlier bar by (1 - dividend / previous close), the CRSP/Yahoo convention. Volume is untouched.
+ * earlier bar by (1 - dividend / previous close), the usual cash-dividend convention. Volume is untouched.
  */
 export function adjustForDividends(bars) {
   const out = new Array(bars.length);

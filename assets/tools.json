@@ -16,11 +16,11 @@
       "category": "Research",
       "icon": "backtest",
       "accent": "#38bdf8",
-      "summary": "Test a rule on real daily history. Price with trade signals, a profit curve against buy-and-hold, and a statistics side panel.",
+      "summary": "Test a rule on daily history, or ATR SuperTrend on HSI futures. Price with trade signals, a profit curve against buy-and-hold, and a statistics side panel.",
       "highlights": [
         "TD Sequential 9 / 13",
-        "Sharpe · Sortino · CAGR",
-        "47 US, HK & crypto tickers"
+        "HSI futures SuperTrend",
+        "Sharpe · Sortino · CAGR"
       ],
       "nav": true,
       "owner": "repo",

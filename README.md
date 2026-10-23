@@ -105,17 +105,38 @@ include `theme.css` + `site.js`, checked by `npm run check`; `own` = page has it
 
 ## Backtest
 
-`/backtest/` runs entirely in the browser on the static price files. The code is split so that
-strategies and data sources are plug-ins:
+`/backtest/` runs entirely in the browser. The code is split so that strategies, composition,
+and data sources stay separate:
 
 ```
-providers/*  →  bars (daily, split-adjusted, dividends on ex-dates)
-engine/bars.js  →  dividend adjustment (optional) → weekly/monthly resampling
-strategies/*  →  target position per bar
-engine/backtest.js  →  fills at next open, costs, risk exits, equity, trades, buy & hold
-engine/metrics.js  →  CAGR, Sharpe, Sortino, max drawdown, win rate, profit factor, …
-charts.js / app.js  →  UI
+providers/*       →  bars. Daily equities, or HSI futures when the public packs are published
+composition/*     →  HTF confirm, entry, exit, session → one target[]
+strategies/*      →  signal plug-ins (direction only; they do not call each other)
+engine/backtest.js → fills at next open, costs or index points, equity, trades
+engine/metrics.js → CAGR, Sharpe, Sortino, max drawdown, win rate, profit factor, …
+charts.js / app.js → the one /backtest/ page
 ```
+
+`/hsi-lab/` redirects to `/backtest/` with the Fast Response recipe selected. There is not a second UI.
+
+HSI futures bars use the same `load()` shape as the daily files. Until the packs are published,
+the provider throws a bars-pending error and the page says so.
+
+| Name | Where it is set | What it points at |
+| --- | --- | --- |
+| `HSI_BARS` | Cloudflare binding | Bar bucket. Prefix `v1/1m/` |
+| `HSI_BARS_URL` | Worker or pack environment | Public base URL for that prefix |
+| `HSI_BARS_BASE` | `window.__HSI_BARS_BASE` or `<meta name="hsi-bars-base">` | Same base, read in the browser |
+| static fallback | `/backtest/data/hsi/` | `v1/1m/manifest.json`, `v1/1m/YYYY.bin`, optional `v1/1d/HSImain.csv` |
+
+Objects are `v1/1m/YYYY.bin` (magic `HSI1`). Every equity and index on the page has daily bars in
+the site files. HSI futures (`HSImain`) read `v1/1d/HSImain.csv` for daily, weekly, and monthly, and
+the 1-minute packs for 1-minute and 5-minute. Until those files are published the page says the bars
+are not on the site yet. 1-minute and 5-minute stay disabled for every other ticker, and choosing
+them locks the security to HSI futures. The page never names a data vendor.
+
+Phase 1 HSI score is index points for one unit (price movement). Basis-point commission is not applied.
+The optional cost field subtracts a flat number of points per closed trade. Until that field is edited it is 6 points on a 5-minute exit and 8 points on a 1-minute exit.
 
 ### Execution model and metric definitions
 
@@ -137,9 +158,12 @@ charts.js / app.js  →  UI
   **Profit factor** = gross profit / gross loss. Also: volatility, longest drawdown, exposure,
   average/best/worst trade, average bars held, beta and correlation to buy & hold.
 
-### Strategy included
+### Strategies included
 
-For now the page ships with TD Sequential only; other rules plug in through the interface in the next section.
+Daily equities keep TD Sequential. ATR SuperTrend is the same kind of plug-in: it emits a direction
+and leaves clocks, confirm, and session flatten to `composition/`. The first selectable recipe is
+SuperTrend Fast Response (ATR 10, factor 2.5, smoothing 2, 5-minute clock at 09:30, re-enter, flatten
+at the day-session close). A second recipe adds a daily SuperTrend confirm as a separate signal.
 
 | id | Rule |
 | --- | --- |
@@ -183,10 +207,11 @@ A provider (see `backtest/providers/index.js`) is an object with `id`, `name`, `
 Bars must be daily, ascending and split-adjusted. Set `sample: true` for anything that is not real
 market data; the page then shows a SAMPLE badge and banner. Register it in `PROVIDERS`.
 
-Included: `site` (the committed Yahoo Finance CSVs) and `csv` (a CSV the visitor picks, read
+Included: `site` (the committed daily CSVs) and `csv` (a CSV the visitor picks, read
 locally). A browser-side API provider (e.g. one that needs an API key and sends CORS headers) can
-be added the same way; Yahoo's own endpoint sends no CORS headers, which is why the site serves
-prices as static files.
+be added the same way. The scheduled fetch's chart endpoint sends no CORS headers, which is why
+the site serves prices as static files. HSI futures are a separate loader (`providers/hsi-futures.js`),
+selected by the `HSImain` symbol rather than by the source dropdown.
 
 To add tickers to the site data, edit `.github/backtest/prices/universe.json` and run the
 "Backtest prices refresh" workflow (or `PYTHONPATH=.github/backtest python3 -m prices fetch --out .`).
@@ -199,9 +224,10 @@ or listing), `manifest.json` and `recent.json` (last 160 bars of a few symbols f
 page). A symbol that fails keeps its previous file and is flagged `stale` (shown on the page).
 Each refresh appends a few lines per file, so git history grows slowly.
 
-The fetcher checks its dividend back-adjustment against Yahoo's own adjusted close
-(`adj_check` in the manifest). It matches to 1e-6 for 45 of 47 symbols; for 0005.HK and 9988.HK
-Yahoo's adjusted close skips some of the dividends it reports, and this site applies all of them.
+The fetcher checks its dividend back-adjustment against the adjusted close reported with the
+download (`adj_check` in the manifest). It matches to 1e-6 for 45 of 47 symbols; for 0005.HK and
+9988.HK that adjusted close skips some of the dividends the download reports, and this site
+applies all of them.
 
 ### Verification
 
@@ -248,7 +274,9 @@ It then stamps public HTML with Organization and WebSite JSON-LD (`og:locale=zh_
 
 The script then writes `/sitemap.xml` from the merged tree. `/` and `/news/` `lastmod` values are at least the preview edition date, so a morning publish moves those entries even when the file mtime is still the previous UTC day. Other URLs keep their own file mtime.
 That index lists every HTML page present (`/`, `/backtest/`, `/politician-tracker/`, static
-member pages, a future `/hsi-lab/`), plus `sitemap-news.xml` for `/news/YYYYMMDD/` editions.
+member pages), plus `sitemap-news.xml` for `/news/YYYYMMDD/` editions. `/hsi-lab/` redirects
+to `/backtest/` and is not a separate HTML page, so it is listed only if an `index.html` is
+actually in the upload.
 Editions from today or yesterday in Hong Kong also go in `news-sitemap.xml` (Google News,
 `<news:language>zh-Hant</news:language>`), and
 the index includes that fragment only when one exists. `news/` is reserved: it is registered in

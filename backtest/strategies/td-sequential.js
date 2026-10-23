@@ -129,6 +129,10 @@ export default {
   short: 'TD 9 / 13',
   summary: 'DeMark exhaustion counts: buy on a buy Setup 9 and/or Countdown 13, exit (or reverse) on the sell-side signal.',
   tags: ['DeMark', 'Counter-trend'],
+  capabilities: {
+    timeframes: ['1d', '1w', '1mo'],
+    session: false,
+  },
   params: [
     {
       key: 'entry',
