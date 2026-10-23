@@ -7,7 +7,9 @@ import { fileURLToPath } from 'node:url';
 import {
   NOT_COMPUTED,
   NOT_SUPERTREND,
+  OUTSIDE_RANGE,
   prepareHsiLookup,
+  presetBounds,
   resultBundleKey,
   comboKey,
   encodeBundle,
@@ -204,6 +206,54 @@ test('a missing bundle or combo is not computed, and a bad combo is not fetched'
     (err) => err instanceof ResultMissing && err.message === NOT_COMPUTED,
   );
   assert.deepEqual(urls, ['https://bars.example/v1/results/5m-10/all.json.gz']);
+});
+
+test('custom dates slice the all bundle even when year is still all', async () => {
+  resetHsiResultCache();
+  assert.equal(presetBounds(1, now).from, '2025-10-23');
+  assert.equal(presetBounds(1, now).to, '2026-10-23');
+  assert.equal(presetBounds(null, now).from, '2020-01-02');
+  assert.equal(presetBounds(20, now).from, '2020-01-02');
+  const inverted = prepareHsiLookup({ ...fast, sessionMode: 'dates', year: 'all', from: '2024-04-01', to: '2024-03-01' }, now);
+  assert.equal(inverted.ok, false);
+  assert.equal(inverted.message, OUTSIDE_RANGE);
+
+  const gz = gzipSync(encodeBundle(sampleBundle()));
+  const urls = [];
+  const fetchImpl = async (url) => {
+    urls.push(String(url));
+    if (String(url).endsWith('v1/results/5m-14/all.json.gz')) {
+      return { status: 200, ok: true, arrayBuffer: async () => gz.buffer.slice(gz.byteOffset, gz.byteOffset + gz.byteLength) };
+    }
+    return { status: 404, ok: false, arrayBuffer: async () => new ArrayBuffer(0) };
+  };
+  const view = await lookupHsiResult({
+    ...fast,
+    atrLength: 14,
+    exitAtrLength: 14,
+    sessionMode: 'dates',
+    year: 'all',
+    from: '2024-03-05',
+    to: '2024-03-05',
+    costPoints: 0,
+  }, { base: 'https://bars.example/', fetchImpl, now });
+  assert.deepEqual(urls, ['https://bars.example/v1/results/5m-14/all.json.gz']);
+  assert.equal(view.metrics.sessionDays, 1);
+  assert.equal(view.equity.length, 1);
+  assert.equal(view.equity[0].date, '2024-03-05');
+  assert.equal(view.params.from, '2024-03-05');
+  assert.equal(view.params.to, '2024-03-05');
+
+  const all = await lookupHsiResult({
+    ...fast,
+    atrLength: 14,
+    exitAtrLength: 14,
+    sessionMode: 'year',
+    year: 'all',
+    costPoints: 0,
+  }, { base: 'https://bars.example/', fetchImpl, now });
+  assert.equal(urls.length, 1);
+  assert.equal(all.metrics.sessionDays, 3);
 });
 
 test('the results function serves the bundle key and refuses anything else', async () => {

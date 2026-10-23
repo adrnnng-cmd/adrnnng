@@ -62,5 +62,7 @@ test('the plugin defaults are ATR 10, factor 2.5, smoothing 2', () => {
   assert.equal(out.target.length, bars.length);
   assert.ok(out.target.every((t) => t === null || t === 1 || t === -1));
   assert.equal(out.overlays[0].values.length, bars.length);
+  assert.equal(out.overlays[0].color, '#0b8a3e');
+  assert.equal(out.overlays[1].color, '#d0182a');
   assert.equal(atrSupertrendStrategy.capabilities.session, true);
 });

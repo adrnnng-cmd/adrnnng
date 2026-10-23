@@ -1,6 +1,6 @@
 import { PROVIDERS, getProvider } from './providers/index.js';
 import hsiFutures, { BarsPending, loadHsiDaily } from './providers/hsi-futures.js';
-import { lookupHsiResult, ResultMissing } from './providers/hsi-results.js';
+import { lookupHsiResult, ResultMissing, RESULT_DATA_START, presetBounds } from './providers/hsi-results.js';
 import { STRATEGIES, getStrategy, defaultParams, normaliseParams } from './strategies/index.js';
 import { adjustForDividends, resample, indexAtOrAfter, indexAtOrBefore } from './engine/bars.js';
 import { filterDaySession, resampleMinutes, toDaily } from './engine/intraday.js';
@@ -589,16 +589,24 @@ function dayOf(t) {
 
 function applyPreset() {
   if (!dataset || state.preset === 'custom' || state.preset === 'year') return;
-  const first = dayOf(dataset.bars[0].time);
-  const last = dayOf(dataset.bars.at(-1).time);
   const p = PRESETS.find((x) => x.id === state.preset);
+  if (!p) return;
+  if (dataset.stored || !dataset.bars?.length) {
+    const window = presetBounds(p.years);
+    state.from = window.from;
+    state.to = window.to;
+    return;
+  }
+  const first = dayOf(dataset.bars[0]?.time);
+  const last = dayOf(dataset.bars.at(-1)?.time);
+  if (!first || !last) return;
   state.to = last;
   state.from = p.years == null ? first : [shiftYears(last, p.years), first].sort().at(-1);
 }
 
 function applyYear() {
   if (!dataset) return;
-  const first = dataset.stored ? '2020-01-02' : dayOf(dataset.bars[0].time);
+  const first = dataset.stored ? RESULT_DATA_START : dayOf(dataset.bars[0].time);
   const last = dataset.stored ? archiveEnd() : dayOf(dataset.bars.at(-1).time);
   if (state.year === 'all' || !/^\d{4}$/.test(state.year)) {
     state.from = first;
@@ -657,8 +665,9 @@ async function loadData(file) {
       dataset = storedShell();
       fillHsiYears();
       if (state.sessionMode === 'year') applyYear();
+      else if (state.preset !== 'custom') applyPreset();
       else if (!state.from) {
-        state.from = '2020-01-02';
+        state.from = RESULT_DATA_START;
         state.to = archiveEnd();
       }
       await run();
@@ -1137,7 +1146,7 @@ function renderStored() {
   const exit = state.exitTf !== state.tf ? ` → ${state.exitTf} exit` : '';
   const rule = `${ENTRY_RULES.find((r) => r.id === state.entryRule)?.label || state.entryRule}${state.entryRule === 'flip' ? '' : ' ' + state.clock} · ${EXIT_RULES.find((r) => r.id === state.exitRule)?.label || ''}`;
   $('price-title').textContent = 'Points';
-  $('price-sub').textContent = 'Stored session score. One point per day, after the round-trip cost. This is not the futures price.';
+  $('price-sub').textContent = 'Stored session score. One candle per day, green when points rise and red when they fall. This is not the futures price.';
   $('equity-sub').textContent = 'The same daily points. Buy & hold is not in the stored result.';
   $('dd-sub').textContent = 'Peak to trough of the daily point curve.';
   $('heat-title').textContent = 'Results by year';
