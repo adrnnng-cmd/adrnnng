@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { newsDoorCaption, parseLatest } from '../../assets/js/latest.js';
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
 
 const lead = {
   date: '2026-10-20',
@@ -28,17 +33,21 @@ test('parseLatest uses image_url and ignores unknown fields', () => {
 });
 
 test('newsDoorCaption uses a truncated headline and falls back without one', () => {
-  assert.deepEqual(newsDoorCaption(null), { title: 'Morning Report', sub: 'Daily ~08:15 HKT' });
-  assert.deepEqual(newsDoorCaption({ headline: '   ', image_url: null }), { title: 'Morning Report', sub: 'Daily ~08:15 HKT' });
+  assert.deepEqual(newsDoorCaption(null), { title: 'Morning Report', sub: '每朝 9 點前' });
+  assert.deepEqual(newsDoorCaption({ headline: '   ', image_url: null }), { title: 'Morning Report', sub: '每朝 9 點前' });
   assert.deepEqual(newsDoorCaption({ headline: 'Nscale signs Anthropic', image_url: null }), {
     title: 'Nscale signs Anthropic',
-    sub: 'Daily ~08:15 HKT',
+    sub: '每朝 9 點前',
   });
   const long = 'Markets reopen after a long weekend with rates, chips, and a weaker dollar in focus today';
   const cap = newsDoorCaption({ headline: long });
   assert.ok(cap.title.length <= 52, cap.title);
   assert.ok(cap.title.endsWith('…'));
-  assert.equal(cap.sub, 'Daily ~08:15 HKT');
+  assert.equal(cap.sub, '每朝 9 點前');
+  assert.doesNotMatch(cap.sub, /08:15/);
+  const news = JSON.parse(readFileSync(join(ROOT, 'assets/tools.json'), 'utf8')).tools.find((t) => t.id === 'news');
+  assert.ok(news.highlights.includes('每朝 9 點前'));
+  assert.equal(news.highlights.some((h) => String(h).includes('08:15')), false);
 });
 
 test('parseLatest falls back when image_url is null, empty, or not a url', () => {
