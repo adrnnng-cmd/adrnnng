@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CHART, candleSeriesOptions, pointCandles, strategyAreaOptions, drawdownSeriesOptions } from '../chart-style.js';
+import { CHART, candleSeriesOptions, pointCandles, strategyAreaOptions, drawdownSeriesOptions, supertrendLabel } from '../chart-style.js';
 
 test('stored point candles use the same up and down colors as the price series', () => {
   const candles = candleSeriesOptions();
@@ -27,4 +27,9 @@ test('stored point candles use the same up and down colors as the price series',
   ]);
   assert.ok(bars[0].close >= bars[0].open);
   assert.ok(bars[1].close < bars[1].open);
+  assert.equal(supertrendLabel(1).text, 'Buy');
+  assert.equal(supertrendLabel(1).color, CHART.up);
+  assert.equal(supertrendLabel(-1).text, 'Sell');
+  assert.equal(supertrendLabel('short').color, CHART.down);
+  assert.equal(supertrendLabel('long').position, 'belowBar');
 });

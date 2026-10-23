@@ -26,6 +26,9 @@
 // Year, custom dates, and the round-trip point cost are applied when the page
 // reads. They are not part of the key. encodeBundle() writes the HSID bytes
 // the gzip body contains.
+//
+// The SuperTrend line and Buy/Sell marks are a separate slim object. See
+// hsi-overlay.js. This score file stays a daily point curve.
 
 import { hsiBarsBase } from './hsi-futures.js';
 

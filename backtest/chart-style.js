@@ -68,6 +68,22 @@ export function buyHoldLineOptions() {
   };
 }
 
+/** Buy sits under the bar. Sell sits above it. Same up and down colors as the candles. */
+export function supertrendLabel(side) {
+  const buy = side === 1 || side === 'long' || side === 'buy';
+  return {
+    position: buy ? 'belowBar' : 'aboveBar',
+    shape: buy ? 'arrowUp' : 'arrowDown',
+    color: buy ? CHART.up : CHART.down,
+    text: buy ? 'Buy' : 'Sell',
+    size: 1.4,
+  };
+}
+
+export function isSupertrendOverlay(name) {
+  return name === 'SuperTrend up' || name === 'SuperTrend down';
+}
+
 /** One candle per stored session day. Open is the previous close, so a rising day is green. */
 export function pointCandles(points) {
   const out = [];
