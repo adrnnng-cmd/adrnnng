@@ -112,6 +112,20 @@ export function utcDay(now = new Date()) {
   return date.toISOString().slice(0, 10);
 }
 
+function shiftYears(iso, years) {
+  const date = new Date(`${iso}T00:00:00Z`);
+  date.setUTCFullYear(date.getUTCFullYear() - years);
+  return date.toISOString().slice(0, 10);
+}
+
+/** From–to for a Range preset against the stored archive. `years` null is the whole archive. */
+export function presetBounds(years, now = new Date()) {
+  const to = utcDay(now);
+  if (years == null) return { from: RESULT_DATA_START, to };
+  const shifted = shiftYears(to, years);
+  return { from: shifted < RESULT_DATA_START ? RESULT_DATA_START : shifted, to };
+}
+
 function archiveYears(now) {
   const end = (now instanceof Date ? now : new Date(now)).getUTCFullYear();
   const years = [];

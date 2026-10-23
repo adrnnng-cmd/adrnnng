@@ -158,8 +158,10 @@ Combo shape: `{exitTf}:{exitAtr}:{entryRule}:{clock}:{exitRule}`.
 
 Factor 2.5, EMA smoothing 2, the 09:15–16:30 Hong Kong session, flatten at the session close, and
 no separate daily confirm are fixed. They are not in the key. `year=all`, a single year, custom
-dates, and the round-trip point cost are applied when the page reads. A combo outside that grid
-shows “not computed yet” and does not run the tape. The chart is one point per session day.
+dates, and the round-trip point cost are applied when the page reads. Custom dates and the
+Range presets slice that same `all` bundle. A combo outside that grid shows “not computed yet”
+and does not run the tape. The chart is one candle per session day, in the same up, down, and
+equity colors as the other backtests.
 
 Phase 1 HSI score is index points for one unit (price movement). Basis-point commission is not applied.
 The optional cost field subtracts a flat number of points per closed trade. Until that field is edited it is 6 points on a 5-minute exit and 8 points on a 1-minute exit.

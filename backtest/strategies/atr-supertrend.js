@@ -18,9 +18,7 @@
 //   - Ratchet and cross use only bars[0..i].
 
 import { atr, pineEma } from '../engine/indicators.js';
-
-const UP = '#34d399';
-const DOWN = '#fb7185';
+import { CHART } from '../chart-style.js';
 
 export function atrSupertrend(bars, params = {}) {
   const atrLength = Math.max(1, Math.round(Number(params.atrLength ?? 10)));
@@ -95,8 +93,8 @@ export default {
     const signal = st.trend.map((t) => (t == null ? null : t));
     const markers = [];
     for (let i = 0; i < bars.length; i++) {
-      if (st.flip[i] === 1) markers.push({ index: i, position: 'below', text: '▲', color: UP, kind: 'flip' });
-      else if (st.flip[i] === -1) markers.push({ index: i, position: 'above', text: '▼', color: DOWN, kind: 'flip' });
+      if (st.flip[i] === 1) markers.push({ index: i, position: 'below', text: '▲', color: CHART.up, kind: 'flip' });
+      else if (st.flip[i] === -1) markers.push({ index: i, position: 'above', text: '▼', color: CHART.down, kind: 'flip' });
     }
     return {
       signal,
@@ -104,8 +102,8 @@ export default {
       flip: st.flip,
       markers,
       overlays: [
-        { name: 'SuperTrend up', color: UP, values: st.line.map((v, i) => (st.trend[i] === 1 ? v : null)) },
-        { name: 'SuperTrend down', color: DOWN, values: st.line.map((v, i) => (st.trend[i] === -1 ? v : null)) },
+        { name: 'SuperTrend up', color: CHART.up, values: st.line.map((v, i) => (st.trend[i] === 1 ? v : null)) },
+        { name: 'SuperTrend down', color: CHART.down, values: st.line.map((v, i) => (st.trend[i] === -1 ? v : null)) },
       ],
     };
   },
