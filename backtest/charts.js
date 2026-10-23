@@ -18,8 +18,10 @@ import {
   buyHoldLineOptions,
   candleSeriesOptions,
   drawdownSeriesOptions,
+  isSupertrendOverlay,
   pointCandles,
   strategyAreaOptions,
+  supertrendLabel,
 } from './chart-style.js';
 
 function baseOptions() {
@@ -60,6 +62,15 @@ function chartTime(t) {
   if (s.length <= 10) return s;
   const ms = Date.parse(s.endsWith('Z') ? s : `${s}Z`);
   return Number.isFinite(ms) ? Math.floor(ms / 1000) : s;
+}
+
+function snapTime(bars, time) {
+  let best = null;
+  for (const bar of bars) {
+    if (bar.time <= time) best = bar.time;
+    else break;
+  }
+  return best ?? bars[0]?.time ?? null;
 }
 
 const line = (times, values, from = 0) => {
@@ -122,20 +133,20 @@ export class BacktestCharts {
     candles.setData(view.map((b) => ({ time: b.time, open: b.open, high: b.high, low: b.low, close: b.close })));
     this.series.price.push(candles);
 
-    if (show.overlays) {
-      for (const o of sig.overlays || []) {
-        const s = this.price.addSeries(LineSeries, {
-          color: o.color,
-          lineWidth: 1.5,
-          lineStyle: o.style === 'dashed' ? LineStyle.Dashed : LineStyle.Solid,
-          priceLineVisible: false,
-          lastValueVisible: false,
-          crosshairMarkerVisible: false,
-          title: '',
-        });
-        s.setData(line(times, o.values, start));
-        this.series.price.push(s);
-      }
+    for (const o of sig.overlays || []) {
+      const trend = isSupertrendOverlay(o.name);
+      if (trend ? show.supertrend !== true : !show.overlays) continue;
+      const s = this.price.addSeries(LineSeries, {
+        color: o.color,
+        lineWidth: 1.5,
+        lineStyle: o.style === 'dashed' ? LineStyle.Dashed : LineStyle.Solid,
+        priceLineVisible: false,
+        lastValueVisible: false,
+        crosshairMarkerVisible: false,
+        title: '',
+      });
+      s.setData(line(times, o.values, start));
+      this.series.price.push(s);
     }
 
     (sig.panes || []).forEach((pane, k) => {
@@ -173,14 +184,17 @@ export class BacktestCharts {
     const allTrades = [...result.trades, ...(result.openTrade ? [result.openTrade] : [])];
     for (const t of allTrades) {
       const isLong = t.side === 'long';
-      markers.push({
-        time: chartTime(t.entryTime),
-        position: isLong ? 'belowBar' : 'aboveBar',
-        shape: isLong ? 'arrowUp' : 'arrowDown',
-        color: isLong ? C.long : C.short,
-        text: isLong ? 'BUY' : 'SHORT',
-        size: 1.4,
-      });
+      if (show.supertrend !== false) {
+        const label = show.supertrend === true ? supertrendLabel(t.side) : null;
+        markers.push({
+          time: chartTime(t.entryTime),
+          position: label?.position || (isLong ? 'belowBar' : 'aboveBar'),
+          shape: label?.shape || (isLong ? 'arrowUp' : 'arrowDown'),
+          color: label?.color || (isLong ? C.long : C.short),
+          text: label?.text || (isLong ? 'BUY' : 'SHORT'),
+          size: label?.size || 1.4,
+        });
+      }
       if (!t.open) {
         markers.push({
           time: chartTime(t.exitTime),
@@ -221,8 +235,8 @@ export class BacktestCharts {
     for (const ch of [this.price, this.equity, this.drawdown]) ch.timeScale().fitContent();
   }
 
-  /** Daily point curve from a stored result. Candles and the equity area use the live series styles. */
-  renderCurve({ times, values }) {
+  /** Daily point curve from a stored result. An optional overlay adds the SuperTrend line. */
+  renderCurve({ times, values, overlay, showSupertrend }) {
     this.clear('price');
     this.clear('equity');
     this.clear('drawdown');
@@ -242,10 +256,27 @@ export class BacktestCharts {
       if (value > peak) peak = value;
       dd.push({ time, value: value - peak });
     }
-    if (!data.length) return;
-    const price = this.price.addSeries(CandlestickSeries, candleSeriesOptions());
-    price.setData(pointCandles(data));
-    this.series.price.push(price);
+    const candlesIn = (overlay?.candles || []).map((bar) => ({ ...bar, time: chartTime(bar.time) })).filter((bar) => bar.time != null);
+    const priceBars = candlesIn.length ? candlesIn : data.length ? pointCandles(data) : [];
+    if (!priceBars.length && !data.length) return;
+    if (priceBars.length) {
+      const price = this.price.addSeries(CandlestickSeries, candleSeriesOptions());
+      price.setData(priceBars.map((bar) => ({ time: bar.time, open: bar.open, high: bar.high, low: bar.low, close: bar.close })));
+      this.series.price.push(price);
+      if (showSupertrend && candlesIn.length && overlay?.line?.length) this.drawStoredLine(overlay.line);
+      if (showSupertrend && candlesIn.length && overlay?.markers?.length) {
+        const marks = overlay.markers.map((mark) => {
+          const label = supertrendLabel(mark.side);
+          return { ...label, time: snapTime(priceBars, chartTime(mark.time)) };
+        }).filter((mark) => mark.time != null);
+        marks.sort((a, b) => (a.time < b.time ? -1 : a.time > b.time ? 1 : 0));
+        this.markers = createSeriesMarkers(price, marks);
+      }
+    }
+    if (!data.length) {
+      this.price.timeScale().fitContent();
+      return;
+    }
     this.equity.priceScale('right').applyOptions({ mode: PriceScaleMode.Normal });
     this.drawdown.applyOptions({ localization: { priceFormatter: (p) => p.toFixed(0) } });
     const eq = this.equity.addSeries(AreaSeries, strategyAreaOptions());
@@ -255,6 +286,26 @@ export class BacktestCharts {
     drop.setData(dd);
     this.series.drawdown.push(drop);
     for (const ch of [this.price, this.equity, this.drawdown]) ch.timeScale().fitContent();
+  }
+
+  drawStoredLine(points) {
+    for (const dir of [1, -1]) {
+      const series = points.map((point) => {
+        const time = chartTime(point.time);
+        return point.dir === dir ? { time, value: point.value } : { time };
+      });
+      if (!series.some((point) => point.value != null)) continue;
+      const s = this.price.addSeries(LineSeries, {
+        color: dir === 1 ? C.up : C.down,
+        lineWidth: 1.5,
+        priceLineVisible: false,
+        lastValueVisible: false,
+        crosshairMarkerVisible: false,
+        title: '',
+      });
+      s.setData(series);
+      this.series.price.push(s);
+    }
   }
 
   focus(fromTime, toTime, padBars = 25) {

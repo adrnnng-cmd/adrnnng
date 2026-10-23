@@ -1,6 +1,7 @@
 import { PROVIDERS, getProvider } from './providers/index.js';
 import hsiFutures, { BarsPending, loadHsiDaily } from './providers/hsi-futures.js';
 import { lookupHsiResult, ResultMissing, RESULT_DATA_START, presetBounds } from './providers/hsi-results.js';
+import { lookupHsiOverlay } from './providers/hsi-overlay.js';
 import { STRATEGIES, getStrategy, defaultParams, normaliseParams } from './strategies/index.js';
 import { adjustForDividends, resample, indexAtOrAfter, indexAtOrBefore } from './engine/bars.js';
 import { filterDaySession, resampleMinutes, toDaily } from './engine/intraday.js';
@@ -357,7 +358,15 @@ function buildStaticControls() {
     }
     setTimeout(() => ($('share').textContent = 'Copy link'), 1800);
   });
-  for (const id of ['show-overlays', 'show-tdcounts', 'log-equity']) $(id).addEventListener('change', () => lastRun && renderCharts());
+  for (const id of ['show-overlays', 'show-tdcounts', 'log-equity']) $(id).addEventListener('change', () => {
+    if (!lastRun || lastRun.stored) return;
+    renderCharts();
+  });
+  $('show-supertrend').addEventListener('change', () => {
+    if (!lastRun) return;
+    if (lastRun.stored) void paintStoredOverlay();
+    else renderCharts();
+  });
   $('heat-which').addEventListener('click', (e) => {
     const b = e.target.closest('button');
     if (!b) return;
@@ -522,6 +531,7 @@ function syncCompose() {
   const on = showCompose();
   ensureYears();
   $('compose-row').hidden = !on;
+  $('st-wrap').hidden = state.strategy !== 'atr-supertrend';
   $('tf-label').textContent = on ? 'Entry' : 'Period';
   renderTimeframes();
   if (symbols.length) renderSymbols();
@@ -733,9 +743,10 @@ async function runStored(token) {
   try {
     const view = await lookupHsiResult(lookupInput());
     if (token !== runToken) return;
-    lastRun = { stored: true, view, strategy: getStrategy('atr-supertrend'), params: { ...state.params } };
+    lastRun = { stored: true, view, strategy: getStrategy('atr-supertrend'), params: { ...state.params }, overlay: null, overlayMissing: false };
     writeHash();
     renderStored();
+    if ($('show-supertrend').checked) await paintStoredOverlay(token);
   } catch (e) {
     if (token !== runToken) return;
     showError(e);
@@ -973,7 +984,12 @@ function renderCharts() {
   charts.render({
     bars: lastRun.bars,
     result: lastRun.result,
-    show: { overlays: $('show-overlays').checked, tdCounts: $('show-tdcounts').checked, logEquity: $('log-equity').checked },
+    show: {
+      overlays: $('show-overlays').checked,
+      tdCounts: $('show-tdcounts').checked,
+      logEquity: $('log-equity').checked,
+      supertrend: state.strategy === 'atr-supertrend' ? $('show-supertrend').checked : undefined,
+    },
   });
 }
 
@@ -1136,6 +1152,27 @@ function focusTrade(t) {
   $('chart-price').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
+async function paintStoredOverlay(token = runToken) {
+  if (!lastRun?.stored || token !== runToken) return;
+  if (!$('show-supertrend').checked) {
+    renderStored();
+    return;
+  }
+  if (!lastRun.overlay && !lastRun.overlayMissing) {
+    try {
+      const overlay = await lookupHsiOverlay(lastRun.view, { from: state.from, to: state.to });
+      if (token !== runToken || !lastRun?.stored) return;
+      if (overlay) lastRun.overlay = overlay;
+      else lastRun.overlayMissing = true;
+    } catch (err) {
+      if (token !== runToken || !lastRun?.stored) return;
+      console.warn(err?.message || err);
+      lastRun.overlayMissing = true;
+    }
+  }
+  renderStored();
+}
+
 function renderStored() {
   const view = lastRun.view;
   const m = view.metrics;
@@ -1145,8 +1182,14 @@ function renderStored() {
   const tf = TIMEFRAME_CHOICES.find((t) => t.id === state.tf)?.label || state.tf;
   const exit = state.exitTf !== state.tf ? ` → ${state.exitTf} exit` : '';
   const rule = `${ENTRY_RULES.find((r) => r.id === state.entryRule)?.label || state.entryRule}${state.entryRule === 'flip' ? '' : ' ' + state.clock} · ${EXIT_RULES.find((r) => r.id === state.exitRule)?.label || ''}`;
-  $('price-title').textContent = 'Points';
-  $('price-sub').textContent = 'Stored session score. One candle per day, green when points rise and red when they fall. This is not the futures price.';
+  const priced = Boolean(lastRun.overlay?.candles?.length);
+  const lineOn = $('show-supertrend').checked && Boolean(lastRun.overlay?.line?.length);
+  $('price-title').textContent = priced ? 'Price & signals' : 'Points';
+  $('price-sub').textContent = priced
+    ? (lineOn
+      ? 'Stored sample of the session price. Green and red are the SuperTrend line. Buy and Sell are the stored fills.'
+      : 'Stored sample of the session price. SuperTrend line and Buy / Sell labels are off.')
+    : 'Stored session score. One candle per day, green when points rise and red when they fall. This is not the futures price.';
   $('equity-sub').textContent = 'The same daily points. Buy & hold is not in the stored result.';
   $('dd-sub').textContent = 'Peak to trough of the daily point curve.';
   $('heat-title').textContent = 'Results by year';
@@ -1159,7 +1202,11 @@ function renderStored() {
   $('run-badges').innerHTML = '<span class="badge">Stored result</span><span class="badge">Index points</span>';
   $('log-equity').disabled = true;
   $('log-equity').checked = false;
-  $('notices').innerHTML = '<div class="notice">Stored result. Statistics use every session day in the range. The chart is that daily curve.</div>';
+  const notes = ['<div class="notice">Stored result. Statistics use every session day in the range. The chart is that daily curve.</div>'];
+  if ($('show-supertrend').checked && lastRun.overlayMissing) {
+    notes.push('<div class="notice">SuperTrend line is not stored for this combination yet. The score is unchanged.</div>');
+  }
+  $('notices').innerHTML = notes.join('');
 
   const cell = (v, cls = '') => `<td class="r ${cls}">${v}</td>`;
   $('summary').innerHTML = `<thead><tr><th></th><th class="r">Long</th><th class="r">Short</th><th class="r">Total</th></tr></thead><tbody>
@@ -1215,6 +1262,8 @@ function renderStored() {
   charts.renderCurve({
     times: view.equity.map((point) => point.date),
     values: view.equity.map((point) => point.points),
+    overlay: lastRun.overlay,
+    showSupertrend: $('show-supertrend').checked,
   });
   renderStoredYearBars(years);
   $('trades-sub').textContent = 'One row per year. Individual fills are not in the stored result.';

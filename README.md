@@ -163,6 +163,15 @@ Range presets slice that same `all` bundle. A combo outside that grid shows “n
 and does not run the tape. The chart is one candle per session day, in the same up, down, and
 equity colors as the other backtests.
 
+The SuperTrend line and Buy/Sell labels are not in that score. They are one extra object per combo,
+`v1/results/{entryTf}m-{entryAtr}/ov/{exitTf}-{exitAtr}-{entryRule}-{clock}-{exitRule}.json.gz`.
+`clock` is `na` for a flip, otherwise `0915` or `0930`. Fast Response is
+`v1/results/5m-10/ov/5-10-clock-0930-reenter.json.gz`. The body is gzip of the bytes
+`encodeOverlay()` in `backtest/providers/hsi-overlay.js` writes. Sample the session line and price
+at direction changes and at least every 15 minutes. Keep at most 60,000 line points and 8,000
+markers. A missing overlay leaves the score on the chart. The page does not rebuild it from the
+minute tape. The price-chart SuperTrend checkbox shows or hides the line and the labels.
+
 Phase 1 HSI score is index points for one unit (price movement). Basis-point commission is not applied.
 The optional cost field subtracts a flat number of points per closed trade. Until that field is edited it is 6 points on a 5-minute exit and 8 points on a 1-minute exit.
 
