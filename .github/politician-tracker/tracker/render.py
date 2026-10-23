@@ -10,6 +10,23 @@ from .model import band_min, display_ticker, parse_date
 
 WEEKDAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
 
+# Same card as assets/js/newsletter.js. /news/ keeps its own signup.
+NEWSLETTER_CARD = """<aside class="nl-card" id="newsletter" aria-labelledby="nl-heading">
+<div class="nl-card-in">
+<p class="nl-eye">ADRRR · NEWSLETTER</p>
+<h2 id="nl-heading">每朝 9 點前，港美股早報直送信箱</h2>
+<p class="nl-lead">ADRRR News Lab — 隔夜美股、港股盤前、經濟數據與異動股，5 分鐘掌握開市前重點。</p>
+<form class="nl-form" action="https://buttondown.com/api/emails/embed-subscribe/adrrr" method="post">
+<label class="nl-sr" for="nl-email">Email</label>
+<input id="nl-email" class="nl-email" type="email" name="email" required autocomplete="email" inputmode="email" maxlength="200" placeholder="Email" spellcheck="false">
+<input type="hidden" name="embed" value="1">
+<button type="submit">免費訂閱</button>
+</form>
+<p class="nl-fine">免費 · 隨時取消 · 由 <a href="https://buttondown.com/adrrr">Buttondown</a> 寄送</p>
+<p class="nl-disc">本報僅供參考，不構成投資建議</p>
+</div>
+</aside>"""
+
 CSS = r"""
 :root{
  --ink:#111;--ink2:#333;--mut:#666;--mut2:#8a8a8a;--rule:#e2e2e2;--rule2:#cfcfcf;--bg:#fff;--off:#f7f7f5;
@@ -427,6 +444,7 @@ def render_page(cfg: dict, payload: dict, now: datetime) -> str:
 {robots}<meta name="referrer" content="no-referrer"><meta name="theme-color" content="#000000">
 {seo}<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;700;900&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap">
+<link rel="stylesheet" href="/assets/css/newsletter.css">
 <style>{CSS}</style></head>
 <body data-today="{today.isoformat()}">
 <header class="mast"><div class="wrap mast-in">
@@ -463,6 +481,7 @@ def render_page(cfg: dict, payload: dict, now: datetime) -> str:
 <div class="tkg">{tickers_html or '<span class="note">No tickers yet.</span>'}</div>
 
 <p class="disc">Disclosures are not investment advice. The STOCK Act allows members up to ~45 days to report a trade, so every row is delayed; <b>lag</b> = filing date − trade date, and rows over 45 days are marked late. Sizes are the statutory reporting bands, so any leaderboard returns cited here are estimates derived from those bands.</p>
+{NEWSLETTER_CARD}
 <footer class="foot"><div class="row"><span>非投資建議。 Not investment advice.</span><span><a href="{_e(site['archive_url'])}">Morning Report archive</a> · <a href="/{_e(site['path'])}/data.json">data.json</a></span></div></footer>
 </main>
 <script>{JS}</script>

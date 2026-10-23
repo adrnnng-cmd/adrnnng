@@ -2,6 +2,8 @@
 //   <header class="mast" data-site-header></header> ... <footer data-site-footer></footer>
 //   <script type="module" src="/assets/js/site.js"></script>
 // Header nav and footer links come from /assets/tools.json.
+// Pages with a footer also get the newsletter end card, unless <body data-newsletter="off">.
+import { mountNewsletterCard } from './newsletter.js';
 
 const REGISTRY_URL = '/assets/tools.json';
 let registryPromise = null;
@@ -84,6 +86,7 @@ function renderFooter(el, reg) {
 export async function mountChrome() {
   const header = document.querySelector('[data-site-header]');
   const footer = document.querySelector('[data-site-footer]');
+  mountNewsletterCard();
   if (!header && !footer) return;
   try {
     const reg = await loadRegistry();

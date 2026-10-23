@@ -13,12 +13,15 @@ export function safeUrl(u) {
   return '';
 }
 
+// Caption only. Publish time stays with the News Analyst; this line is not a schedule.
+const NEWS_DOOR_SUB = '每朝 9 點前';
+
 // Morning Report door line. Keeps a headline even when image_url is missing
 // (parseLatest returns null in that case) and clips it to one line.
 export function newsDoorCaption(data, max = 52) {
   const headline = data && typeof data === 'object' && !Array.isArray(data) ? tidy(data.headline) : '';
-  if (!headline) return { title: 'Morning Report', sub: 'Daily ~08:15 HKT' };
-  return { title: clipLine(headline, max), sub: 'Daily ~08:15 HKT' };
+  if (!headline) return { title: 'Morning Report', sub: NEWS_DOOR_SUB };
+  return { title: clipLine(headline, max), sub: NEWS_DOOR_SUB };
 }
 
 function clipLine(s, max) {
