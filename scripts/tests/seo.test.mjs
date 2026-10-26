@@ -127,7 +127,19 @@ test('assemble-deploy writes the sitemap from the merged news tree', async () =>
     assert.doesNotMatch(recent, /<news:language>en<\/news:language>/);
     assert.match(await readFile(join(out, '404.html'), 'utf8'), /noindex/);
     const editionHtml = await readFile(join(out, 'news', today, 'index.html'), 'utf8');
-    assert.equal(editionHtml, `<html><head><title>Edition ${today}</title></head></html>`);
+    assert.match(editionHtml, new RegExp(`<title>Edition ${today}</title>`));
+    assert.match(editionHtml, /property="og:locale" content="zh_HK"/);
+    assert.match(editionHtml, /name="twitter:site" content="@adrnnng"/);
+    assert.match(editionHtml, /id="adrnnng-site"/);
+    assert.match(editionHtml, /"@type":"WebSite"/);
+    assert.doesNotMatch(editionHtml, /SearchAction|FAQPage|article:published_time/);
+    const homeBlock = /<loc>https:\/\/adrnnng\.com\/<\/loc>\s*<lastmod>([^<]+)<\/lastmod>/.exec(pages);
+    assert.equal(homeBlock?.[1], `${today.slice(0, 4)}-${today.slice(4, 6)}-${today.slice(6, 8)}`);
+    const feed = await readFile(join(out, 'news/feed.xml'), 'utf8');
+    assert.equal((feed.match(/<item>/g) || []).length, 1);
+    assert.match(feed, new RegExp(`<title>Edition ${today}</title>`));
+    assert.match(feed, new RegExp(`<dc:date>${today.slice(0, 4)}-${today.slice(4, 6)}-${today.slice(6, 8)}</dc:date>`));
+    assert.doesNotMatch(feed, /<pubDate>/);
     const preview = JSON.parse(await readFile(join(out, 'assets/news-preview.json'), 'utf8'));
     assert.equal(preview.href, `/news/${today}/`);
     assert.equal(preview.serp_hook, '');
@@ -227,7 +239,7 @@ test('committed indexing files allow public pages and keep /api private', async 
   assert.equal(parseHeaders(headers).some((r) => r.path === '/*'), false);
 
   const llms = await readFile(join(root, 'llms.txt'), 'utf8');
-  for (const needle of ['Backtest', 'Politician Tracker', 'Morning Report', '/hsi-lab/', 'https://adrnnng.com/news/']) {
+  for (const needle of ['Backtest', 'Politician Tracker', 'Morning Report', '/hsi-lab/', 'https://adrnnng.com/news/', '/news/feed.xml', 'no site search']) {
     assert.ok(llms.includes(needle), needle);
   }
 

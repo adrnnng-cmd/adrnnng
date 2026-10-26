@@ -242,7 +242,11 @@ written into `news-preview.json` is taken from `news/latest.json`, a JSON sideca
 `<meta name="serp_hook">` tag, or the edition `<title>`. An empty string is kept when the
 field is present but blank.
 
-The script then writes `/sitemap.xml` from the merged tree.
+It then stamps public HTML with Organization and WebSite JSON-LD (`og:locale=zh_HK`, `twitter:site=@adrnnng`, breadcrumbs on sections and editions). Day pages keep their News Analyst titles and headlines. If a day page already has `NewsArticle` JSON-LD, the stamp adds `publisher.logo` (the apple-touch icon) and copies `datePublished` into `article:published_time` when that timestamp is already on the page. It does not add `SearchAction` or `FAQPage`. There is no site search.
+
+`/news/feed.xml` is written from the edition files in that upload: one item per `/news/YYYYMMDD/`, using that page's title and description. `pubDate` is set only when the page already has a timestamp. `dc:date` is the edition date in the path.
+
+The script then writes `/sitemap.xml` from the merged tree. `/` and `/news/` `lastmod` values are at least the preview edition date, so a morning publish moves those entries even when the file mtime is still the previous UTC day. Other URLs keep their own file mtime.
 That index lists every HTML page present (`/`, `/backtest/`, `/politician-tracker/`, static
 member pages, a future `/hsi-lab/`), plus `sitemap-news.xml` for `/news/YYYYMMDD/` editions.
 Editions from today or yesterday in Hong Kong also go in `news-sitemap.xml` (Google News,
@@ -270,8 +274,13 @@ has none, so the committed file wins. It must not append `X-Robots-Tag: noindex`
 `wrangler pages deploy`, ping IndexNow with `node scripts/ping-indexnow.mjs --site <deploy_dir>`.
 `404.html` must be in every upload. Without it, Pages treats the site as a single-page app and serves `index.html`
 with status 200 for unknown paths, including `/backtest/tests/`. `_redirects` only aliases
-`/backtesting` to `/backtest/`. The News Analyst merges the `/latest` redirect rules at upload
-time and does not write a root `index.html`.
+`/backtesting` to `/backtest/` and `www` to the apex. `/favicon.ico` is the same file as
+`assets/brand/favicon.ico`, so browsers that request the root icon get the real one. The News
+Analyst merges the `/latest` redirect rules at upload time and does not write a root `index.html`.
+
+Sitemap files are static XML written at assemble time. This repo has no Pages Function that
+could return 500 for them. Titles are XML-escaped, and characters XML 1.0 forbids are stripped,
+so a news title cannot make the document malformed. A direct fetch of `/sitemap.xml` returns 200.
 
 ## Disclaimer
 

@@ -30,6 +30,12 @@ class SeoTests(unittest.TestCase):
         self.assertIn('<meta property="og:image" content="https://adrnnng.com/assets/brand/og-image.png">', html)
         self.assertIn('<meta name="twitter:card" content="summary_large_image">', html)
         self.assertIn('name="description"', html)
+        self.assertIn('<meta property="og:locale" content="zh_HK">', html)
+        self.assertIn('<meta name="twitter:site" content="@adrnnng">', html)
+        self.assertIn('"@type":"Organization"', html)
+        self.assertIn('"@type":"WebSite"', html)
+        self.assertNotIn('SearchAction', html)
+        self.assertNotIn('FAQPage', html)
 
     def test_noindex_flag_still_emits_the_robots_meta(self):
         html = _page(True)
