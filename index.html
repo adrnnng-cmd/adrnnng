@@ -1,23 +1,23 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-Hant-HK">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>ADRRR · Adrian Ng</title>
-  <meta name="description" content="Adrian Ng. Morning Report, Politician Tracker, and a TD Sequential backtest.">
+  <title>港股美股盤前早報｜ADRRR News Lab</title>
+  <meta name="description" content="每日港美股晨報，爭取每朝 9 點前更新。ADRRR News Lab by Adrian Ng — 訂閱電郵，追蹤盤前重點、政治人物持股與回測工具。">
   <link rel="canonical" href="https://adrnnng.com/">
   <meta name="theme-color" content="#000000">
   <meta property="og:site_name" content="ADRRR">
-  <meta property="og:title" content="ADRRR · Adrian Ng">
-  <meta property="og:description" content="Adrian Ng. Morning Report, Politician Tracker, and a TD Sequential backtest.">
+  <meta property="og:title" content="港股美股盤前早報｜ADRRR News Lab">
+  <meta property="og:description" content="每日港美股晨報，爭取每朝 9 點前更新。ADRRR News Lab by Adrian Ng — 訂閱電郵，追蹤盤前重點、政治人物持股與回測工具。">
   <meta property="og:url" content="https://adrnnng.com/">
   <meta property="og:type" content="website">
   <meta property="og:image" content="https://adrnnng.com/assets/brand/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="ADRRR · Adrian Ng">
-  <meta name="twitter:description" content="Adrian Ng. Morning Report, Politician Tracker, and a TD Sequential backtest.">
+  <meta name="twitter:title" content="港股美股盤前早報｜ADRRR News Lab">
+  <meta name="twitter:description" content="每日港美股晨報，爭取每朝 9 點前更新。ADRRR News Lab by Adrian Ng — 訂閱電郵，追蹤盤前重點、政治人物持股與回測工具。">
   <meta name="twitter:image" content="https://adrnnng.com/assets/brand/og-image.png">
   <link rel="icon" href="/assets/brand/favicon.svg" type="image/svg+xml">
   <link rel="icon" href="/assets/brand/favicon.ico" sizes="any">
@@ -47,11 +47,15 @@
     </figure>
     <section class="cover wrap">
       <div class="cover-copy">
-        <p class="kicker" id="report-kicker">晨報摘要 <span class="sep">/</span> Morning Report</p>
-        <h1 id="report-lead"><a href="/news/">Today's Morning Report</a></h1>
-        <p class="dek" id="report-dek"></p>
-        <ol class="front-list" id="report-stories"></ol>
-        <p class="read"><a id="report-link" href="/news/">Read the report <span class="arrow">→</span></a></p>
+        <p class="kicker" id="report-kicker">每日簡報 <span class="sep">/</span> Daily Briefing <span class="sep">/</span> 2026年10月26日（一）</p>
+        <h1 id="report-lead"><a href="/news/20261026/">港股美股盤前早報</a></h1>
+        <p class="dek" id="report-dek">伊朗臨決斷；高盛砍韓股目標；周五美股續跌 周末地緣與 AI 交易：伊朗臨決斷；高盛砍韓股目標；周五美股續跌、油價創六個月高 早晨。周末焦點：川普稱伊朗問題臨近「決斷時刻」——達成協議或「了結」（finish it off）；高盛將 Kospi 12 個月目標下調 25% 至 9,000；中國股市約 3.5 萬億美元市值蒸發的熊市敘事延續。周五美股續跌：標普500 (S&amp;P 500) −0.5% 報 7,623.68、道指 (Dow) −1.2% 報 52,215.16、納指 (NASDAQ) −0.2% 報 25,955.34；布蘭特 (Brent) +3.1% 至約 116.72 美元創六個月高。本周聯儲會 (Fed)、歐洲央行 (ECB)、日本央行 (BOJ) 利率決議料按兵不動。</p>
+        <ol class="front-list" id="report-stories">
+          <li><span class="n">01</span><span>Watchlist 波幅：BUG、1682、2451、9926、RKLB 領漲；0147、USAR、LLY、2668 偏弱</span></li>
+          <li><span class="n">02</span><span>中國股市：盈利下沉令 3.5 萬億美元跌勢成陷阱；東山精密港股 IPO 約 99 億港元</span></li>
+          <li><span class="n">03</span><span>SpaceX 據稱完成 400 億美元 AI 晶片債務融資；本周三大央行決議</span></li>
+        </ol>
+        <p class="read"><a id="report-link" href="/news/20261026/">Read the report <span class="arrow">→</span></a></p>
       </div>
       <aside class="cover-rail">
         <figure class="signal-card" id="signal-card">
@@ -66,13 +70,36 @@
           <div class="sc-chart" id="sc-chart" role="img" aria-label="Candlestick chart"></div>
           <figcaption class="sc-foot"><span class="sc-src" id="sc-src">Yahoo Finance</span></figcaption>
         </figure>
-        <table class="mkt" id="report-markets"></table>
+        <table class="mkt" id="report-markets">
+          <tr><td class="n">標普500</td><td class="v">7,623.68</td><td class="c down">▼0.52%</td></tr>
+          <tr><td class="n">道指</td><td class="v">52,215.16</td><td class="c down">▼1.23%</td></tr>
+          <tr><td class="n">納指</td><td class="v">25,955.34</td><td class="c down">▼0.21%</td></tr>
+          <tr><td class="n">恒指</td><td class="v">23,093.37</td><td class="c up">▲0.69%</td></tr>
+          <tr><td class="n">日經225</td><td class="v">62,634.29</td><td class="c down">▼0.09%</td></tr>
+          <tr><td class="n">美債10年</td><td class="v">5.00%</td><td class="c up">▲0.7bp</td></tr>
+        </table>
       </aside>
     </section>
 
     <p class="nl-strip wrap"><a href="#newsletter">喜歡今日早報？每朝 9 點前免費送到你的信箱 →</a></p>
 
     <nav class="doors wrap" id="tools" aria-label="Sections"></nav>
+
+    <aside class="nl-card" id="newsletter" aria-labelledby="nl-heading">
+      <div class="nl-card-in">
+        <p class="nl-eye">ADRRR · NEWSLETTER</p>
+        <h2 id="nl-heading">每朝 9 點前，港美股早報直送信箱</h2>
+        <p class="nl-lead">ADRRR News Lab — 隔夜美股、港股盤前、經濟數據與異動股，5 分鐘掌握開市前重點。</p>
+        <form class="nl-form" action="https://buttondown.com/api/emails/embed-subscribe/adrrr" method="post">
+          <label class="nl-sr" for="nl-email">Email</label>
+          <input id="nl-email" class="nl-email" type="email" name="email" required autocomplete="email" inputmode="email" maxlength="200" placeholder="Email" spellcheck="false">
+          <input type="hidden" name="embed" value="1">
+          <button type="submit">免費訂閱</button>
+        </form>
+        <p class="nl-fine">免費 · 隨時取消 · 由 <a href="https://buttondown.com/adrrr">Buttondown</a> 寄送</p>
+        <p class="nl-disc">本報僅供參考，不構成投資建議</p>
+      </div>
+    </aside>
   </main>
 
   <footer data-site-footer></footer>

@@ -147,6 +147,7 @@ function urlset(urls) {
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${body}\n</urlset>\n`;
 }
 
+// Day pages are html lang="zh-Hant-HK". Google News gets the Traditional Chinese tag.
 function newsUrlset(urls) {
   const body = urls.map((u) => `  <url>
     <loc>${xmlEscape(u.loc)}</loc>
@@ -154,7 +155,7 @@ function newsUrlset(urls) {
     <news:news>
       <news:publication>
         <news:name>ADRRR Morning Report</news:name>
-        <news:language>en</news:language>
+        <news:language>zh-Hant</news:language>
       </news:publication>
       <news:publication_date>${u.lastmod}</news:publication_date>
       <news:title>${xmlEscape(u.title)}</news:title>

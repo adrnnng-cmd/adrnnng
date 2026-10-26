@@ -58,7 +58,10 @@ npm run verify:backtest   # engine vs an independent Python implementation on re
 npm run check        # registry, page wiring, local links/imports, reserved paths, price manifest
 ```
 
-The landing asks for `/news/latest.json` when the page loads. That file is published with the
+The landing ships a static cover in `index.html` (kicker, H1, dek, stories, and a link to the
+edition) so a no-JS fetch still shows the morning report. `assets/js/home.js` still replaces
+that cover from `/news/` or `/assets/news-preview.json` when JavaScript runs. The page also
+asks for `/news/latest.json` when it loads, for the lead photo. That file is published with the
 Morning Report and is not part of this repo. To preview the lead photo, copy the sample over
 that path and do not commit it (`npm run check` fails while `news/` exists):
 
@@ -226,15 +229,31 @@ node adrnnng/scripts/ping-indexnow.mjs --site /tmp/site || true      # after the
 ```
 
 `assemble-deploy.sh` copies the tracked site files (minus `.github/`, `scripts/`, tests, docs),
-then the News Analyst's folder into `news/`, then writes `/sitemap.xml` from the merged tree.
+then the News Analyst's folder into `news/`. It then rewrites `assets/news-preview.json` and
+the static home cover from the newest `news/YYYYMMDD/index.html` (href, kicker, dek, stories,
+markets, and `serp_hook`), and patches `news/index.html` with the archive meta description, a
+`<title>` aligned to the og:title (港股美股), and a static Buttondown card. It does not rewrite
+daily edition titles. Those already come from News Analyst: `serp_hook` in
+`digest/data/YYYY-MM-DD.json` (also `YYYYMMDD.json`), copied into the day-page
+`<title>` as `{serp_hook}｜{M}月{D}日港股美股盤前早報 — ADRRR`, with a dated fallback and no
+empty hook prefix when the field is missing. Pass that digest directory with
+`ADRRR_DIGEST_DIR` or place it at `../digest/data` next to this repo; otherwise the hook
+written into `news-preview.json` is taken from `news/latest.json`, a JSON sidecar, a
+`<meta name="serp_hook">` tag, or the edition `<title>`. An empty string is kept when the
+field is present but blank.
+
+The script then writes `/sitemap.xml` from the merged tree.
 That index lists every HTML page present (`/`, `/backtest/`, `/politician-tracker/`, static
 member pages, a future `/hsi-lab/`), plus `sitemap-news.xml` for `/news/YYYYMMDD/` editions.
-Editions from today or yesterday in Hong Kong also go in `news-sitemap.xml` (Google News), and
+Editions from today or yesterday in Hong Kong also go in `news-sitemap.xml` (Google News,
+`<news:language>zh-Hant</news:language>`), and
 the index includes that fragment only when one exists. `news/` is reserved: it is registered in
 `tools.json` with `owner: "news-analyst"`, and `npm run check` fails if the repo ever contains
 it. A hand upload of the repo checkout plus `news/` still works if you run
+`node scripts/home-preview.mjs --site <dir>` and
 `node scripts/build-sitemap.mjs --site <dir>` on that folder before Wrangler. The committed
-sitemap has no daily editions, because `news/` is not in the repo.
+sitemap has no daily editions, because `news/` is not in the repo. The committed
+`assets/news-preview.json` is only the fallback copy; every assemble overwrites the upload.
 
 The landing reads `news/latest.json` after load and uses `date`, `headline`, `summary`,
 `image_url`, `image_credit`, `source_name`, `source_url`, and `report_url`. `image_url` is the

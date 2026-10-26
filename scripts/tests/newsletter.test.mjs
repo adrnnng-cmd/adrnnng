@@ -46,6 +46,15 @@ test('homepage strip, shared card, and tracker card use the signup outside news/
   assert.match(home, /\/assets\/css\/newsletter\.css/);
   assert.match(home, /\/assets\/js\/site\.js/);
 
+  for (const html of [home, backtest]) {
+    assert.match(html, /id="newsletter"/);
+    assert.match(html, /action="https:\/\/buttondown\.com\/api\/emails\/embed-subscribe\/adrrr"/);
+    assert.match(html, /name="embed" value="1"/);
+    for (const line of [NEWSLETTER.eyebrow, NEWSLETTER.title, NEWSLETTER.body, NEWSLETTER.button, NEWSLETTER.disclaimer]) {
+      assert.ok(html.includes(line), line);
+    }
+  }
+
   for (const html of [backtest, template]) {
     assert.match(html, /\/assets\/css\/newsletter\.css/);
     assert.match(html, /data-site-footer/);

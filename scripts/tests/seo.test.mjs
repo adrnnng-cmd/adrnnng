@@ -70,6 +70,8 @@ test('sitemap index lists pages, member pages, hsi-lab, and news fragments', asy
       'https://adrnnng.com/news/20261022/',
     ]);
     assert.match(built.files['news-sitemap.xml'], /xmlns:news="http:\/\/www.google.com\/schemas\/sitemap-news\/0.9"/);
+    assert.match(built.files['news-sitemap.xml'], /<news:language>zh-Hant<\/news:language>/);
+    assert.doesNotMatch(built.files['news-sitemap.xml'], /<news:language>en<\/news:language>/);
     assert.match(built.files['news-sitemap.xml'], /<news:title>Today&apos;s Report<\/news:title>/);
     assert.match(built.files['news-sitemap.xml'], /<news:title>Yesterday<\/news:title>/);
     assert.match(built.files['sitemap-news.xml'], /<lastmod>2026-10-20<\/lastmod>/);
@@ -121,7 +123,22 @@ test('assemble-deploy writes the sitemap from the merged news tree', async () =>
     assert.match(pages, /https:\/\/adrnnng\.com\/politician-tracker\//);
     assert.match(editions, new RegExp(`/news/${today}/`));
     assert.match(recent, new RegExp(`<news:title>Edition ${today}</news:title>`));
+    assert.match(recent, /<news:language>zh-Hant<\/news:language>/);
+    assert.doesNotMatch(recent, /<news:language>en<\/news:language>/);
     assert.match(await readFile(join(out, '404.html'), 'utf8'), /noindex/);
+    const editionHtml = await readFile(join(out, 'news', today, 'index.html'), 'utf8');
+    assert.equal(editionHtml, `<html><head><title>Edition ${today}</title></head></html>`);
+    const preview = JSON.parse(await readFile(join(out, 'assets/news-preview.json'), 'utf8'));
+    assert.equal(preview.href, `/news/${today}/`);
+    assert.equal(preview.serp_hook, '');
+    assert.equal(typeof preview.serp_hook, 'string');
+    const home = await readFile(join(out, 'index.html'), 'utf8');
+    assert.match(home, new RegExp(`href="/news/${today}/"`));
+    assert.match(home, /港股美股盤前早報/);
+    const archive = await readFile(join(out, 'news/index.html'), 'utf8');
+    assert.match(archive, /name="description" content="ADRRR 港股美股晨報往期全文。每朝 9 點前更新；訂閱 Newsletter 收最新盤前摘要。"/);
+    assert.match(archive, /<title>[^<]*港股美股[^<]*<\/title>/);
+    assert.match(archive, /embed-subscribe\/adrrr/);
   } finally {
     await rm(news, { recursive: true, force: true });
     await rm(out, { recursive: true, force: true });
