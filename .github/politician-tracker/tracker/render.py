@@ -435,6 +435,20 @@ def render_page(cfg: dict, payload: dict, now: datetime) -> str:
         f'<meta name="twitter:title" content="{_e(title)}">\n'
         f'<meta name="twitter:description" content="{_e(description)}">\n'
         f'<meta name="twitter:image" content="{_e(image)}">\n'
+        '<meta property="og:locale" content="zh_HK">\n'
+        '<meta name="twitter:site" content="@adrnnng">\n'
+        '<script type="application/ld+json" id="adrnnng-breadcrumb">'
+        '{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":['
+        '{"@type":"ListItem","position":1,"name":"Home","item":"https://adrnnng.com/"},'
+        '{"@type":"ListItem","position":2,"name":"Politician Tracker","item":"https://adrnnng.com/politician-tracker/"}'
+        ']}</script>\n'
+        '<script type="application/ld+json" id="adrnnng-site">'
+        '{"@context":"https://schema.org","@graph":['
+        '{"@type":"Organization","@id":"https://adrnnng.com/#organization","name":"ADRRR","url":"https://adrnnng.com/",'
+        '"logo":{"@type":"ImageObject","url":"https://adrnnng.com/assets/brand/apple-touch-icon.png","width":180,"height":180}},'
+        '{"@type":"WebSite","@id":"https://adrnnng.com/#website","name":"ADRRR","url":"https://adrnnng.com/","inLanguage":"zh-Hant-HK",'
+        '"publisher":{"@id":"https://adrnnng.com/#organization"}}'
+        ']}</script>\n'
     )
     empty_hidden = " hidden" if trades else ""
     weekday = WEEKDAYS[today.weekday()]

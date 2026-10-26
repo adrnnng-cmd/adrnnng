@@ -79,7 +79,7 @@ function editionIso(compact) {
 }
 
 function xmlEscape(s) {
-  return String(s).replace(/[&<>'"]/g, (c) => ({
+  return String(s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g, '').replace(/[&<>'"]/g, (c) => ({
     '&': '&amp;',
     '<': '&lt;',
     '>': '&gt;',
@@ -105,6 +105,25 @@ function urlPath(rel) {
 function isNewsFile(rel) {
   return rel === 'news/index.html' || rel.startsWith('news/');
 }
+
+// Home and the news archive change when assemble publishes the morning-report preview.
+// Their lastmod is at least that edition date, even if the file mtime is still the
+// previous UTC day. Other pages keep their own mtime.
+export function readPreviewEditionDate(siteDir) {
+  const file = join(siteDir, 'assets', 'news-preview.json');
+  if (!existsSync(file)) return null;
+  try {
+    const data = JSON.parse(readFileSync(file, 'utf8'));
+    const href = typeof data.href === 'string' ? data.href : '';
+    const m = /^\/news\/(\d{8})\/$/.exec(href);
+    if (!m) return null;
+    return editionIso(m[1]);
+  } catch {
+    return null;
+  }
+}
+
+const PREVIEW_PATHS = new Set(['/', '/news/']);
 
 /**
  * @returns {{ pages: object[], news: object[], recent: object[] }}
@@ -136,6 +155,12 @@ export function collectPages(siteDir, { now } = {}) {
     // Morning Report markup is owned by the News Analyst. List the pages either way.
     if (!isNewsFile(file.rel) && isNoindexHtml(html)) continue;
     pages.push({ locPath: urlPath(file.rel), lastmod: lastmodOf(file.mtime) });
+  }
+  const previewDate = readPreviewEditionDate(siteDir);
+  if (previewDate) {
+    for (const page of pages) {
+      if (PREVIEW_PATHS.has(page.locPath) && page.lastmod < previewDate) page.lastmod = previewDate;
+    }
   }
   pages.sort((a, b) => (a.locPath === '/' ? -1 : b.locPath === '/' ? 1 : a.locPath.localeCompare(b.locPath)));
   news.sort((a, b) => a.locPath.localeCompare(b.locPath));

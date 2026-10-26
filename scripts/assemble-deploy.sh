@@ -56,7 +56,7 @@ fi
 
 # Home cover + news-preview.json from the newest edition in this upload, so the
 # committed preview cannot lag /news/YYYYMMDD/. Archive meta, title, and the
-# static newsletter card are patched on news/index.html. Edition HTML is not written.
+# static newsletter card are patched on news/index.html. Edition titles are not written.
 digest_args=()
 if [ -n "${ADRRR_DIGEST_DIR:-}" ] && [ -d "$ADRRR_DIGEST_DIR" ]; then
   digest_args=(--digest "$ADRRR_DIGEST_DIR")
@@ -65,9 +65,17 @@ elif [ -d "$root/../digest/data" ]; then
 fi
 node "$root/scripts/home-preview.mjs" --site "$out" "${digest_args[@]}"
 
+# Organization + WebSite JSON-LD, locale, twitter:site, breadcrumbs, publisher.logo,
+# and article:published_time. Does not rewrite day-page titles or headlines.
+node "$root/scripts/seo-meta.mjs" --site "$out"
+
+# /news/feed.xml from the edition HTML in this upload. No items are invented.
+node "$root/scripts/news-feed.mjs" --site "$out"
+
 # Sitemap index from the files actually being uploaded, including news/YYYYMMDD/
-# editions and any new section such as hsi-lab/. Overwrites a sitemap copied
-# from git so the upload is not stuck on the repo's news-less copy.
+# editions and any new section such as hsi-lab/. Home and /news/ lastmod are at
+# least the preview edition date. Overwrites a sitemap copied from git so the
+# upload is not stuck on the repo's news-less copy.
 node "$root/scripts/build-sitemap.mjs" --site "$out"
 echo "indexnow: after wrangler pages deploy, run: node \"$root/scripts/ping-indexnow.mjs\" --site \"$out\""
 

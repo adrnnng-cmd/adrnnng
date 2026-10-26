@@ -151,10 +151,14 @@ const llmsPath = join(ROOT, 'llms.txt');
 if (!existsSync(llmsPath)) err('llms.txt missing');
 else {
   const llms = readFileSync(llmsPath, 'utf8');
-  for (const needle of ['Backtest', 'Politician Tracker', 'Morning Report', '/hsi-lab/']) {
+  for (const needle of ['Backtest', 'Politician Tracker', 'Morning Report', '/hsi-lab/', '/news/feed.xml', 'no site search']) {
     if (!llms.includes(needle)) err(`llms.txt must mention ${needle}`);
   }
 }
+const brandIcon = join(ROOT, 'assets/brand/favicon.ico');
+const rootIcon = join(ROOT, 'favicon.ico');
+if (!existsSync(rootIcon) || !existsSync(brandIcon)) err('favicon.ico missing at / or /assets/brand/favicon.ico');
+else if (!readFileSync(rootIcon).equals(readFileSync(brandIcon))) err('favicon.ico must match assets/brand/favicon.ico');
 const indexable = [
   ['index.html', 'https://adrnnng.com/'],
   ['backtest/index.html', 'https://adrnnng.com/backtest/'],
@@ -174,6 +178,12 @@ for (const [file, canonical] of indexable) {
   for (const name of ['twitter:card', 'twitter:title', 'twitter:description', 'twitter:image']) {
     if (!html.includes(`name="${name}"`)) err(`${file}: missing ${name}`);
   }
+  if (!html.includes('property="og:locale" content="zh_HK"')) err(`${file}: missing og:locale zh_HK`);
+  if (!html.includes('name="twitter:site" content="@adrnnng"')) err(`${file}: missing twitter:site @adrnnng`);
+  if (!html.includes('id="adrnnng-site"') || !html.includes('"@type":"Organization"') || !html.includes('"@type":"WebSite"')) {
+    err(`${file}: missing Organization and WebSite JSON-LD`);
+  }
+  if (/SearchAction|FAQPage/.test(html)) err(`${file}: must not add SearchAction or FAQPage`);
   if (/\bnoindex\b/i.test(html)) err(`${file}: must not set noindex`);
 }
 if (new Set(titles.filter(Boolean)).size !== titles.filter(Boolean).length) err(`page titles must be unique: ${titles.join(' | ')}`);

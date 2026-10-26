@@ -57,6 +57,9 @@
 /news/*
   ! X-Robots-Tag
 
+/news/feed.xml
+  Content-Type: application/rss+xml; charset=utf-8
+
 /robots.txt
   ! X-Robots-Tag
 

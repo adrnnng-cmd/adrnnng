@@ -2,7 +2,7 @@
 
 > Adrian Ng's trading and investing site. Morning Report, a congressional-trading tracker, and a TD Sequential backtest. Research and education, not investment advice.
 
-The public site is https://adrnnng.com. Pages are static HTML on Cloudflare Pages. Crawlers may fetch every public URL. `/api/` is not a public page. Discovery files: `/robots.txt` and `/sitemap.xml` (a sitemap index). Daily Morning Report editions are `/news/YYYYMMDD/`.
+The public site is https://adrnnng.com. Pages are static HTML on Cloudflare Pages. Crawlers may fetch every public URL. `/api/` is not a public page. There is no site search. Discovery files: `/robots.txt`, `/sitemap.xml` (a sitemap index), and `/news/feed.xml` (RSS for Morning Report editions). Daily Morning Report editions are `/news/YYYYMMDD/`.
 
 ## Sections
 
@@ -10,10 +10,12 @@ The public site is https://adrnnng.com. Pages are static HTML on Cloudflare Page
 - [Backtest](https://adrnnng.com/backtest/): Run TD Sequential Setup 9 / Countdown 13 on daily history for US, Hong Kong, and crypto tickers. The chart, profit curve, and statistics run in the browser on the site's price files.
 - [Politician Tracker](https://adrnnng.com/politician-tracker/): STOCK Act disclosures from a VIP list of members of Congress, plus any member's trade in a Watchlist ticker. Refreshed about 07:05 HKT. Members are listed on this one page; there is no separate URL per member unless a static member page is published later.
 - [Morning Report](https://adrnnng.com/news/): The daily market briefing, published around 08:15 HKT, and its archive. Each edition is `/news/YYYYMMDD/`.
+- [Morning Report RSS](https://adrnnng.com/news/feed.xml): One item per edition that exists under `/news/YYYYMMDD/`. Titles, links, and descriptions come from those pages. A publish time is included only when the page already has one.
 
 Strategy Lab (`/hsi-lab/`) is the Hang Seng strategy lab. It is not published yet. Once `hsi-lab/index.html` is on the site, the sitemap builder includes it with the other sections.
 
 ## Discovery
 
 - [Sitemap index](https://adrnnng.com/sitemap.xml): Points at the page sitemap and, when editions exist, the news archive sitemap. A Google News sitemap is added for editions from today or yesterday in Hong Kong.
+- [RSS](https://adrnnng.com/news/feed.xml): Morning Report editions only. Written when the site is assembled with `news/`.
 - [robots.txt](https://adrnnng.com/robots.txt): Allows all crawlers, names the major search and AI crawlers, and disallows `/api/`.
