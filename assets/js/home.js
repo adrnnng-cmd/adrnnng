@@ -104,7 +104,7 @@ async function bootCover() {
 function paintReport(r) {
   const kicker = document.getElementById('report-kicker');
   if (r.kicker) kicker.innerHTML = r.kicker.split(/\s*\/\s*/).filter(Boolean).map(esc).join('<span class="sep">/</span>');
-  document.getElementById('report-lead').innerHTML = `<a href="${esc(r.href || '/news/')}">${esc(r.lead || "Today's Morning Report")}</a>`;
+  document.getElementById('report-lead').innerHTML = `<a href="${esc(r.href || '/news/')}">${esc(r.lead || r.serp_hook || '港股美股盤前早報')}</a>`;
   document.getElementById('report-dek').textContent = r.dek || '';
   document.getElementById('report-link').href = r.href || '/news/';
   document.getElementById('report-stories').innerHTML = (r.stories || [])

@@ -1,2 +1,4 @@
+https://www.adrnnng.com/* https://adrnnng.com/:splat 301
+http://www.adrnnng.com/* https://adrnnng.com/:splat 301
 /backtesting/* /backtest/:splat 301
 /backtesting /backtest/ 301

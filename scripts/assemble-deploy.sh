@@ -7,6 +7,8 @@
 # (.github/, scripts/, tests, docs, package.json), then copies <news_dir> into <out_dir>/news/.
 # Fails if the repo itself contains news/ (that path belongs to the News Analyst).
 # Writes sitemap.xml from the merged tree (pages, /news/YYYYMMDD/ editions, and any new section).
+# Rewrites assets/news-preview.json and the home cover from the newest edition.
+# Does not rewrite daily edition titles (News Analyst owns serp_hook → <title>).
 #
 # Then:  npx wrangler pages deploy <out_dir> --project-name adrnnng --branch main
 # A Pages direct upload replaces the whole deployment, so always upload the merged folder,
@@ -51,6 +53,17 @@ if [ ! -f "$out/404.html" ]; then
   echo "error: 404.html is missing from the upload; Pages would serve index.html with status 200" >&2
   exit 1
 fi
+
+# Home cover + news-preview.json from the newest edition in this upload, so the
+# committed preview cannot lag /news/YYYYMMDD/. Archive meta, title, and the
+# static newsletter card are patched on news/index.html. Edition HTML is not written.
+digest_args=()
+if [ -n "${ADRRR_DIGEST_DIR:-}" ] && [ -d "$ADRRR_DIGEST_DIR" ]; then
+  digest_args=(--digest "$ADRRR_DIGEST_DIR")
+elif [ -d "$root/../digest/data" ]; then
+  digest_args=(--digest "$root/../digest/data")
+fi
+node "$root/scripts/home-preview.mjs" --site "$out" "${digest_args[@]}"
 
 # Sitemap index from the files actually being uploaded, including news/YYYYMMDD/
 # editions and any new section such as hsi-lab/. Overwrites a sitemap copied
