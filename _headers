@@ -2,17 +2,24 @@
 /backtest/data/*
   Cache-Control: public, max-age=1800, must-revalidate
 
+# Public registry the page fetches. `!` clears a publish.sh `/*` noindex
+# before this value is set, so the two do not join. The fetch stays open.
 /assets/tools.json
   Cache-Control: public, max-age=300
+  ! X-Robots-Tag
+  X-Robots-Tag: noindex, nofollow
 
 /assets/vendor/*
   Cache-Control: public, max-age=604800
 
 # Indexing.
-# Cloudflare joins X-Robots-Tag from every matching rule with a comma, and a
-# joined value that still contains noindex blocks the URL. Detach the header
-# on public pages so a publish.sh `/*` noindex rule cannot stick. Do not set
-# a second X-Robots-Tag here. /api keeps noindex. publish.sh must stop
+# Cloudflare applies every matching rule in file order. A repeated
+# X-Robots-Tag is joined with a comma, and a joined value that still contains
+# noindex blocks the URL. `! X-Robots-Tag` removes what earlier rules attached;
+# it does not remove a value a later rule sets. Detach on public HTML so a
+# publish.sh `/*` noindex rule above these lines cannot stick. Do not set
+# X-Robots-Tag on the detach rules themselves. /api keeps noindex. The JSON
+# rules at the bottom set noindex after these detaches. publish.sh must stop
 # emitting `/*` + `X-Robots-Tag: noindex, nofollow`.
 
 /
@@ -88,4 +95,15 @@
   X-Robots-Tag: noindex, nofollow
 
 /api/*
+  X-Robots-Tag: noindex, nofollow
+
+# Browser JSON under the detach globs above. Keep these rules below
+# /politician-tracker/* and /news/*. A later matching `!` would delete this
+# header. HTML under those trees does not match these paths.
+/politician-tracker/data.json
+  ! X-Robots-Tag
+  X-Robots-Tag: noindex, nofollow
+
+/news/latest.json
+  ! X-Robots-Tag
   X-Robots-Tag: noindex, nofollow

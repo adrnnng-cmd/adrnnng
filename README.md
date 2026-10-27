@@ -19,7 +19,7 @@ index.html                     landing page
 robots.txt                     crawlers allowed; /api/ disallowed; sitemap pointer
 llms.txt                       section guide for AI crawlers
 sitemap.xml                    sitemap index (regenerated for the upload)
-_headers                       cache rules; X-Robots-Tag noindex on /api/* only
+_headers                       cache rules; X-Robots-Tag noindex on /api/* and browser JSON
 assets/
   tools.json                   TOOL REGISTRY: drives the header nav, footer and landing cards
   css/theme.css                design system (tokens + components) shared by every tool
@@ -270,8 +270,12 @@ This repo owns the site root outside `news/`: `index.html`, `404.html`, `robots.
 the IndexNow key file, `_headers`, `_redirects`, `assets/`, `backtest/` (without `backtest/tests/`),
 and `politician-tracker/`. `publish.sh` still writes a `Disallow: /` robots.txt only when the repo
 has none, so the committed file wins. It must not append `X-Robots-Tag: noindex` on `/*`;
-`_headers` detaches that header on public pages and sets it only for `/api/`. After
-`wrangler pages deploy`, ping IndexNow with `node scripts/ping-indexnow.mjs --site <deploy_dir>`.
+`_headers` detaches that header on public HTML and sets it for `/api/` plus
+`/politician-tracker/data.json`, `/news/latest.json`, and `/assets/tools.json`.
+Those JSON rules stay below the `/news/*` and `/politician-tracker/*` detaches:
+Cloudflare applies `_headers` in file order, and a later `!` would remove the
+noindex. After `wrangler pages deploy`, ping IndexNow with
+`node scripts/ping-indexnow.mjs --site <deploy_dir>`.
 `404.html` must be in every upload. Without it, Pages treats the site as a single-page app and serves `index.html`
 with status 200 for unknown paths, including `/backtest/tests/`. `_redirects` only aliases
 `/backtesting` to `/backtest/` and `www` to the apex. `/favicon.ico` is the same file as
