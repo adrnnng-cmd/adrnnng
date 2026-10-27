@@ -105,15 +105,6 @@
         </div>
         <div class="run-badges" id="run-badges"></div>
       </div>
-      <section class="assumptions" id="assumptions" aria-label="Assumptions in force">
-        <p class="assumptions-kicker">Assumptions</p>
-        <p class="assumptions-line" id="assumptions-line">Historical fills only. Signal on the close, fill at the next open. Not a live order.</p>
-        <dl>
-          <div class="assumptions-row"><dt>Costs</dt><dd id="assumptions-cost">Commission 5 bps and slippage 5 bps each side. 0 is off.</dd></div>
-          <div class="assumptions-row"><dt>Session</dt><dd id="assumptions-session">Not in force on this run.</dd></div>
-          <div class="assumptions-row"><dt>Data</dt><dd id="assumptions-data">Daily OHLCV, split-adjusted. Weekly and monthly bars are built from the daily bars.</dd></div>
-        </dl>
-      </section>
       <div id="notices"></div>
 
       <div class="chart-stack">
@@ -199,6 +190,15 @@
   </div>
 
   <section class="bt-below">
+    <section class="assumptions" id="assumptions" aria-label="Assumptions">
+      <p class="assumptions-kicker">Assumptions</p>
+      <p class="assumptions-line" id="assumptions-line">Historical fills only. Signal on the close, fill at the next open. Not a live order.</p>
+      <dl>
+        <div class="assumptions-row"><dt>Costs</dt><dd id="assumptions-cost">Commission 5 bps and slippage 5 bps each side. 0 is off.</dd></div>
+        <div class="assumptions-row"><dt>Session</dt><dd id="assumptions-session">Not in force on this run.</dd></div>
+        <div class="assumptions-row"><dt>Data</dt><dd id="assumptions-data">Daily OHLCV, split-adjusted. Weekly and monthly bars are built from the daily bars.</dd></div>
+      </dl>
+    </section>
     <details class="panel method" id="method">
       <summary><h2 class="panel-title">Methodology &amp; data</h2><span class="panel-sub">Fills, costs, session, and every metric</span></summary>
       <div class="panel-body method-body">

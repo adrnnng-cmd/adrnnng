@@ -54,9 +54,11 @@ test('the page shows assumptions, session rules, and a readable chart scale', ()
   assert.match(html, /Clock state fills at the clock bar’s open/);
   assert.match(html, /8 on a 1-minute exit and 6 on a 5-minute, 30-minute, or 1-hour exit/);
   assert.doesNotMatch(html, /\b15m\b/);
-  const strip = html.slice(html.indexOf('id="assumptions"'), html.indexOf('id="notices"'));
+  const strip = html.slice(html.indexOf('id="assumptions"'), html.indexOf('id="method"'));
   assert.doesNotMatch(strip, /they mean/);
   assert.doesNotMatch(strip, /Clock state fills/);
+  assert.ok(html.indexOf('id="notices"') < html.indexOf('id="assumptions"'));
+  assert.ok(html.indexOf('id="assumptions"') < html.indexOf('id="method"'));
   assert.doesNotMatch(html, /BTST/);
   assert.doesNotMatch(html, /plug in here later/);
   assert.doesNotMatch(html, /load in the browser/);
