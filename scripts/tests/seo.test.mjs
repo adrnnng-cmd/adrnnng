@@ -23,6 +23,7 @@ async function fixture() {
     'politician-tracker/img/note.html': '<html><head><title>skip portrait dir</title></head></html>',
     'hsi-lab/index.html': '<html><head><title>Strategy Lab</title></head></html>',
     'api/index.html': '<html><head><title>API</title></head></html>',
+    'thanks/index.html': '<html><head><meta name="robots" content="noindex, nofollow"><title>訂閱成功</title></head></html>',
     'draft/index.html': '<html><head><meta content="noindex,nofollow" name="robots"><title>Draft</title></head></html>',
     'news/index.html': '<html><head><meta name="robots" content="noindex"><title>Archive</title></head></html>',
     'news/20261020/index.html': '<html><head><title>Older &amp; still listed</title></head></html>',
@@ -76,6 +77,7 @@ test('sitemap index lists pages, member pages, hsi-lab, and news fragments', asy
     assert.match(built.files['news-sitemap.xml'], /<news:title>Yesterday<\/news:title>/);
     assert.match(built.files['sitemap-news.xml'], /<lastmod>2026-10-20<\/lastmod>/);
     assert.doesNotMatch(built.files['sitemap-pages.xml'], /\/api\//);
+    assert.doesNotMatch(built.files['sitemap-pages.xml'], /\/thanks/);
     assert.doesNotMatch(built.files['sitemap-pages.xml'], /draft/);
     assert.equal(isNoindexHtml('<meta content="noindex" name="robots">'), true);
     assert.equal(isNoindexHtml('<meta name="robots" content="index,follow">'), false);
@@ -121,6 +123,7 @@ test('assemble-deploy writes the sitemap from the merged news tree', async () =>
     assert.match(pages, /https:\/\/adrnnng\.com\/news\//);
     assert.match(pages, /https:\/\/adrnnng\.com\/backtest\//);
     assert.match(pages, /https:\/\/adrnnng\.com\/politician-tracker\//);
+    assert.doesNotMatch(pages, /\/thanks/);
     assert.match(editions, new RegExp(`/news/${today}/`));
     assert.match(recent, new RegExp(`<news:title>Edition ${today}</news:title>`));
     assert.match(recent, /<news:language>zh-Hant<\/news:language>/);
@@ -164,6 +167,8 @@ test('changed paths become public URLs and IndexNow submits the new ones', async
     'hsi-lab/app.js',
     'README.md',
     'assets/css/theme.css',
+    'thanks/index.html',
+    '404.html',
   ]), [
     'https://adrnnng.com/hsi-lab/',
     'https://adrnnng.com/news/',
@@ -243,6 +248,13 @@ test('committed indexing files allow public pages and keep /api private', async 
   for (const path of ['/', '/politician-tracker/', '/politician-tracker/index.html', '/news/', '/news/20261022/', '/backtest/', '/robots.txt']) {
     assert.equal(applyHeaders(headers, path).get('x-robots-tag'), null, path);
   }
+  for (const path of ['/thanks', '/thanks/', '/thanks/index.html']) {
+    assert.equal(applyHeaders(headers, path).get('x-robots-tag'), 'noindex, nofollow', path);
+  }
+  const prepended = `/*\n  X-Robots-Tag: noindex, nofollow\n${headers}`;
+  assert.equal(applyHeaders(prepended, '/').get('x-robots-tag'), null);
+  assert.equal(applyHeaders(prepended, '/thanks').get('x-robots-tag'), 'noindex, nofollow');
+  assert.equal(applyHeaders(prepended, '/news/20261022/').get('x-robots-tag'), null);
   assert.equal(applyHeaders(headers, '/assets/tools.json').get('cache-control'), 'public, max-age=300');
   assert.equal(applyHeaders(headers, '/news/feed.xml').get('content-type'), 'application/rss+xml; charset=utf-8');
 

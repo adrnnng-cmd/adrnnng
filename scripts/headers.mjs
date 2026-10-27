@@ -109,8 +109,10 @@ export function applyHeaders(text, pathname) {
   return headers;
 }
 
+const PRIVATE_HTML = ['/api', '/api/', '/api/*', '/thanks', '/thanks/', '/thanks/*'];
+
 function isAllowedNoindex(path) {
-  return path === '/api' || path === '/api/' || path === '/api/*' || JSON_NOINDEX.includes(path);
+  return PRIVATE_HTML.includes(path) || JSON_NOINDEX.includes(path);
 }
 
 function robotsTag(text, pathname) {
@@ -132,6 +134,12 @@ function checkResolved(text, errors, label) {
   for (const path of ['/api/health']) {
     const value = robotsTag(text, path);
     if (!value || !/noindex/i.test(value)) errors.push(`_headers: ${path} resolves without noindex${label}`);
+  }
+  for (const path of ['/thanks', '/thanks/', '/thanks/index.html']) {
+    const value = robotsTag(text, path);
+    if (value !== 'noindex, nofollow') {
+      errors.push(`_headers: ${path} resolves X-Robots-Tag to ${value || '(absent)'}${label}, want noindex, nofollow`);
+    }
   }
   const feed = applyHeaders(text, '/news/feed.xml').get('content-type');
   if (feed !== 'application/rss+xml; charset=utf-8') {
@@ -163,7 +171,7 @@ export function indexingHeaderErrors(text, { keyFile } = {}) {
       }
     }
   }
-  for (const path of ['/api', '/api/', '/api/*', ...JSON_NOINDEX]) {
+  for (const path of [...PRIVATE_HTML, ...JSON_NOINDEX]) {
     const rule = rules.find((r) => r.path === path);
     const setsNoindex = rule?.headers.some((h) => !h.detach && h.name.toLowerCase() === 'x-robots-tag' && /noindex/i.test(h.value));
     if (!setsNoindex) errors.push(`_headers: ${path} must set X-Robots-Tag: noindex, nofollow`);
