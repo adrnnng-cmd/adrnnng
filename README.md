@@ -201,9 +201,16 @@ The optional cost field subtracts a flat number of points per closed trade. Unti
 ### Strategies included
 
 Daily equities keep TD Sequential. ATR SuperTrend is the same kind of plug-in: it emits a direction
-and leaves clocks, confirm, and session flatten to `composition/`. The first selectable recipe is
+and leaves clocks, confirm, and session flatten to `composition/`. Both are choices in the Strategy
+select. The composition row (entry, exit, clock, after the flip, confirm, session, year or custom
+From–To, plus Entry ATR / Exit ATR when the study has an ATR length) is on the page for every
+strategy. A slot that does not change that run is disabled, with the reason on the control and in
+the row hint. TD Sequential on daily, weekly, and monthly bars uses By year and From–To. Clock,
+exit, confirm, flatten, and point cost apply to HSI futures 1-minute and 5-minute ATR SuperTrend,
+which reads the stored matrix and does not run the minute tape. The first selectable recipe is
 SuperTrend Fast Response (ATR 10, factor 2.5, smoothing 2, 5-minute clock at 09:30, re-enter, flatten
 at the day-session close). A second recipe adds a daily SuperTrend confirm as a separate signal.
+That confirm is not in the stored results.
 
 | id | Rule |
 | --- | --- |

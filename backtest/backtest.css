@@ -23,6 +23,9 @@
 .cmd-actions { display: flex; gap: 8px; padding-bottom: 1px; }
 .bt-compose { border-top: 1px solid var(--line); padding-top: 10px; }
 .bt-compose[hidden] { display: none; }
+.bt-compose .is-off > span,
+.bt-compose .is-off > .field-label,
+.bt-compose .check.is-off { color: var(--faint); }
 .cmd-recipe { width: min(260px, 100%); }
 .compose-hint { flex: 1 1 220px; margin: 0; color: var(--faint); font-size: 12px; line-height: 1.45; align-self: center; }
 .seg button:disabled,

@@ -9,6 +9,7 @@ import { runBacktest, DEFAULT_OPTIONS } from './engine/backtest.js';
 import { periodReturns } from './engine/metrics.js';
 import { compose } from './composition/index.js';
 import { RECIPES, getRecipe, defaultCostPoints } from './composition/recipes.js';
+import { compositionSlots, periodAvailability, supportedTimeframe } from './composition/slots.js';
 import { HSI_FUTURES, TIMEFRAME_CHOICES, isHsiFutures, isIntradayTimeframe, timeframeChoices, lockedSymbol } from './symbols.js';
 import { BacktestCharts } from './charts.js';
 import { esc } from '/assets/js/site.js';
@@ -115,6 +116,7 @@ function readHash() {
     }
   }
   if (has('tf') && TIMEFRAME_CHOICES.some((t) => t.id === get('tf'))) state.tf = get('tf');
+  state.tf = supportedTimeframe(getStrategy(state.strategy), state.tf);
   if (has('xtf') && EXIT_TFS.some((t) => t.id === get('xtf'))) state.exitTf = get('xtf');
   if (has('entry') && ENTRY_RULES.some((r) => r.id === get('entry'))) state.entryRule = get('entry');
   if (has('exit') && EXIT_RULES.some((r) => r.id === get('exit'))) state.exitRule = get('exit');
@@ -152,20 +154,20 @@ function writeHash() {
   const def = defaultParams(s);
   for (const [k, v] of Object.entries(state.params)) if (v !== def[k]) h.set(`p.${k}`, typeof v === 'boolean' ? (v ? '1' : '0') : String(v));
   h.set('tf', state.tf);
-  if (showCompose()) {
-    if (state.recipe) h.set('recipe', state.recipe);
-    if (isIntradayTimeframe(state.tf)) {
-      h.set('xtf', state.exitTf);
-      h.set('entry', state.entryRule);
-      h.set('exit', state.exitRule);
-      if (state.entryRule !== 'flip') h.set('clock', state.clock);
-      if (state.confirm !== 'none') h.set('confirm', state.confirm);
-      h.set('session', state.sessionMode);
-      if (state.sessionMode === 'year') h.set('year', state.year);
-      if (!state.flattenEod) h.set('flat', '0');
-      if (state.costTouched || state.costPoints !== defaultCostPoints(state.exitTf)) h.set('cost', String(state.costPoints));
-      if (state.exitTf !== state.tf) h.set('xatr', String(state.exitAtr));
-    }
+  if (state.recipe) h.set('recipe', state.recipe);
+  if (state.sessionMode === 'year') {
+    h.set('session', 'year');
+    h.set('year', state.year);
+  }
+  if (matrixActive()) {
+    h.set('xtf', state.exitTf);
+    h.set('entry', state.entryRule);
+    h.set('exit', state.exitRule);
+    if (state.entryRule !== 'flip') h.set('clock', state.clock);
+    if (state.confirm !== 'none') h.set('confirm', state.confirm);
+    if (!state.flattenEod) h.set('flat', '0');
+    if (state.costTouched || state.costPoints !== defaultCostPoints(state.exitTf)) h.set('cost', String(state.costPoints));
+    if (state.exitTf !== state.tf) h.set('xatr', String(state.exitAtr));
   }
   if (state.preset !== 'custom' && state.preset !== 'year') h.set('range', state.preset);
   h.set('from', state.from);
@@ -207,14 +209,16 @@ function buildStaticControls() {
     state.recipe = '';
     state.params = defaultParams(getStrategy(state.strategy));
     state.exitAtr = state.params.atrLength ?? state.exitAtr;
-    if (!isIntradayTimeframe(state.tf)) state.sessionMode = 'dates';
+    const nextTf = supportedTimeframe(getStrategy(state.strategy), state.tf);
+    if (isIntradayTimeframe(state.tf) && !isIntradayTimeframe(nextTf)) state.sessionMode = 'dates';
+    state.tf = nextTf;
     buildParams();
     syncCompose();
     schedule();
   });
   $('timeframe').addEventListener('click', async (e) => {
     const b = e.target.closest('button');
-    if (!b) return;
+    if (!b || b.dataset.block === '1') return;
     const tf = b.dataset.v;
     const lock = lockedSymbol(tf);
     const prevSymbol = state.symbol;
@@ -232,7 +236,7 @@ function buildStaticControls() {
   });
   $('exit-tf').addEventListener('click', async (e) => {
     const b = e.target.closest('button');
-    if (!b) return;
+    if (!b || b.dataset.block === '1') return;
     state.exitTf = b.dataset.v;
     state.recipe = '';
     applySessionCost();
@@ -415,12 +419,17 @@ function syncProviderUi() {
   $('file-field').hidden = p.kind !== 'file';
 }
 
-function showCompose() {
-  return Boolean(getStrategy(state.strategy).capabilities?.session);
+function matrixActive() {
+  return compositionSlots(getStrategy(state.strategy), {
+    symbol: state.symbol,
+    timeframe: state.tf,
+    exitTimeframe: state.exitTf,
+    entryRule: state.entryRule,
+  }).matrix;
 }
 
 function sessionActive() {
-  return showCompose() && isIntradayTimeframe(state.tf) && isHsiFutures(state.symbol);
+  return matrixActive();
 }
 
 function wantsHsiLookup() {
@@ -493,15 +502,26 @@ function applyRecipe(id, { silent = false } = {}) {
   if (!silent) syncCompose();
 }
 
-function renderTimeframes() {
+function renderTimeframes(slots) {
   const choices = timeframeChoices(state.symbol);
   $('timeframe').innerHTML = choices
-    .map((t) => `<button type="button" data-v="${t.id}" ${t.disabled ? 'aria-disabled="true"' : ''} title="${esc(t.reason || t.label)}">${t.label}</button>`)
+    .map((t) => {
+      const avail = periodAvailability(getStrategy(state.strategy), state.symbol, t.id);
+      const disabled = t.disabled || avail.disabled;
+      const reason = avail.block ? avail.reason : t.reason || avail.reason || t.label;
+      const block = avail.block ? ' data-block="1"' : '';
+      return `<button type="button" data-v="${t.id}" ${disabled ? 'aria-disabled="true"' : ''}${block} title="${esc(reason)}">${t.label}</button>`;
+    })
     .join('');
-  const exitLocked = !isHsiFutures(state.symbol);
+  const exitOff = !slots.exitTf.enabled;
   $('exit-tf').innerHTML = EXIT_TFS
-    .map((t) => `<button type="button" data-v="${t.id}" ${exitLocked ? 'aria-disabled="true"' : ''} title="${esc(exitLocked ? '1-minute and 5-minute bars are only available for HSI futures' : t.label)}">${t.label}</button>`)
+    .map((t) => `<button type="button" data-v="${t.id}" ${exitOff ? 'aria-disabled="true" data-block="1"' : ''} title="${esc(exitOff ? slots.exitTf.reason : t.label)}">${t.label}</button>`)
     .join('');
+  const exitField = $('exit-tf').closest('.field');
+  if (exitField) {
+    exitField.title = slots.exitTf.reason || '';
+    exitField.classList.toggle('is-off', exitOff);
+  }
 }
 
 function renderSymbols() {
@@ -527,30 +547,46 @@ function applySessionCost() {
   state.costPoints = defaultCostPoints(state.exitTf);
 }
 
+function applySlot(id, slot) {
+  const el = $(id);
+  if (!el || !slot) return;
+  el.disabled = !slot.enabled;
+  el.title = slot.reason || '';
+  const field = el.closest('.field, .check');
+  if (!field) return;
+  field.hidden = Boolean(slot.hidden);
+  field.title = slot.reason || '';
+  field.classList.toggle('is-off', !slot.enabled);
+}
+
 function syncCompose() {
-  const on = showCompose();
+  const slots = compositionSlots(getStrategy(state.strategy), {
+    symbol: state.symbol,
+    timeframe: state.tf,
+    exitTimeframe: state.exitTf,
+    entryRule: state.entryRule,
+  });
   ensureYears();
-  $('compose-row').hidden = !on;
+  $('compose-row').hidden = false;
   $('st-wrap').hidden = state.strategy !== 'atr-supertrend';
-  $('tf-label').textContent = on ? 'Entry' : 'Period';
-  renderTimeframes();
+  $('tf-label').textContent = slots.matrix ? 'Entry' : 'Period';
+  renderTimeframes(slots);
   if (symbols.length) renderSymbols();
-  const session = sessionActive();
+  const session = slots.matrix;
   if (session) applySessionCost();
-  const hasAtr = getStrategy(state.strategy).params.some((p) => p.key === 'atrLength');
-  $('entry-atr-field').hidden = !hasAtr;
-  for (const id of ['entry-rule', 'exit-rule', 'clock', 'confirm', 'flatten', 'cost-points']) {
-    const el = $(id);
-    if (el) el.disabled = !session;
-  }
-  $('recipe').disabled = !on;
-  $('entry-atr').disabled = !on || !hasAtr;
-  $('year').disabled = !on;
-  $('clock-field').hidden = state.entryRule === 'flip';
+  applySlot('recipe', slots.recipe);
+  applySlot('entry-rule', slots.entry);
+  applySlot('clock', slots.clock);
+  applySlot('exit-rule', slots.exitRule);
+  applySlot('confirm', slots.confirm);
+  applySlot('entry-atr', slots.entryAtr);
+  applySlot('exit-atr', slots.exitAtr);
+  applySlot('flatten', slots.flatten);
+  applySlot('cost-points', slots.cost);
   $('year-field').hidden = state.sessionMode !== 'year';
-  $('exit-atr').disabled = !session || state.exitTf === state.tf;
+  $('year').disabled = false;
+  $('year').title = '';
   $('flatten').checked = state.flattenEod;
-  $('flatten').disabled = !session;
   const entryLen = state.params.atrLength ?? state.exitAtr;
   if (document.activeElement !== $('entry-atr')) $('entry-atr').value = entryLen;
   if (document.activeElement !== $('exit-atr')) $('exit-atr').value = state.exitTf === state.tf ? entryLen : state.exitAtr;
@@ -561,21 +597,24 @@ function syncCompose() {
   $('confirm').value = state.confirm;
   $('recipe').value = state.recipe || '';
   if ($('year').options.length) $('year').value = [...$('year').options].some((o) => o.value === state.year) ? state.year : 'all';
-  $('session-mode').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === state.sessionMode)));
+  $('session-mode').querySelectorAll('button').forEach((b) => {
+    b.disabled = false;
+    b.removeAttribute('aria-disabled');
+    b.title = b.dataset.v === 'year' ? 'Sets From and To to that calendar year.' : 'Uses the From and To dates.';
+    b.setAttribute('aria-pressed', String(b.dataset.v === state.sessionMode));
+  });
   $('timeframe').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === state.tf)));
   $('exit-tf').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === state.exitTf)));
   const points = isHsiFutures(state.symbol);
   for (const id of ['commission', 'slippage', 'rf', 'stop', 'take', 'maxbars']) $(id).disabled = points;
   $('short').disabled = points;
   if (points) $('short').checked = true;
-  $('exec-hint').textContent = points
+  $('exec-hint').textContent = session
     ? 'HSI futures score is index points for one unit. Basis-point commission is not applied. Cost defaults to 6 points on a 5-minute exit and 8 on a 1-minute exit. 0 is price movement only.'
-    : '0 turns a risk rule off. Fills at the next open after a signal. Costs on each side.';
-  $('compose-hint').textContent = session
-    ? 'Day session 09:15–16:30 Hong Kong time. A flip fills at the next bar’s open. The daily confirm is a separate signal.'
-    : on
-      ? 'Clock, flip, and the exit timeframe apply to HSI futures 1-minute and 5-minute bars. Daily stays on this security’s daily bars.'
-      : '';
+    : points
+      ? 'HSI futures on daily, weekly, and monthly bars score index points for one unit. Basis-point commission is not applied. Point cost turns on for 1-minute and 5-minute ATR SuperTrend.'
+      : '0 turns a risk rule off. Fills at the next open after a signal. Costs on each side.';
+  $('compose-hint').textContent = slots.hint;
 }
 
 function syncControls() {
