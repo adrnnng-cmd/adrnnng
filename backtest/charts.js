@@ -13,19 +13,16 @@ import {
   PriceScaleMode,
   CrosshairMode,
 } from '/assets/vendor/lightweight-charts.mjs';
-
-const C = {
-  text: '#666666',
-  grid: 'rgba(17,17,17,0.06)',
-  border: 'rgba(17,17,17,0.14)',
-  up: '#0b8a3e',
-  down: '#d0182a',
-  accent: '#111111',
-  bh: '#8a8a8a',
-  long: '#1a3fd1',
-  short: '#d0182a',
-  exit: '#111111',
-};
+import {
+  CHART as C,
+  buyHoldLineOptions,
+  candleSeriesOptions,
+  drawdownSeriesOptions,
+  isSupertrendOverlay,
+  pointCandles,
+  strategyAreaOptions,
+  supertrendLabel,
+} from './chart-style.js';
 
 function baseOptions() {
   return {
@@ -34,7 +31,7 @@ function baseOptions() {
       background: { type: 'solid', color: 'transparent' },
       textColor: C.text,
       fontFamily: "'JetBrains Mono', ui-monospace, monospace",
-      fontSize: 11,
+      fontSize: 12,
       attributionLogo: true,
       panes: { separatorColor: C.border, separatorHoverColor: 'rgba(17,17,17,0.2)' },
     },
@@ -57,6 +54,23 @@ function fmtAxis(p) {
   if (a >= 100) return p.toFixed(0);
   if (a >= 1) return p.toFixed(2);
   return p.toPrecision(3);
+}
+
+/** Daily stays a business-day string. Intraday wall-clock is drawn as labelled, so 09:15 reads 09:15. */
+function chartTime(t) {
+  const s = String(t);
+  if (s.length <= 10) return s;
+  const ms = Date.parse(s.endsWith('Z') ? s : `${s}Z`);
+  return Number.isFinite(ms) ? Math.floor(ms / 1000) : s;
+}
+
+function snapTime(bars, time) {
+  let best = null;
+  for (const bar of bars) {
+    if (bar.time <= time) best = bar.time;
+    else break;
+  }
+  return best ?? bars[0]?.time ?? null;
 }
 
 const line = (times, values, from = 0) => {
@@ -102,9 +116,12 @@ export class BacktestCharts {
    * @param ctx { bars (full history), result (runBacktest output), show: { tdCounts, overlays, logEquity } }
    */
   render({ bars, result, show }) {
-    const { start, end, times } = result;
-    const view = bars.slice(start, end + 1);
+    const { start, end } = result;
+    const points = result.accounting === 'points';
+    const times = result.times.map(chartTime);
+    const view = bars.slice(start, end + 1).map((b) => ({ ...b, time: chartTime(b.time) }));
     const sig = result.signal || {};
+    const logOk = show.logEquity && !points && result.equity.every((v) => v > 0) && result.benchmark.every((v) => v > 0);
 
     // ---- Price
     this.clear('price');
@@ -112,31 +129,24 @@ export class BacktestCharts {
       this.markers.detach();
       this.markers = null;
     }
-    const candles = this.price.addSeries(CandlestickSeries, {
-      upColor: C.up,
-      downColor: C.down,
-      borderVisible: false,
-      wickUpColor: 'rgba(11,138,62,0.75)',
-      wickDownColor: 'rgba(208,24,42,0.75)',
-      priceLineColor: C.accent,
-    });
+    const candles = this.price.addSeries(CandlestickSeries, candleSeriesOptions());
     candles.setData(view.map((b) => ({ time: b.time, open: b.open, high: b.high, low: b.low, close: b.close })));
     this.series.price.push(candles);
 
-    if (show.overlays) {
-      for (const o of sig.overlays || []) {
-        const s = this.price.addSeries(LineSeries, {
-          color: o.color,
-          lineWidth: 1.5,
-          lineStyle: o.style === 'dashed' ? LineStyle.Dashed : LineStyle.Solid,
-          priceLineVisible: false,
-          lastValueVisible: false,
-          crosshairMarkerVisible: false,
-          title: '',
-        });
-        s.setData(line(times, o.values, start));
-        this.series.price.push(s);
-      }
+    for (const o of sig.overlays || []) {
+      const trend = isSupertrendOverlay(o.name);
+      if (trend ? show.supertrend !== true : !show.overlays) continue;
+      const s = this.price.addSeries(LineSeries, {
+        color: o.color,
+        lineWidth: 1.5,
+        lineStyle: o.style === 'dashed' ? LineStyle.Dashed : LineStyle.Solid,
+        priceLineVisible: false,
+        lastValueVisible: false,
+        crosshairMarkerVisible: false,
+        title: '',
+      });
+      s.setData(line(times, o.values, start));
+      this.series.price.push(s);
     }
 
     (sig.panes || []).forEach((pane, k) => {
@@ -147,7 +157,7 @@ export class BacktestCharts {
             ? this.price.addSeries(HistogramSeries, { color: ser.color, priceLineVisible: false, lastValueVisible: false }, idx)
             : this.price.addSeries(LineSeries, { color: ser.color, lineWidth: 1.5, priceLineVisible: false, lastValueVisible: true, crosshairMarkerVisible: false }, idx);
         const data = line(times, ser.values, start);
-        s.setData(ser.type === 'histogram' ? data.map((d) => (d.value == null ? d : { ...d, color: d.value >= 0 ? 'rgba(11,138,62,0.45)' : 'rgba(208,24,42,0.45)' })) : data);
+        s.setData(ser.type === 'histogram' ? data.map((d) => (d.value == null ? d : { ...d, color: d.value >= 0 ? C.histUp : C.histDown })) : data);
         this.series.price.push(s);
         if (ser === pane.series[0]) {
           for (const lv of pane.levels || []) s.createPriceLine({ price: lv, color: 'rgba(148,163,184,0.35)', lineStyle: LineStyle.Dotted, lineWidth: 1, axisLabelVisible: false });
@@ -163,7 +173,7 @@ export class BacktestCharts {
       if (m.index < start || m.index > end || !tdKinds.has(m.kind)) continue;
       const small = m.kind === 'count';
       markers.push({
-        time: bars[m.index].time,
+        time: chartTime(bars[m.index].time),
         position: m.position === 'above' ? 'aboveBar' : 'belowBar',
         shape: m.shape || 'circle',
         color: m.color,
@@ -174,21 +184,24 @@ export class BacktestCharts {
     const allTrades = [...result.trades, ...(result.openTrade ? [result.openTrade] : [])];
     for (const t of allTrades) {
       const isLong = t.side === 'long';
-      markers.push({
-        time: t.entryTime,
-        position: isLong ? 'belowBar' : 'aboveBar',
-        shape: isLong ? 'arrowUp' : 'arrowDown',
-        color: isLong ? C.long : C.short,
-        text: isLong ? 'BUY' : 'SHORT',
-        size: 1.4,
-      });
+      if (show.supertrend !== false) {
+        const label = show.supertrend === true ? supertrendLabel(t.side) : null;
+        markers.push({
+          time: chartTime(t.entryTime),
+          position: label?.position || (isLong ? 'belowBar' : 'aboveBar'),
+          shape: label?.shape || (isLong ? 'arrowUp' : 'arrowDown'),
+          color: label?.color || (isLong ? C.long : C.short),
+          text: label?.text || (isLong ? 'BUY' : 'SHORT'),
+          size: label?.size || 1.4,
+        });
+      }
       if (!t.open) {
         markers.push({
-          time: t.exitTime,
+          time: chartTime(t.exitTime),
           position: isLong ? 'aboveBar' : 'belowBar',
           shape: 'square',
           color: t.pnl >= 0 ? C.up : C.down,
-          text: `${t.returnPct >= 0 ? '+' : ''}${t.returnPct.toFixed(1)}%`,
+          text: points ? `${t.pnl >= 0 ? '+' : ''}${t.pnl.toFixed(1)}` : `${t.returnPct >= 0 ? '+' : ''}${t.returnPct.toFixed(1)}%`,
           size: 0.8,
         });
       }
@@ -198,47 +211,107 @@ export class BacktestCharts {
 
     // ---- Equity vs buy & hold
     this.clear('equity');
-    this.equity.priceScale('right').applyOptions({ mode: show.logEquity ? PriceScaleMode.Logarithmic : PriceScaleMode.Normal });
-    const bh = this.equity.addSeries(LineSeries, { color: C.bh, lineWidth: 1.5, lineStyle: LineStyle.Solid, priceLineVisible: false, title: 'Buy & hold' });
-    bh.setData(times.map((t, i) => ({ time: t, value: result.benchmark[i] })));
-    const eq = this.equity.addSeries(AreaSeries, {
-      lineColor: C.accent,
-      lineWidth: 2,
-      topColor: 'rgba(17,17,17,0.12)',
-      bottomColor: 'rgba(17,17,17,0.0)',
-      priceLineVisible: false,
-      title: 'Strategy',
+    this.equity.priceScale('right').applyOptions({ mode: logOk ? PriceScaleMode.Logarithmic : PriceScaleMode.Normal });
+    this.drawdown.applyOptions({
+      localization: { priceFormatter: (p) => (points ? p.toFixed(0) : `${(p * 100).toFixed(0)}%`) },
     });
+    const bh = this.equity.addSeries(LineSeries, { ...buyHoldLineOptions(), lineStyle: LineStyle.Solid });
+    bh.setData(times.map((t, i) => ({ time: t, value: result.benchmark[i] })));
+    const eq = this.equity.addSeries(AreaSeries, strategyAreaOptions());
     eq.setData(times.map((t, i) => ({ time: t, value: result.equity[i] })));
     const exposure = this.equity.addSeries(HistogramSeries, { priceScaleId: 'pos', priceLineVisible: false, lastValueVisible: false });
     this.equity.priceScale('pos').applyOptions({ scaleMargins: { top: 0.94, bottom: 0 }, visible: false });
-    exposure.setData(times.map((t, i) => ({ time: t, value: result.positions[i] === 0 ? 0 : 1, color: result.positions[i] > 0 ? 'rgba(26,63,209,0.45)' : 'rgba(208,24,42,0.45)' })));
+    exposure.setData(times.map((t, i) => ({ time: t, value: result.positions[i] === 0 ? 0 : 1, color: result.positions[i] > 0 ? C.exposureLong : C.exposureShort })));
     this.series.equity.push(bh, eq, exposure);
 
     // ---- Drawdown
     this.clear('drawdown');
-    const bhd = this.drawdown.addSeries(LineSeries, { color: 'rgba(148,163,184,0.7)', lineWidth: 1, priceLineVisible: false, title: 'B&H' });
+    const bhd = this.drawdown.addSeries(LineSeries, { color: C.bhDrawdown, lineWidth: 1, priceLineVisible: false, title: 'B&H' });
     bhd.setData(times.map((t, i) => ({ time: t, value: result.benchmarkDrawdown[i] })));
-    const dd = this.drawdown.addSeries(BaselineSeries, {
-      baseValue: { type: 'price', price: 0 },
-      bottomLineColor: C.down,
-      bottomFillColor1: 'rgba(208,24,42,0.04)',
-      bottomFillColor2: 'rgba(208,24,42,0.28)',
-      topLineColor: C.down,
-      lineWidth: 1.5,
-      priceLineVisible: false,
-      title: 'Strategy',
-    });
+    const dd = this.drawdown.addSeries(BaselineSeries, drawdownSeriesOptions());
     dd.setData(times.map((t, i) => ({ time: t, value: result.drawdown[i] })));
     this.series.drawdown.push(bhd, dd);
 
     for (const ch of [this.price, this.equity, this.drawdown]) ch.timeScale().fitContent();
   }
 
+  /** Daily point curve from a stored result. An optional overlay adds the SuperTrend line. */
+  renderCurve({ times, values, overlay, showSupertrend }) {
+    this.clear('price');
+    this.clear('equity');
+    this.clear('drawdown');
+    if (this.markers) {
+      this.markers.detach();
+      this.markers = null;
+    }
+    const data = [];
+    const dd = [];
+    let peak = -Infinity;
+    for (let i = 0; i < times.length; i++) {
+      const time = chartTime(times[i]);
+      const value = values[i];
+      if (value == null || !Number.isFinite(value)) continue;
+      if (data.length && data[data.length - 1].time === time) continue;
+      data.push({ time, value });
+      if (value > peak) peak = value;
+      dd.push({ time, value: value - peak });
+    }
+    const candlesIn = (overlay?.candles || []).map((bar) => ({ ...bar, time: chartTime(bar.time) })).filter((bar) => bar.time != null);
+    const priceBars = candlesIn.length ? candlesIn : data.length ? pointCandles(data) : [];
+    if (!priceBars.length && !data.length) return;
+    if (priceBars.length) {
+      const price = this.price.addSeries(CandlestickSeries, candleSeriesOptions());
+      price.setData(priceBars.map((bar) => ({ time: bar.time, open: bar.open, high: bar.high, low: bar.low, close: bar.close })));
+      this.series.price.push(price);
+      if (showSupertrend && candlesIn.length && overlay?.line?.length) this.drawStoredLine(overlay.line);
+      if (showSupertrend && candlesIn.length && overlay?.markers?.length) {
+        const marks = overlay.markers.map((mark) => {
+          const label = supertrendLabel(mark.side);
+          return { ...label, time: snapTime(priceBars, chartTime(mark.time)) };
+        }).filter((mark) => mark.time != null);
+        marks.sort((a, b) => (a.time < b.time ? -1 : a.time > b.time ? 1 : 0));
+        this.markers = createSeriesMarkers(price, marks);
+      }
+    }
+    if (!data.length) {
+      this.price.timeScale().fitContent();
+      return;
+    }
+    this.equity.priceScale('right').applyOptions({ mode: PriceScaleMode.Normal });
+    this.drawdown.applyOptions({ localization: { priceFormatter: (p) => p.toFixed(0) } });
+    const eq = this.equity.addSeries(AreaSeries, strategyAreaOptions());
+    eq.setData(data);
+    this.series.equity.push(eq);
+    const drop = this.drawdown.addSeries(BaselineSeries, drawdownSeriesOptions());
+    drop.setData(dd);
+    this.series.drawdown.push(drop);
+    for (const ch of [this.price, this.equity, this.drawdown]) ch.timeScale().fitContent();
+  }
+
+  drawStoredLine(points) {
+    for (const dir of [1, -1]) {
+      const series = points.map((point) => {
+        const time = chartTime(point.time);
+        return point.dir === dir ? { time, value: point.value } : { time };
+      });
+      if (!series.some((point) => point.value != null)) continue;
+      const s = this.price.addSeries(LineSeries, {
+        color: dir === 1 ? C.up : C.down,
+        lineWidth: 1.5,
+        priceLineVisible: false,
+        lastValueVisible: false,
+        crosshairMarkerVisible: false,
+        title: '',
+      });
+      s.setData(series);
+      this.series.price.push(s);
+    }
+  }
+
   focus(fromTime, toTime, padBars = 25) {
     const ts = this.price.timeScale();
-    const a = ts.timeToIndex(fromTime, true);
-    const b = ts.timeToIndex(toTime, true);
+    const a = ts.timeToIndex(chartTime(fromTime), true);
+    const b = ts.timeToIndex(chartTime(toTime), true);
     if (a == null || b == null) return;
     ts.setVisibleLogicalRange({ from: a - padBars, to: b + padBars });
   }

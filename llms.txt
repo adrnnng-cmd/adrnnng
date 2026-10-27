@@ -7,12 +7,12 @@ The public site is https://adrnnng.com. Pages are static HTML on Cloudflare Page
 ## Sections
 
 - [Home](https://adrnnng.com/): Landing page. The latest Morning Report lead, a market tape, and doors into each section.
-- [Backtest](https://adrnnng.com/backtest/): Run TD Sequential Setup 9 / Countdown 13 on daily history for US, Hong Kong, and crypto tickers. The chart, profit curve, and statistics run in the browser on the site's price files.
+- [Backtest](https://adrnnng.com/backtest/): Run TD Sequential or ATR SuperTrend on daily history, and HSI futures on 1-minute and 5-minute bars. The chart, profit curve, and statistics run in the browser.
 - [Politician Tracker](https://adrnnng.com/politician-tracker/): STOCK Act disclosures from a VIP list of members of Congress, plus any member's trade in a Watchlist ticker. Refreshed about 07:05 HKT. Members are listed on this one page; there is no separate URL per member unless a static member page is published later.
 - [Morning Report](https://adrnnng.com/news/): The daily market briefing, published around 08:15 HKT, and its archive. Each edition is `/news/YYYYMMDD/`.
 - [Morning Report RSS](https://adrnnng.com/news/feed.xml): One item per edition that exists under `/news/YYYYMMDD/`. Titles, links, and descriptions come from those pages. A publish time is included only when the page already has one.
 
-Strategy Lab (`/hsi-lab/`) is the Hang Seng strategy lab. It is not published yet. Once `hsi-lab/index.html` is on the site, the sitemap builder includes it with the other sections.
+`/hsi-lab/` redirects to [Backtest](https://adrnnng.com/backtest/) with the HSI futures SuperTrend recipe. That is the only strategy lab URL.
 
 ## Discovery
 

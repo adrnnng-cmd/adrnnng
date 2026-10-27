@@ -231,7 +231,7 @@ function drawSignal() {
   const chgEl = document.getElementById('sc-chg');
   chgEl.textContent = `${fmtPct(chg)} · ${last.time}`;
   chgEl.className = `num sc-chg ${chg >= 0 ? 'up' : 'down'}`;
-  document.getElementById('sc-src').textContent = `Daily bars to ${last.time} · Yahoo Finance`;
+  document.getElementById('sc-src').textContent = `Daily bars to ${last.time}`;
 
   const W = el.clientWidth || 600;
   const H = el.clientHeight || 300;

@@ -18,9 +18,9 @@ function getManifest() {
 
 export default {
   id: 'site',
-  name: 'Site data · Yahoo Finance daily',
+  name: 'Daily history',
   kind: 'catalog',
-  description: 'Daily OHLCV with dividends and splits, refreshed every weekday by a scheduled job and served as static files.',
+  description: 'Daily OHLCV with dividends and splits, refreshed on a schedule and served as static files.',
 
   async listSymbols() {
     const m = await getManifest();

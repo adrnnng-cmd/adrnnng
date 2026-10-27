@@ -3,6 +3,14 @@
 
 const DAY_MS = 864e5;
 
+/** Date or 'YYYY-MM-DDTHH:mm:ss' (wall clock, no zone). */
+export function parseBarTime(t) {
+  const s = String(t);
+  if (s.length <= 10) return Date.parse(`${s}T00:00:00Z`);
+  if (/[zZ]|[+-]\d{2}:?\d{2}$/.test(s)) return Date.parse(s);
+  return Date.parse(`${s}Z`);
+}
+
 export function drawdownSeries(equity) {
   let peak = -Infinity;
   return equity.map((v) => {
@@ -12,7 +20,16 @@ export function drawdownSeries(equity) {
 }
 
 function yearsBetween(t0, t1) {
-  return (Date.parse(t1 + 'T00:00:00Z') - Date.parse(t0 + 'T00:00:00Z')) / DAY_MS / 365.25;
+  return (parseBarTime(t1) - parseBarTime(t0)) / DAY_MS / 365.25;
+}
+
+/** Peak-to-trough in the same units as `equity` (index points, not a ratio). */
+export function pointsDrawdown(equity) {
+  let peak = -Infinity;
+  return equity.map((v) => {
+    if (v > peak) peak = v;
+    return v - peak;
+  });
 }
 
 const mean = (a) => (a.length ? a.reduce((s, x) => s + x, 0) / a.length : NaN);
@@ -48,7 +65,7 @@ export function computeMetrics({ times, equity, trades = [], positions = [], ris
   for (let i = 0; i < n; i++) {
     if (dd[i] < 0 && ddStart === null) ddStart = i - 1;
     if ((dd[i] === 0 || i === n - 1) && ddStart !== null) {
-      const days = (Date.parse(times[i]) - Date.parse(times[Math.max(0, ddStart)])) / DAY_MS;
+      const days = (parseBarTime(times[i]) - parseBarTime(times[Math.max(0, ddStart)])) / DAY_MS;
       longestDd = Math.max(longestDd, days);
       ddStart = null;
     }
@@ -108,21 +125,23 @@ export function computeMetrics({ times, equity, trades = [], positions = [], ris
   };
 }
 
-/** Calendar-month returns of an equity curve: [{ year, month (0-11), ret }], plus yearly totals. */
-export function periodReturns(times, equity) {
+/** Calendar-month returns of an equity curve: [{ year, month (0-11), ret }], plus yearly totals.
+ *  `absolute: true` stores point changes instead of ratios. */
+export function periodReturns(times, equity, { absolute = false } = {}) {
   const months = [];
   const years = [];
   let mStart = equity[0];
   let yStart = equity[0];
+  const delta = (end, start) => (absolute ? end - start : end / start - 1);
   for (let i = 1; i <= times.length; i++) {
     const prev = times[i - 1];
     const cur = times[i];
     if (!cur || cur.slice(0, 7) !== prev.slice(0, 7)) {
-      months.push({ year: +prev.slice(0, 4), month: +prev.slice(5, 7) - 1, ret: equity[i - 1] / mStart - 1 });
+      months.push({ year: +prev.slice(0, 4), month: +prev.slice(5, 7) - 1, ret: delta(equity[i - 1], mStart) });
       mStart = equity[i - 1];
     }
     if (!cur || cur.slice(0, 4) !== prev.slice(0, 4)) {
-      years.push({ year: +prev.slice(0, 4), ret: equity[i - 1] / yStart - 1 });
+      years.push({ year: +prev.slice(0, 4), ret: delta(equity[i - 1], yStart) });
       yStart = equity[i - 1];
     }
   }

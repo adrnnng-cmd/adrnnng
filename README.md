@@ -105,17 +105,79 @@ include `theme.css` + `site.js`, checked by `npm run check`; `own` = page has it
 
 ## Backtest
 
-`/backtest/` runs entirely in the browser on the static price files. The code is split so that
-strategies and data sources are plug-ins:
+`/backtest/` runs entirely in the browser. The code is split so that strategies, composition,
+and data sources stay separate:
 
 ```
-providers/*  →  bars (daily, split-adjusted, dividends on ex-dates)
-engine/bars.js  →  dividend adjustment (optional) → weekly/monthly resampling
-strategies/*  →  target position per bar
-engine/backtest.js  →  fills at next open, costs, risk exits, equity, trades, buy & hold
-engine/metrics.js  →  CAGR, Sharpe, Sortino, max drawdown, win rate, profit factor, …
-charts.js / app.js  →  UI
+providers/*       →  bars. Daily equities, or HSI futures when the public packs are published
+composition/*     →  HTF confirm, entry, exit, session → one target[]
+strategies/*      →  signal plug-ins (direction only; they do not call each other)
+engine/backtest.js → fills at next open, costs or index points, equity, trades
+engine/metrics.js → CAGR, Sharpe, Sortino, max drawdown, win rate, profit factor, …
+charts.js / app.js → the one /backtest/ page
 ```
+
+`/hsi-lab/` redirects to `/backtest/` with the Fast Response recipe selected. There is not a second UI.
+
+HSI futures ATR SuperTrend on 1m, 5m, 30m, and 1h does not run the minute tape in the browser.
+1m and 5m look up a stored score. 30m and 1h are selectable and say not computed until a matrix is stored.
+Pages Functions in `functions/backtest/data/hsi/`
+read the objects from the existing `HSI_BARS` KV binding. The year packs and the result bundles stay
+out of git. A missing result says it is not computed yet. A missing daily file says the bars are not
+on the site yet.
+
+| Name | Where it is set | What it points at |
+| --- | --- | --- |
+| `HSI_BARS` | Pages project binding, namespace `f6577e29d4b249dea5a81b4f00443082` | KV keys `v1/1m/…` and `v1/results/…` |
+| `HSI_BARS_URL` | Worker or pack environment | Public base URL for that prefix |
+| `HSI_BARS_BASE` | `window.__HSI_BARS_BASE` or `<meta name="hsi-bars-base">` | Same base, read in the browser |
+| bar paths | `/backtest/data/hsi/` | `v1/1m/manifest.json`, `v1/1m/YYYY.bin`, optional `v1/1d/HSImain.csv` |
+| result paths | `/backtest/data/hsi/` | `v1/results/{1\|5}m-{10\|11\|12\|13\|14}/all.json.gz` |
+
+`_routes.json` sends only `/backtest/data/hsi/*` through a Function. The rest of the site stays static.
+Minute objects are `v1/1m/YYYY.bin` (magic `HSI1`). Every equity and index on the page has daily bars
+in the site files. HSI futures daily, weekly, and monthly use `v1/1d/HSImain.csv` when that file is
+published. 1m, 5m, 30m, and 1h stay disabled for every other ticker, and choosing them locks the
+security to HSI futures. There is no 15-minute choice. The page never names a data vendor.
+
+### Stored HSI SuperTrend results
+
+The page requests one key and slices it. Fast Response is entry 5-minute, ATR 10, exit 5-minute,
+clock 09:30, re-enter:
+
+- Key and public path: `v1/results/5m-10/all.json.gz`
+- Combo inside the bundle: `5:10:clock:09:30:reenter`
+
+Key shape: `v1/results/{entryTf}m-{entryAtr}/all.json.gz` with `entryTf` of `1` or `5` and
+`entryAtr` of 10, 11, 12, 13, or 14. The body is gzip (magic `1f 8b`) of an HSID v1 daily bundle,
+the same bytes `encodeBundle()` in `backtest/providers/hsi-results.js` writes. The name ends in
+`.json.gz`; the payload is not JSON. A year file `v1/results/{entryTf}m-{entryAtr}/{year}.json.gz`
+is served if it is uploaded. The page reads the `all` bundle.
+
+Combo shape: `{exitTf}:{exitAtr}:{entryRule}:{clock}:{exitRule}`.
+
+- `exitTf` is `1` or `5`. `exitAtr` is 10–14, and equals `entryAtr` when the timeframes match.
+- `entryRule` is `flip`, `clock`, or `firstFlip`. `clock` is `-` for `flip`, otherwise `09:15` or `09:30`.
+- `exitRule` is `flat`, `reenter`, or `reverse`.
+
+Factor 2.5, EMA smoothing 2, the 09:15–16:30 Hong Kong session, flatten at the session close, and
+no separate daily confirm are fixed. They are not in the key. `year=all`, a single year, custom
+dates, and the round-trip point cost are applied when the page reads. Custom dates and the
+Range presets slice that same `all` bundle. A combo outside that grid shows “not computed yet”
+and does not run the tape. The chart is one candle per session day, in the same up, down, and
+equity colors as the other backtests.
+
+The SuperTrend line and Buy/Sell labels are not in that score. They are one extra object per combo,
+`v1/results/{entryTf}m-{entryAtr}/ov/{exitTf}-{exitAtr}-{entryRule}-{clock}-{exitRule}.json.gz`.
+`clock` is `na` for a flip, otherwise `0915` or `0930`. Fast Response is
+`v1/results/5m-10/ov/5-10-clock-0930-reenter.json.gz`. The body is gzip of the bytes
+`encodeOverlay()` in `backtest/providers/hsi-overlay.js` writes. Sample the session line and price
+at direction changes and at least every 15 minutes. Keep at most 60,000 line points and 8,000
+markers. A missing overlay leaves the score on the chart. The page does not rebuild it from the
+minute tape. The price-chart SuperTrend checkbox shows or hides the line and the labels.
+
+Phase 1 HSI score is index points for one unit (price movement). Basis-point commission is not applied.
+The optional cost field subtracts a flat number of points per closed trade. Until that field is edited it is 6 points on a 5-minute exit and 8 points on a 1-minute exit.
 
 ### Execution model and metric definitions
 
@@ -137,9 +199,19 @@ charts.js / app.js  →  UI
   **Profit factor** = gross profit / gross loss. Also: volatility, longest drawdown, exposure,
   average/best/worst trade, average bars held, beta and correlation to buy & hold.
 
-### Strategy included
+### Strategies included
 
-For now the page ships with TD Sequential only; other rules plug in through the interface in the next section.
+Daily equities keep TD Sequential. ATR SuperTrend is the same kind of plug-in: it emits a direction
+and leaves clocks, confirm, and session flatten to `composition/`. Both are choices in the Strategy
+select. The composition row (entry, exit, clock, after the flip, confirm, session, year or custom
+From–To, plus Entry ATR / Exit ATR when the study has an ATR length) is on the page for every
+strategy. A slot that does not change that run is disabled, with the reason on the control and in
+the row hint. TD Sequential on daily, weekly, and monthly bars uses By year and From–To. Clock,
+exit, confirm, flatten, and point cost apply to HSI futures 1m, 5m, 30m, and 1h ATR SuperTrend.
+1m and 5m read the stored matrix. 30m and 1h are not stored yet and do not run the minute tape. The first selectable recipe is
+SuperTrend Fast Response (ATR 10, factor 2.5, smoothing 2, 5-minute clock at 09:30, re-enter, flatten
+at the day-session close). A second recipe adds a daily SuperTrend confirm as a separate signal.
+That confirm is not in the stored results.
 
 | id | Rule |
 | --- | --- |
@@ -183,10 +255,11 @@ A provider (see `backtest/providers/index.js`) is an object with `id`, `name`, `
 Bars must be daily, ascending and split-adjusted. Set `sample: true` for anything that is not real
 market data; the page then shows a SAMPLE badge and banner. Register it in `PROVIDERS`.
 
-Included: `site` (the committed Yahoo Finance CSVs) and `csv` (a CSV the visitor picks, read
+Included: `site` (the committed daily CSVs) and `csv` (a CSV the visitor picks, read
 locally). A browser-side API provider (e.g. one that needs an API key and sends CORS headers) can
-be added the same way; Yahoo's own endpoint sends no CORS headers, which is why the site serves
-prices as static files.
+be added the same way. The scheduled fetch's chart endpoint sends no CORS headers, which is why
+the site serves prices as static files. HSI futures are a separate loader (`providers/hsi-futures.js`),
+selected by the `HSImain` symbol rather than by the source dropdown.
 
 To add tickers to the site data, edit `.github/backtest/prices/universe.json` and run the
 "Backtest prices refresh" workflow (or `PYTHONPATH=.github/backtest python3 -m prices fetch --out .`).
@@ -199,9 +272,10 @@ or listing), `manifest.json` and `recent.json` (last 160 bars of a few symbols f
 page). A symbol that fails keeps its previous file and is flagged `stale` (shown on the page).
 Each refresh appends a few lines per file, so git history grows slowly.
 
-The fetcher checks its dividend back-adjustment against Yahoo's own adjusted close
-(`adj_check` in the manifest). It matches to 1e-6 for 45 of 47 symbols; for 0005.HK and 9988.HK
-Yahoo's adjusted close skips some of the dividends it reports, and this site applies all of them.
+The fetcher checks its dividend back-adjustment against the adjusted close reported with the
+download (`adj_check` in the manifest). It matches to 1e-6 for 45 of 47 symbols; for 0005.HK and
+9988.HK that adjusted close skips some of the dividends the download reports, and this site
+applies all of them.
 
 ### Verification
 
@@ -248,7 +322,9 @@ It then stamps public HTML with Organization and WebSite JSON-LD (`og:locale=zh_
 
 The script then writes `/sitemap.xml` from the merged tree. `/` and `/news/` `lastmod` values are at least the preview edition date, so a morning publish moves those entries even when the file mtime is still the previous UTC day. Other URLs keep their own file mtime.
 That index lists every HTML page present (`/`, `/backtest/`, `/politician-tracker/`, static
-member pages, a future `/hsi-lab/`), plus `sitemap-news.xml` for `/news/YYYYMMDD/` editions.
+member pages), plus `sitemap-news.xml` for `/news/YYYYMMDD/` editions. `/hsi-lab/` redirects
+to `/backtest/` and is not a separate HTML page, so it is listed only if an `index.html` is
+actually in the upload.
 Editions from today or yesterday in Hong Kong also go in `news-sitemap.xml` (Google News,
 `<news:language>zh-Hant</news:language>`), and
 the index includes that fragment only when one exists. `news/` is reserved: it is registered in

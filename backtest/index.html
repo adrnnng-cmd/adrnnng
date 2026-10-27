@@ -4,18 +4,18 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Backtest · ADRRR</title>
-  <meta name="description" content="Backtest TD Sequential Setup 9 / Countdown 13 on real daily price history. Strategy analysis chart, profit curve, statistics, trades.">
+  <meta name="description" content="Backtest TD Sequential and ATR SuperTrend on daily history, and HSI futures on 1m, 5m, 30m, and 1h. Strategy analysis chart, profit curve, statistics, trades.">
   <link rel="canonical" href="https://adrnnng.com/backtest/">
   <meta name="theme-color" content="#000000">
   <meta property="og:site_name" content="ADRRR">
   <meta property="og:title" content="Backtest · ADRRR">
-  <meta property="og:description" content="Backtest TD Sequential Setup 9 / Countdown 13 on real daily price history. Strategy analysis chart, profit curve, statistics, trades.">
+  <meta property="og:description" content="Backtest TD Sequential and ATR SuperTrend on daily history, and HSI futures on 1m, 5m, 30m, and 1h. Strategy analysis chart, profit curve, statistics, trades.">
   <meta property="og:url" content="https://adrnnng.com/backtest/">
   <meta property="og:type" content="website">
   <meta property="og:image" content="https://adrnnng.com/assets/brand/og-image.png">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Backtest · ADRRR">
-  <meta name="twitter:description" content="Backtest TD Sequential Setup 9 / Countdown 13 on real daily price history. Strategy analysis chart, profit curve, statistics, trades.">
+  <meta name="twitter:description" content="Backtest TD Sequential and ATR SuperTrend on daily history, and HSI futures on 1m, 5m, 30m, and 1h. Strategy analysis chart, profit curve, statistics, trades.">
   <meta name="twitter:image" content="https://adrnnng.com/assets/brand/og-image.png">
   <link rel="icon" href="/assets/brand/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/assets/brand/apple-touch-icon.png">
@@ -41,7 +41,7 @@
     <div class="bt-cmd-row">
       <label class="field cmd-symbol" id="symbol-field"><span>Security</span><select class="select" id="symbol"></select></label>
       <label class="field cmd-strat"><span>Strategy</span><select class="select" id="strategy"></select></label>
-      <div class="field"><span class="field-label">Period</span><div class="seg" id="timeframe" role="group" aria-label="Timeframe"></div></div>
+      <div class="field"><span class="field-label" id="tf-label">Period</span><div class="seg" id="timeframe" role="group" aria-label="Timeframe"></div></div>
       <div class="field"><span class="field-label">Range</span><div class="seg seg-wrap" id="presets" role="group" aria-label="Range presets"></div></div>
       <label class="field"><span>From</span><input class="input" type="date" id="from"></label>
       <label class="field"><span>To</span><input class="input" type="date" id="to"></label>
@@ -75,8 +75,23 @@
           <label class="field"><span>Max bars held</span><input class="input num" type="number" id="maxbars" min="0" max="5000" step="1" value="0" placeholder="off"></label>
         </div>
         <label class="check"><input type="checkbox" id="short"> Allow short selling</label>
-        <small class="hint">0 turns a risk rule off. Fills at the next open after a signal. Costs on each side.</small>
+        <small class="hint" id="exec-hint">0 turns a risk rule off. Fills at the next open after a signal. Costs on each side.</small>
       </fieldset>
+    </div>
+    <div class="bt-cmd-row bt-compose" id="compose-row">
+      <label class="field cmd-recipe"><span>Recipe</span><select class="select" id="recipe"></select></label>
+      <div class="field"><span class="field-label">Exit</span><div class="seg" id="exit-tf" role="group" aria-label="Exit timeframe"></div></div>
+      <label class="field"><span>Entry</span><select class="select" id="entry-rule"></select></label>
+      <label class="field" id="clock-field"><span>Clock</span><select class="select" id="clock"><option value="09:15">09:15</option><option value="09:30">09:30</option></select></label>
+      <label class="field"><span>After the flip</span><select class="select" id="exit-rule"></select></label>
+      <label class="field"><span>Confirm</span><select class="select" id="confirm"><option value="none">None</option><option value="daily">Daily agrees</option></select></label>
+      <div class="field"><span class="field-label">Session</span><div class="seg" id="session-mode" role="group" aria-label="Session"><button type="button" data-v="year">By year</button><button type="button" data-v="dates">Custom dates</button></div></div>
+      <label class="field" id="year-field"><span>Year</span><select class="select" id="year"></select></label>
+      <label class="field" id="entry-atr-field"><span>Entry ATR</span><input class="input num" type="number" id="entry-atr" min="1" max="200" step="1" value="10"></label>
+      <label class="field" id="exit-atr-field"><span>Exit ATR</span><input class="input num" type="number" id="exit-atr" min="1" max="200" step="1" value="10"></label>
+      <label class="check" id="flatten-wrap"><input type="checkbox" id="flatten" checked> Flatten at session close</label>
+      <label class="field"><span>Cost pts</span><input class="input num" type="number" id="cost-points" min="0" max="100" step="0.5" value="0"></label>
+      <p class="compose-hint" id="compose-hint"></p>
     </div>
   </form>
 
@@ -84,9 +99,9 @@
     <section class="bt-analysis">
       <div class="run-head">
         <div>
-          <p class="run-fn">BTST <span class="muted">Strategy Analysis</span></p>
+          <p class="run-fn">Research <span class="muted">Backtest</span></p>
           <h1 id="run-title">TD Sequential backtest</h1>
-          <p class="run-sub" id="run-sub">Backtest Setup 9 and Countdown 13 on daily price history. Charts, the equity curve, and trade statistics load in the browser.</p>
+          <p class="run-sub" id="run-sub">Backtest Setup 9 and Countdown 13 on daily price history. Fills at the next open. Costs are basis points on each side.</p>
         </div>
         <div class="run-badges" id="run-badges"></div>
       </div>
@@ -96,9 +111,10 @@
         <div class="panel chart-panel">
           <div class="panel-head">
             <div>
-              <h2 class="panel-title">Price &amp; signals</h2>
+              <h2 class="panel-title" id="price-title">Price &amp; signals</h2>
               <p class="panel-sub" id="price-sub">Markers are signals. Unless noted, the fill is the next bar’s open.</p>
             </div>
+            <label class="check sm" id="st-wrap" hidden><input type="checkbox" id="show-supertrend" checked> SuperTrend</label>
           </div>
           <div class="chart chart-price" id="chart-price"></div>
         </div>
@@ -106,7 +122,7 @@
           <div class="panel-head">
             <div>
               <h2 class="panel-title">Profit curve</h2>
-              <p class="panel-sub"><i class="sw sw-strat"></i>Strategy <i class="sw sw-bh"></i>Buy &amp; hold <i class="sw sw-pos"></i>In market</p>
+              <p class="panel-sub" id="equity-sub"><i class="sw sw-strat"></i>Strategy <i class="sw sw-bh"></i>Buy &amp; hold <i class="sw sw-pos"></i>In market</p>
             </div>
             <label class="check sm"><input type="checkbox" id="log-equity" checked> Log scale</label>
           </div>
@@ -116,7 +132,7 @@
           <div class="panel-head">
             <div>
               <h2 class="panel-title">Drawdown</h2>
-              <p class="panel-sub"><i class="sw sw-dd"></i>Strategy <i class="sw sw-bh"></i>Buy &amp; hold</p>
+              <p class="panel-sub" id="dd-sub"><i class="sw sw-dd"></i>Strategy <i class="sw sw-bh"></i>Buy &amp; hold</p>
             </div>
           </div>
           <div class="chart chart-dd" id="chart-dd"></div>
@@ -126,14 +142,14 @@
       <div class="bt-sheets">
         <div class="panel">
           <div class="panel-head">
-            <div><h2 class="panel-title">Monthly returns</h2><p class="panel-sub">Calendar months in %. Grey months were spent in cash.</p></div>
+            <div><h2 class="panel-title" id="heat-title">Monthly returns</h2><p class="panel-sub" id="heat-sub">Calendar months in %. Grey months were spent in cash.</p></div>
             <div class="seg" id="heat-which" role="group" aria-label="Series"><button type="button" data-v="strategy" aria-pressed="true">Strategy</button><button type="button" data-v="bh" aria-pressed="false">Buy &amp; hold</button></div>
           </div>
           <div class="panel-body"><div class="heat-wrap" id="heatmap"></div></div>
         </div>
         <div class="panel">
           <div class="panel-head">
-            <div><h2 class="panel-title">Trade returns</h2><p class="panel-sub">Each closed trade in order. Height is the return after costs.</p></div>
+            <div><h2 class="panel-title" id="tradebars-title">Trade returns</h2><p class="panel-sub" id="tradebars-sub">Each closed trade in order. Height is the return after costs.</p></div>
           </div>
           <div class="panel-body"><div class="trade-bars" id="trade-bars"></div></div>
         </div>
@@ -166,7 +182,7 @@
         <div class="table-wrap" style="margin-top:16px"><table class="table stats compact" id="stats-trades"></table></div>
       </div>
       <div class="side-pane" data-pane="factors" hidden>
-        <p class="side-note">What is drawn on the analysis chart. Studies and extra strategies will plug in here later.</p>
+        <p class="side-note">Chart studies for this run. TD counts print setup bars 1–8. The SuperTrend line is the study on ATR SuperTrend.</p>
         <label class="check"><input type="checkbox" id="show-overlays" checked> Overlays / studies</label>
         <label class="check" id="tdcounts-wrap"><input type="checkbox" id="show-tdcounts"> TD counts 1–8</label>
       </div>
@@ -174,22 +190,46 @@
   </div>
 
   <section class="bt-below">
+    <section class="assumptions" id="assumptions" aria-label="Assumptions">
+      <p class="assumptions-kicker">Assumptions</p>
+      <p class="assumptions-line" id="assumptions-line">Historical fills only. Signal on the close, fill at the next open. Not a live order.</p>
+      <dl>
+        <div class="assumptions-row"><dt>Costs</dt><dd id="assumptions-cost">Commission 5 bps and slippage 5 bps each side. 0 is off.</dd></div>
+        <div class="assumptions-row"><dt>Session</dt><dd id="assumptions-session">Not in force on this run.</dd></div>
+        <div class="assumptions-row"><dt>Data</dt><dd id="assumptions-data">Daily OHLCV, split-adjusted. Weekly and monthly bars are built from the daily bars.</dd></div>
+      </dl>
+    </section>
     <details class="panel method" id="method">
-      <summary><h2 class="panel-title">Methodology &amp; data</h2><span class="panel-sub">Fills, costs and every metric</span></summary>
+      <summary><h2 class="panel-title">Methodology &amp; data</h2><span class="panel-sub">Fills, costs, session, and every metric</span></summary>
       <div class="panel-body method-body">
         <div>
           <h3>Execution</h3>
           <ul>
             <li>Signals are evaluated on each bar's close. Orders fill at the <b>next bar's open</b>.</li>
-            <li>Each entry invests 100% of current equity (fractional units). Commission and slippage are charged in basis points on every entry and exit.</li>
+            <li>Each entry invests 100% of current equity (fractional units). Commission and slippage are charged in basis points on every entry and exit. The inputs default to 5 bps and 5 bps. 0 turns that leg off.</li>
             <li>Indicators are warmed up on the history before the start date; trades only happen inside the selected range.</li>
-            <li>Stop loss, take profit and max bars are checked on the close and exit at the next open.</li>
+            <li>Stop loss, take profit and max bars are checked on the close and exit at the next open. 0 leaves that rule off.</li>
             <li>Buy &amp; hold buys at the close of the first bar with the same costs. An open position on the last bar is marked to market and excluded from trade statistics.</li>
+          </ul>
+          <h4>Session</h4>
+          <ul>
+            <li>The session rules apply to HSI futures 1m, 5m, 30m, and 1h ATR SuperTrend. Daily, weekly, and monthly runs ignore clock, exit timeframe, after the flip, confirm, flatten, and point cost. 1m and 5m read the stored matrix. 30m and 1h are not stored yet.</li>
+            <li>Day session is 09:15–12:00 and 13:00–16:30 Hong Kong time.</li>
+            <li>Clock state fills at the clock bar’s open, using the direction of the last completed bar. The clock is not used for Any flip.</li>
+            <li>Any flip fills at the next bar’s open. First flip after the clock ignores earlier flips and fills at the next open.</li>
+            <li>After the flip: flat exits on the opposite flip and stays out for the day; re-enter takes a later flip back to the original side; reverse takes the new side on the opposite flip.</li>
+            <li>Flatten exits at that bar’s close. The stored matrix flattens at the session close. Turning flatten off, and Daily agrees, are not in the stored matrix.</li>
+          </ul>
+          <h4>Costs</h4>
+          <ul>
+            <li>Equities: basis points on each side. HSI futures daily, weekly, and monthly: index points for one unit. Basis-point commission is not applied, and point cost is off.</li>
+            <li>HSI futures 1m, 5m, 30m, and 1h ATR SuperTrend: round-trip points, once per closed trade. Default is 8 on a 1-minute exit and 6 on a 5-minute, 30-minute, or 1-hour exit. 0 is price only. Basis-point commission is not applied.</li>
           </ul>
           <h4>Data</h4>
           <ul id="data-notes">
-            <li>Daily OHLCV, dividends and splits from Yahoo Finance. Weekly and monthly bars are built from the daily bars.</li>
+            <li>Daily OHLCV, dividends and splits, refreshed on a schedule. Weekly and monthly bars are built from the daily bars.</li>
             <li>Prices are split-adjusted. With dividends on, earlier prices are scaled by (1 − D ÷ previous close).</li>
+            <li>HSI futures 1m and 5m ATR SuperTrend is a stored result. 30m and 1h use the same controls and say not computed until a matrix is stored. The page does not replay the tape. Factor 2.5 and EMA smoothing 2 are the stored study. The score is index points for one unit.</li>
             <li>Index symbols (^GSPC, ^NDX, ^HSI) are not directly tradable and carry no dividends.</li>
           </ul>
         </div>

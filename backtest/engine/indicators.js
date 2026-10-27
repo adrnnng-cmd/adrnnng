@@ -12,6 +12,75 @@ export function sma(values, period) {
   return out;
 }
 
+/**
+ * TradingView `ta.ema`: seed equals the first finite value, then
+ * ema = alpha * src + (1 - alpha) * prev, alpha = 2 / (period + 1).
+ * Nulls are ignored and do not reset the recursion. This is not `ema()` below,
+ * which SMA-seeds; ATR SuperTrend follows `ta.ema`.
+ */
+export function pineEma(values, period) {
+  const out = new Array(values.length).fill(null);
+  if (period < 1) return out;
+  const alpha = 2 / (period + 1);
+  let prev = null;
+  for (let i = 0; i < values.length; i++) {
+    const v = values[i];
+    if (v == null || !Number.isFinite(v)) continue;
+    prev = prev == null ? v : alpha * v + (1 - alpha) * prev;
+    out[i] = prev;
+  }
+  return out;
+}
+
+/**
+ * TradingView `ta.rma` (Wilder). Seeds with the SMA of the first `period`
+ * finite values, then (src + (period - 1) * prev) / period. Nulls are ignored.
+ */
+export function rma(values, period) {
+  const out = new Array(values.length).fill(null);
+  if (period < 1) return out;
+  let sum = 0;
+  let count = 0;
+  let prev = null;
+  for (let i = 0; i < values.length; i++) {
+    const v = values[i];
+    if (v == null || !Number.isFinite(v)) continue;
+    if (prev == null) {
+      sum += v;
+      count++;
+      if (count === period) {
+        prev = sum / period;
+        out[i] = prev;
+      }
+    } else {
+      prev = (v + (period - 1) * prev) / period;
+      out[i] = prev;
+    }
+  }
+  return out;
+}
+
+/** True range. Bar 0 is high-low; later bars include the previous close. */
+export function trueRange(bars) {
+  const out = new Array(bars.length);
+  for (let i = 0; i < bars.length; i++) {
+    const b = bars[i];
+    const hl = b.high - b.low;
+    if (i === 0) {
+      out[i] = hl;
+      continue;
+    }
+    const prev = bars[i - 1].close;
+    out[i] = Math.max(hl, Math.abs(b.high - prev), Math.abs(b.low - prev));
+  }
+  return out;
+}
+
+/** Wilder ATR: RMA of true range. The SuperTrend factor is applied by the strategy. */
+export function atr(bars, period) {
+  return rma(trueRange(bars), period);
+}
+
 /** EMA seeded with the SMA of the first `period` values. Null inputs are skipped until the first value. */
 export function ema(values, period) {
   const out = new Array(values.length).fill(null);
