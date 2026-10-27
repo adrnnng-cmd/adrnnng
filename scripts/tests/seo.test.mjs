@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import test from 'node:test';
-import { indexingHeaderErrors, parseHeaders } from '../headers.mjs';
+import { applyHeaders, indexingHeaderErrors, parseHeaders } from '../headers.mjs';
 import { buildPayload, postIndexNow, selectPingUrls, urlsForChangedPaths } from '../indexnow.mjs';
 import { buildSitemaps, extractLocs, isNoindexHtml, repoRoot } from '../sitemap.mjs';
 
@@ -237,6 +237,14 @@ test('committed indexing files allow public pages and keep /api private', async 
   const headers = await readFile(join(root, '_headers'), 'utf8');
   assert.deepEqual(indexingHeaderErrors(headers, { keyFile: 'ae5543efbf2a5168fc9df6644b06bc38.txt' }), []);
   assert.equal(parseHeaders(headers).some((r) => r.path === '/*'), false);
+  for (const path of ['/politician-tracker/data.json', '/news/latest.json', '/assets/tools.json', '/api/health']) {
+    assert.equal(applyHeaders(headers, path).get('x-robots-tag'), 'noindex, nofollow', path);
+  }
+  for (const path of ['/', '/politician-tracker/', '/politician-tracker/index.html', '/news/', '/news/20261022/', '/backtest/', '/robots.txt']) {
+    assert.equal(applyHeaders(headers, path).get('x-robots-tag'), null, path);
+  }
+  assert.equal(applyHeaders(headers, '/assets/tools.json').get('cache-control'), 'public, max-age=300');
+  assert.equal(applyHeaders(headers, '/news/feed.xml').get('content-type'), 'application/rss+xml; charset=utf-8');
 
   const llms = await readFile(join(root, 'llms.txt'), 'utf8');
   for (const needle of ['Backtest', 'Politician Tracker', 'Morning Report', '/hsi-lab/', 'https://adrnnng.com/news/', '/news/feed.xml', 'no site search']) {
@@ -245,4 +253,45 @@ test('committed indexing files allow public pages and keep /api private', async 
 
   const key = await readFile(join(root, 'ae5543efbf2a5168fc9df6644b06bc38.txt'));
   assert.ok(key.equals(Buffer.from('ae5543efbf2a5168fc9df6644b06bc38')) || key.equals(Buffer.from('ae5543efbf2a5168fc9df6644b06bc38\n')));
+});
+
+test('a JSON noindex rule above its detach glob is removed, and a second X-Robots-Tag joins', () => {
+  const above = `
+/politician-tracker/data.json
+  ! X-Robots-Tag
+  X-Robots-Tag: noindex, nofollow
+/politician-tracker/*
+  ! X-Robots-Tag
+`;
+  assert.equal(applyHeaders(above, '/politician-tracker/data.json').get('x-robots-tag'), null);
+  assert.equal(applyHeaders(above, '/politician-tracker/index.html').get('x-robots-tag'), null);
+
+  const below = `
+/politician-tracker/*
+  ! X-Robots-Tag
+/politician-tracker/data.json
+  ! X-Robots-Tag
+  X-Robots-Tag: noindex, nofollow
+`;
+  assert.equal(applyHeaders(below, '/politician-tracker/data.json').get('x-robots-tag'), 'noindex, nofollow');
+  assert.equal(applyHeaders(below, '/politician-tracker/').get('x-robots-tag'), null);
+  assert.equal(applyHeaders(below, '/politician-tracker/members/P000197/').get('x-robots-tag'), null);
+
+  const joined = `
+/*
+  X-Robots-Tag: noindex
+/static/*
+  X-Robots-Tag: nosnippet
+`;
+  assert.equal(applyHeaders(joined, '/static/app.js').get('x-robots-tag'), 'noindex, nosnippet');
+
+  const replaced = `
+/*
+  X-Robots-Tag: noindex
+/static/data.json
+  ! X-Robots-Tag
+  X-Robots-Tag: noindex, nofollow
+`;
+  assert.equal(applyHeaders(replaced, '/static/data.json').get('x-robots-tag'), 'noindex, nofollow');
+  assert.equal(applyHeaders(replaced, '/static/index.html').get('x-robots-tag'), 'noindex');
 });
