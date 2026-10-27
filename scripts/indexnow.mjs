@@ -34,6 +34,8 @@ export function urlsForChangedPaths(paths) {
   }
   for (const p of list) {
     if (p.startsWith('.github/') || p.startsWith('scripts/') || p.includes('/tests/') || p.endsWith('.md') || p === 'package.json' || p === '.gitignore') continue;
+    // 404 and the subscribe confirmation are noindex. Do not submit them.
+    if (p === '404.html' || p.startsWith('thanks/')) continue;
     if (p === 'index.html') urls.add(`${BASE}/`);
     else if (p === 'robots.txt' || p === 'llms.txt' || p === 'sitemap.xml' || p.startsWith('sitemap-') || p === 'news-sitemap.xml') urls.add(`${BASE}/${p}`);
     else if (/^[a-f0-9]{8,128}\.txt$/.test(p)) urls.add(`${BASE}/${p}`);

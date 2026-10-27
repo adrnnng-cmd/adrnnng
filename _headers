@@ -18,9 +18,9 @@
 # noindex blocks the URL. `! X-Robots-Tag` removes what earlier rules attached;
 # it does not remove a value a later rule sets. Detach on public HTML so a
 # publish.sh `/*` noindex rule above these lines cannot stick. Do not set
-# X-Robots-Tag on the detach rules themselves. /api keeps noindex. The JSON
-# rules at the bottom set noindex after these detaches. publish.sh must stop
-# emitting `/*` + `X-Robots-Tag: noindex, nofollow`.
+# X-Robots-Tag on the detach rules themselves. /api and /thanks keep noindex.
+# The JSON rules at the bottom set noindex after these detaches. publish.sh
+# must stop emitting `/*` + `X-Robots-Tag: noindex, nofollow`.
 
 /
   ! X-Robots-Tag
@@ -105,5 +105,20 @@
   X-Robots-Tag: noindex, nofollow
 
 /news/latest.json
+  ! X-Robots-Tag
+  X-Robots-Tag: noindex, nofollow
+
+# Subscribe confirmation. Same noindex as /api. `!` then set so a prepended
+# `/*` noindex does not join into a second value, and no later detach matches.
+# Public HTML above only detaches; it does not match these paths.
+/thanks
+  ! X-Robots-Tag
+  X-Robots-Tag: noindex, nofollow
+
+/thanks/
+  ! X-Robots-Tag
+  X-Robots-Tag: noindex, nofollow
+
+/thanks/*
   ! X-Robots-Tag
   X-Robots-Tag: noindex, nofollow

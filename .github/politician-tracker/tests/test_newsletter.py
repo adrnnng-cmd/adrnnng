@@ -35,6 +35,10 @@ class NewsletterTests(unittest.TestCase):
         self.assertIn('name="email"', html)
         self.assertIn("required", html)
         self.assertIn('name="embed" value="1"', html)
+        form = html.split('<form class="nl-form"', 1)[1].split("</form>", 1)[0]
+        self.assertNotIn("target=", form)
+        self.assertNotIn("redirect", form.lower())
+        self.assertEqual(form.count('type="hidden"'), 1)
         self.assertIn('href="https://buttondown.com/adrrr"', html)
         self.assertIn('href="/assets/css/newsletter.css"', html)
         for line in COPY:

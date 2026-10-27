@@ -121,3 +121,24 @@ main.container .nl-card-in {
   main.container .nl-card-in { padding-left: 0; padding-right: 0; }
   .nl-form button { flex-basis: auto; }
 }
+
+/* Post-subscribe /thanks. Same type scale as the 404 page, without a second signup. */
+.thanks { border-bottom: 0; padding-top: 72px; }
+.thanks h1 { font-size: clamp(40px, 6vw, 64px); letter-spacing: -0.02em; }
+.thanks .lede {
+  margin-top: 14px;
+  max-width: 28em;
+  font-family: var(--font-display, "Source Serif 4", "Noto Serif TC", Georgia, serif);
+  font-size: 18px;
+  line-height: 1.6;
+  color: #1a1a1a;
+}
+.thanks-cta { margin-top: 28px; }
+.thanks-links { margin-top: 18px; font-size: 15px; }
+.thanks-links a { color: var(--link, #1a3fd1); font-weight: 600; text-decoration: none; }
+.thanks-links a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.thanks-links .sep { margin: 0 0.45em; color: var(--faint, #8a8a8a); }
+.thanks .nl-fine { margin-top: 14px; }
+.thanks-x { margin: 36px 0 0; font-size: 12px; }
+.thanks-x a { color: var(--faint, #8a8a8a); text-decoration: none; }
+.thanks-x a:hover { text-decoration: underline; text-underline-offset: 3px; }

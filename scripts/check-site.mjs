@@ -87,11 +87,14 @@ notes.push(`reserved for external publishers: ${reserved.join(', ') || 'none'}`)
 
 // ---- local links in HTML and imports in JS
 const isReserved = (p) => reserved.some((r) => p.replace(/^\//, '').startsWith(r) || p === '/' + r.slice(0, -1));
+// /latest is a 302 to today's /news/YYYYMMDD/, merged into _redirects by the News Analyst at upload.
+const PUBLISHED_ELSEWHERE = new Set(['/latest', '/latest/']);
 function resolvesLocal(urlPath, fromFile) {
   const clean = urlPath.split('#')[0].split('?')[0];
   if (!clean) return true;
   const abs = clean.startsWith('/') ? join(ROOT, clean) : join(dirname(fromFile), clean);
   if (clean.startsWith('/') && isReserved(clean)) return true;
+  if (PUBLISHED_ELSEWHERE.has(clean)) return true;
   if (existsSync(abs) && statSync(abs).isFile()) return true;
   if (existsSync(join(abs, 'index.html'))) return true;
   return false;
@@ -188,6 +191,9 @@ for (const [file, canonical] of indexable) {
 }
 if (new Set(titles.filter(Boolean)).size !== titles.filter(Boolean).length) err(`page titles must be unique: ${titles.join(' | ')}`);
 if (existsSync(notFound) && !/\bnoindex\b/i.test(readFileSync(notFound, 'utf8'))) err('404.html should stay noindex');
+const thanksPage = join(ROOT, 'thanks/index.html');
+if (!existsSync(thanksPage)) err('thanks/index.html missing');
+else if (!/\bnoindex\b/i.test(readFileSync(thanksPage, 'utf8'))) err('thanks/index.html must stay noindex');
 for (const problem of sitemapDrift(ROOT)) err(problem);
 
 for (const n of notes) console.log(`  · ${n}`);

@@ -1,5 +1,7 @@
 // Buttondown signup shared by pages outside /news/. The Morning Report page is
 // published separately and already has its own strip and end card.
+// Native POST, same tab. email + hidden embed=1 only. The success URL is set
+// on the Buttondown newsletter, not as a per-form redirect field.
 
 export const NEWSLETTER = {
   subscribeUrl: 'https://buttondown.com/adrrr',
