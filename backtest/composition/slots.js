@@ -86,7 +86,7 @@ export function compositionSlots(strategy, ctx = {}) {
 
   let hint;
   if (matrix) {
-    hint = 'Day session 09:15–16:30 Hong Kong time. A flip fills at the next bar’s open. Daily confirm is not in the stored results. By year sets From and To.';
+    hint = 'Stored HSI futures ATR SuperTrend only. Clock fills at the clock open; Any flip and First flip fill at the next open. After the flip: flat, re-enter, or reverse. Flatten exits at the session close. Point cost is once per closed trade. By year sets From and To.';
   } else if (session) {
     hint = 'Entry ATR is this study’s length. Clock, exit, confirm, and point cost turn on for HSI futures 1-minute and 5-minute bars. By year sets From and To.';
   } else {

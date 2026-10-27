@@ -31,7 +31,7 @@ function baseOptions() {
       background: { type: 'solid', color: 'transparent' },
       textColor: C.text,
       fontFamily: "'JetBrains Mono', ui-monospace, monospace",
-      fontSize: 11,
+      fontSize: 12,
       attributionLogo: true,
       panes: { separatorColor: C.border, separatorHoverColor: 'rgba(17,17,17,0.2)' },
     },

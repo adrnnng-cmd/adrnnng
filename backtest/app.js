@@ -10,6 +10,7 @@ import { periodReturns } from './engine/metrics.js';
 import { compose } from './composition/index.js';
 import { RECIPES, getRecipe, defaultCostPoints } from './composition/recipes.js';
 import { compositionSlots, periodAvailability, supportedTimeframe } from './composition/slots.js';
+import { deskAssumptions } from './composition/assumptions.js';
 import { HSI_FUTURES, TIMEFRAME_CHOICES, isHsiFutures, isIntradayTimeframe, timeframeChoices, lockedSymbol } from './symbols.js';
 import { BacktestCharts } from './charts.js';
 import { esc } from '/assets/js/site.js';
@@ -613,8 +614,24 @@ function syncCompose() {
     ? 'HSI futures score is index points for one unit. Basis-point commission is not applied. Cost defaults to 6 points on a 5-minute exit and 8 on a 1-minute exit. 0 is price movement only.'
     : points
       ? 'HSI futures on daily, weekly, and monthly bars score index points for one unit. Basis-point commission is not applied. Point cost turns on for 1-minute and 5-minute ATR SuperTrend.'
-      : '0 turns a risk rule off. Fills at the next open after a signal. Costs on each side.';
+      : `Fills at the next open. Commission ${state.commission} bps and slippage ${state.slippage} bps on each side. 0 turns that leg off.`;
   $('compose-hint').textContent = slots.hint;
+  paintAssumptions(session ? 'matrix' : points ? 'hsi-daily' : 'equity');
+}
+
+function paintAssumptions(mode) {
+  const copy = deskAssumptions({
+    mode,
+    commission: state.commission,
+    slippage: state.slippage,
+    costPoints: state.costPoints,
+    confirm: state.confirm,
+    flattenEod: state.flattenEod,
+  });
+  $('assumptions-line').textContent = copy.line;
+  $('assumptions-cost').textContent = copy.cost;
+  $('assumptions-session').textContent = copy.session;
+  $('assumptions-data').textContent = copy.data;
 }
 
 function syncControls() {
@@ -901,6 +918,22 @@ function clearWorkspace() {
   }
 }
 
+function emptyState(message) {
+  const line = `<p class="empty-state">${esc(message)}</p>`;
+  $('heatmap').innerHTML = line;
+  $('trade-bars').innerHTML = line;
+  $('trades').innerHTML = `<tbody><tr><td class="empty-state">${esc(message)}</td></tr></tbody>`;
+  $('summary').innerHTML = `<tbody><tr><td class="empty-state">${esc(message)}</td></tr></tbody>`;
+  $('stats').innerHTML = `<tbody><tr><td class="empty-state">${esc(message)}</td></tr></tbody>`;
+  $('stats-trades').innerHTML = '';
+  $('trades-sub').textContent = message;
+  $('price-sub').textContent = 'No price curve for this run.';
+  $('equity-sub').textContent = 'No profit curve for this run.';
+  $('dd-sub').textContent = 'No drawdown curve for this run.';
+  $('heat-sub').textContent = message;
+  $('tradebars-sub').textContent = message;
+}
+
 function showError(e) {
   const pending = e?.code === 'bars-pending' || e?.name === 'BarsPending';
   const missing = e?.code === 'results-pending' || e?.name === 'ResultMissing';
@@ -909,6 +942,12 @@ function showError(e) {
   restoreChrome();
   $('results').classList.remove('loading');
   clearWorkspace();
+  const empty = pending
+    ? 'No curve. 1-minute and 5-minute bars for this selection are not published.'
+    : missing
+      ? 'No curve. This combination is not in the stored result.'
+      : 'No curve. This run did not complete.';
+  emptyState(empty);
   $('notices').innerHTML = `<div class="notice ${pending || missing ? 'notice-warn' : 'notice-error'}">${esc(e.message || e)}</div>`;
   $('run-title').textContent = pending
     ? 'HSI futures bars are not on this site yet'
@@ -919,7 +958,7 @@ function showError(e) {
     ? 'Daily strategies on the other symbols still run. 1-minute and 5-minute bars show up here when the public packs are published.'
     : missing
       ? 'All years stays available. Another control may already have a stored result.'
-      : '';
+      : 'The run stopped before a curve or a statistic was produced.';
   if (pending) $('run-badges').innerHTML = '<span class="badge">Bars pending</span>';
   if (missing) $('run-badges').innerHTML = '<span class="badge">Not computed yet</span>';
 }
@@ -1052,6 +1091,10 @@ function renderHeatmap() {
   const yearRet = Object.fromEntries(years.map((y) => [y.year, y.ret]));
   const names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const rows = [...byYear.entries()].sort((a, b) => b[0] - a[0]);
+  if (!rows.length) {
+    $('heatmap').innerHTML = '<p class="empty-state">No months in this range.</p>';
+    return;
+  }
   $('heatmap').innerHTML = `<table class="heat"><thead><tr><th class="y"></th>${names.map((n) => `<th>${n}</th>`).join('')}<th>Year</th></tr></thead><tbody>${rows
     .map(
       ([y, ms]) =>
@@ -1173,6 +1216,11 @@ function renderTrades() {
   const points = lastRun.result.accounting === 'points';
   const cur = points ? 'pts' : dataset.currency;
   const all = [...trades, ...(openTrade ? [openTrade] : [])];
+  if (!all.length) {
+    $('trades-sub').textContent = 'No closed trades in this range.';
+    $('trades').innerHTML = '<tbody><tr><td class="empty-state">No closed trades.</td></tr></tbody>';
+    return;
+  }
   const why = (t) => (t.open ? 'marked to market' : t.reason === 'session' ? 'session close' : t.reason);
   $('trades-sub').textContent = points
     ? `${trades.length} closed${openTrade ? ' + 1 open' : ''}. One index unit. Points are exit minus entry for a long, and the opposite for a short. Click a row to zoom the charts to it.`

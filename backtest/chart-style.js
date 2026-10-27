@@ -1,7 +1,7 @@
 // Shared chart colors for /backtest/. Live runs and stored HSI curves both use these.
 
 export const CHART = {
-  text: '#666666',
+  text: '#333333',
   grid: 'rgba(17,17,17,0.06)',
   border: 'rgba(17,17,17,0.14)',
   up: '#0b8a3e',

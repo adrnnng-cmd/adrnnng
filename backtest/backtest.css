@@ -1,4 +1,4 @@
-/* Backtest — BTST-style workspace on the shared light chrome. */
+/* Backtest workspace on the shared light chrome. */
 
 .bt-page { background: var(--bg); }
 .bt-page .site-footer { margin-top: 48px; }
@@ -27,7 +27,7 @@
 .bt-compose .is-off > .field-label,
 .bt-compose .check.is-off { color: var(--faint); }
 .cmd-recipe { width: min(260px, 100%); }
-.compose-hint { flex: 1 1 220px; margin: 0; color: var(--faint); font-size: 12px; line-height: 1.45; align-self: center; }
+.compose-hint { flex: 1 1 280px; margin: 0; color: var(--text-2); font-size: 13px; line-height: 1.45; align-self: center; }
 .seg button:disabled,
 .seg button[aria-disabled='true'] { color: var(--faint); background: var(--bg-2); cursor: not-allowed; }
 .seg button:disabled:hover,
@@ -73,7 +73,41 @@ select option:disabled { color: var(--faint); }
 .bt-sheets { display: grid; gap: 12px; min-width: 0; }
 .bt-sheets .panel { min-width: 0; }
 .run-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
-.run-fn { font: 700 11px/1 var(--font-sans); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.run-fn { font: 700 11px/1 var(--font-sans); letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-2); }
+.assumptions {
+  border: 1px solid var(--line);
+  background: #fff;
+  padding: 12px 14px 14px;
+  display: grid;
+  gap: 8px;
+}
+.assumptions-kicker {
+  margin: 0;
+  font: 700 11px/1 var(--font-sans);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+.assumptions-line { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--text); }
+.assumptions dl { margin: 0; display: grid; gap: 8px; }
+.assumptions-row { display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 12px; align-items: start; }
+.assumptions dt {
+  margin: 0;
+  padding-top: 3px;
+  font: 700 11px/1.3 var(--font-sans);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+.assumptions dd { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--text); }
+.empty-state {
+  margin: 0;
+  padding: 28px 12px;
+  text-align: center;
+  color: var(--text-2);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
 .run-head h1 { font-size: clamp(22px, 3vw, 30px); margin-top: 6px; }
 .run-sub { margin-top: 6px; color: var(--muted); font-size: 13px; font-family: var(--font-sans); }
 .run-sub .num { color: var(--text-2); }
@@ -115,7 +149,7 @@ select option:disabled { color: var(--faint); }
   position: sticky; top: 0; z-index: 1;
 }
 .side-pane { padding: 12px 12px 16px; display: grid; gap: 10px; }
-.side-note { font-size: 12px; color: var(--muted); line-height: 1.45; }
+.side-note { font-size: 13px; color: var(--text-2); line-height: 1.5; }
 .stats.compact { font-size: 12.5px; }
 .stats.compact th, .stats.compact td { padding: 6px 6px 6px 0; }
 .stats.compact th { border-bottom-color: #000; }
@@ -134,8 +168,8 @@ select option:disabled { color: var(--faint); }
 }
 
 .heat-wrap { overflow-x: auto; }
-.heat { border-collapse: separate; border-spacing: 3px; width: 100%; font: 500 11px var(--font-mono); font-variant-numeric: tabular-nums; }
-.heat th { color: var(--faint); font-weight: 500; padding: 2px 4px; text-align: center; }
+.heat { border-collapse: separate; border-spacing: 3px; width: 100%; font: 500 12px var(--font-mono); font-variant-numeric: tabular-nums; }
+.heat th { color: var(--text-2); font-weight: 600; padding: 2px 4px; text-align: center; }
 .heat th.y { text-align: left; color: var(--muted); }
 .heat td { text-align: center; padding: 7px 2px; color: var(--text); min-width: 42px; }
 .heat td.empty { background: var(--bg-2); color: transparent; }
@@ -148,7 +182,7 @@ select option:disabled { color: var(--faint); }
 
 .trade-bars { height: 150px; position: relative; }
 .trade-bars svg { width: 100%; height: 100%; overflow: visible; }
-.trade-bars .axis text { fill: var(--faint); font: 500 10px var(--font-mono); }
+.trade-bars .axis text { fill: #333; font: 500 12px var(--font-mono); }
 .trade-bars rect { transition: opacity 0.15s; cursor: pointer; }
 .trade-bars rect:hover { opacity: 0.7; }
 
@@ -186,4 +220,5 @@ select option:disabled { color: var(--faint); }
   .chart-equity { height: 200px; }
   .method-body { grid-template-columns: 1fr; }
   .cmd-symbol, .cmd-strat { width: 100%; }
+  .assumptions-row { grid-template-columns: 1fr; gap: 2px; }
 }

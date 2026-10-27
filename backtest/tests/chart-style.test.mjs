@@ -32,4 +32,5 @@ test('stored point candles use the same up and down colors as the price series',
   assert.equal(supertrendLabel(-1).text, 'Sell');
   assert.equal(supertrendLabel('short').color, CHART.down);
   assert.equal(supertrendLabel('long').position, 'belowBar');
+  assert.equal(CHART.text, '#333333');
 });

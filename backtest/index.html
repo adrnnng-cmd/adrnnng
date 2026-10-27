@@ -99,12 +99,21 @@
     <section class="bt-analysis">
       <div class="run-head">
         <div>
-          <p class="run-fn">BTST <span class="muted">Strategy Analysis</span></p>
+          <p class="run-fn">Research <span class="muted">Backtest</span></p>
           <h1 id="run-title">TD Sequential backtest</h1>
-          <p class="run-sub" id="run-sub">Backtest Setup 9 and Countdown 13 on daily price history. Charts, the equity curve, and trade statistics load in the browser.</p>
+          <p class="run-sub" id="run-sub">Backtest Setup 9 and Countdown 13 on daily price history. Fills at the next open. Costs are basis points on each side.</p>
         </div>
         <div class="run-badges" id="run-badges"></div>
       </div>
+      <section class="assumptions" id="assumptions" aria-label="Assumptions in force">
+        <p class="assumptions-kicker">Assumptions</p>
+        <p class="assumptions-line" id="assumptions-line">Research backtest of historical fills. Not a live order. A signal is read on the close; an equity fill is the next open.</p>
+        <dl>
+          <div class="assumptions-row"><dt>Costs</dt><dd id="assumptions-cost">Commission 5 bps and slippage 5 bps on each side, entry and exit. 0 turns that leg off. Stop, take profit, and max bars at 0 are off and, when set, exit at the next open. Point cost is not used.</dd></div>
+          <div class="assumptions-row"><dt>Session</dt><dd id="assumptions-session">Not in force on this run. Clock, exit, after the flip, confirm, flatten, and point cost do not change this result. On HSI futures 1-minute and 5-minute ATR SuperTrend they mean: Hong Kong day session is 09:15–12:00 and 13:00–16:30. Clock state fills at the clock bar’s open from the last completed bar’s direction. Any flip fills at the next bar’s open. First flip after the clock ignores earlier flips and fills at the next open. After the flip: flat exits on the opposite flip and stays out for the day; re-enter takes a later flip back to the original side; reverse takes the new side on the opposite flip. Flatten exits at that bar’s close.</dd></div>
+          <div class="assumptions-row"><dt>Data</dt><dd id="assumptions-data">Daily OHLCV, split-adjusted. Weekly and monthly bars are built from the daily bars. Dividends on scales earlier prices by (1 − dividend ÷ previous close).</dd></div>
+        </dl>
+      </section>
       <div id="notices"></div>
 
       <div class="chart-stack">
@@ -182,7 +191,7 @@
         <div class="table-wrap" style="margin-top:16px"><table class="table stats compact" id="stats-trades"></table></div>
       </div>
       <div class="side-pane" data-pane="factors" hidden>
-        <p class="side-note">What is drawn on the analysis chart. Studies and extra strategies will plug in here later.</p>
+        <p class="side-note">Chart studies for this run. TD counts print setup bars 1–8. The SuperTrend line is the study on ATR SuperTrend.</p>
         <label class="check"><input type="checkbox" id="show-overlays" checked> Overlays / studies</label>
         <label class="check" id="tdcounts-wrap"><input type="checkbox" id="show-tdcounts"> TD counts 1–8</label>
       </div>
@@ -191,22 +200,36 @@
 
   <section class="bt-below">
     <details class="panel method" id="method">
-      <summary><h2 class="panel-title">Methodology &amp; data</h2><span class="panel-sub">Fills, costs and every metric</span></summary>
+      <summary><h2 class="panel-title">Methodology &amp; data</h2><span class="panel-sub">Fills, costs, session, and every metric</span></summary>
       <div class="panel-body method-body">
         <div>
           <h3>Execution</h3>
           <ul>
             <li>Signals are evaluated on each bar's close. Orders fill at the <b>next bar's open</b>.</li>
-            <li>Each entry invests 100% of current equity (fractional units). Commission and slippage are charged in basis points on every entry and exit.</li>
+            <li>Each entry invests 100% of current equity (fractional units). Commission and slippage are charged in basis points on every entry and exit. The inputs default to 5 bps and 5 bps. 0 turns that leg off.</li>
             <li>Indicators are warmed up on the history before the start date; trades only happen inside the selected range.</li>
-            <li>Stop loss, take profit and max bars are checked on the close and exit at the next open.</li>
+            <li>Stop loss, take profit and max bars are checked on the close and exit at the next open. 0 leaves that rule off.</li>
             <li>Buy &amp; hold buys at the close of the first bar with the same costs. An open position on the last bar is marked to market and excluded from trade statistics.</li>
+          </ul>
+          <h4>Session</h4>
+          <ul>
+            <li>The session rules apply only to HSI futures 1-minute and 5-minute ATR SuperTrend. Daily, weekly, and monthly runs ignore clock, exit timeframe, after the flip, confirm, flatten, and point cost.</li>
+            <li>Day session is 09:15–12:00 and 13:00–16:30 Hong Kong time.</li>
+            <li>Clock state fills at the clock bar’s open, using the direction of the last completed bar. The clock is not used for Any flip.</li>
+            <li>Any flip fills at the next bar’s open. First flip after the clock ignores earlier flips and fills at the next open.</li>
+            <li>After the flip: flat exits on the opposite flip and stays out for the day; re-enter takes a later flip back to the original side; reverse takes the new side on the opposite flip.</li>
+            <li>Flatten exits at that bar’s close. The stored matrix flattens at the session close. Turning flatten off, and Daily agrees, are not in the stored matrix.</li>
+          </ul>
+          <h4>Costs</h4>
+          <ul>
+            <li>Equities: basis points on each side. HSI futures daily, weekly, and monthly: index points for one unit. Basis-point commission is not applied, and point cost is off.</li>
+            <li>HSI futures 1-minute and 5-minute ATR SuperTrend: round-trip points, subtracted once on each closed trade. Default is 8 points on a 1-minute exit and 6 on a 5-minute exit. 0 is price movement only.</li>
           </ul>
           <h4>Data</h4>
           <ul id="data-notes">
             <li>Daily OHLCV, dividends and splits, refreshed on a schedule. Weekly and monthly bars are built from the daily bars.</li>
             <li>Prices are split-adjusted. With dividends on, earlier prices are scaled by (1 − D ÷ previous close).</li>
-            <li>HSI futures add 1-minute and 5-minute bars. The day session is 09:15–12:00 and 13:00–16:30 Hong Kong time. A flip fills at the next bar’s open. A clock entry uses the direction of the last completed bar. Whatever is still open flattens at the session close. The score is index points for one unit.</li>
+            <li>HSI futures 1-minute and 5-minute ATR SuperTrend is a stored result. The page reads that matrix. It does not replay the minute tape. Factor 2.5 and EMA smoothing 2 are the stored study. The score is index points for one unit.</li>
             <li>Index symbols (^GSPC, ^NDX, ^HSI) are not directly tradable and carry no dividends.</li>
           </ul>
         </div>
