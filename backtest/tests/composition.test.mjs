@@ -130,8 +130,29 @@ test('a 5-minute flip is stamped on the next 5-minute bucket', () => {
 test('round-trip cost defaults follow the exit timeframe', () => {
   assert.equal(defaultCostPoints('5m'), 6);
   assert.equal(defaultCostPoints('1m'), 8);
+  assert.equal(defaultCostPoints('30m'), 6);
+  assert.equal(defaultCostPoints('1h'), 6);
   assert.equal(RECIPES.find((r) => r.id === 'fast-response').costPoints, 6);
   assert.equal(RECIPES.find((r) => r.id === 'daily-confirm').costPoints, 6);
+});
+
+test('30-minute and 1-hour bars resample from the 1-minute session tape', () => {
+  const bars = [];
+  for (let m = 9 * 60 + 15; m < 11 * 60; m++) {
+    const px = 100 + (m - (9 * 60 + 15));
+    bars.push({ time: stamp('2024-06-03', m), open: px, high: px + 2, low: px - 2, close: px + 1, volume: 1 });
+  }
+  const half = resampleMinutes(bars, 30);
+  assert.deepEqual(half.map((b) => b.time), ['2024-06-03T09:00:00', '2024-06-03T09:30:00', '2024-06-03T10:00:00', '2024-06-03T10:30:00']);
+  assert.equal(half[0].open, bars[0].open);
+  assert.equal(half[0].close, bars[14].close);
+  assert.equal(half[1].open, bars[15].open);
+  const hour = resampleMinutes(bars, 60);
+  assert.deepEqual(hour.map((b) => b.time), ['2024-06-03T09:00:00', '2024-06-03T10:00:00']);
+  assert.equal(hour[0].open, bars[0].open);
+  assert.equal(hour[0].close, bars[44].close);
+  assert.equal(hour[1].open, bars[45].open);
+  assert.equal(hour[1].close, bars.at(-1).close);
 });
 
 test('daily confirm blocks an entry when the previous daily direction disagrees', () => {
@@ -176,15 +197,17 @@ test('daily confirm blocks an entry when the previous daily direction disagrees'
   assert.equal(result.trades.length, 0);
 });
 
-test('ticker timeframe policy: 1m and 5m only for HSI futures', () => {
+test('ticker timeframe policy: 1m, 5m, 30m, and 1h only for HSI futures', () => {
   const spy = timeframeChoices('SPY');
   assert.equal(spy.find((t) => t.id === '1d').disabled, false);
-  assert.equal(spy.find((t) => t.id === '1m').disabled, true);
-  assert.equal(spy.find((t) => t.id === '5m').disabled, true);
-  assert.match(spy.find((t) => t.id === '5m').reason, /HSI futures/);
+  assert.equal(spy.find((t) => t.id === '15m'), undefined);
+  for (const id of ['1m', '5m', '30m', '1h']) {
+    assert.equal(spy.find((t) => t.id === id).disabled, true, id);
+    assert.match(spy.find((t) => t.id === id).reason, /1m, 5m, 30m, and 1h are only available for HSI futures/);
+    assert.equal(lockedSymbol(id), 'HSImain');
+  }
   const hsi = timeframeChoices('HSImain');
   assert.equal(hsi.every((t) => t.disabled === false), true);
-  assert.equal(lockedSymbol('1m'), 'HSImain');
-  assert.equal(lockedSymbol('5m'), 'HSImain');
+  assert.deepEqual(hsi.filter((t) => t.intraday).map((t) => t.id), ['1m', '5m', '30m', '1h']);
   assert.equal(lockedSymbol('1d'), null);
 });

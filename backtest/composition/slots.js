@@ -3,15 +3,15 @@
 // period do not read is disabled, with a short reason, instead of being left
 // live and ignored.
 //
-// Clock, exit, confirm, flatten, and point cost are read by the stored HSI
-// futures 1-minute and 5-minute ATR SuperTrend matrix (and by a strategy that
-// declares `capabilities.session` on those bars). Daily, weekly, and monthly
-// runs do not read them. By year / custom dates set From and To for every
-// strategy. Entry ATR is shown only when the strategy has an `atrLength` param.
+// Clock, exit, confirm, flatten, and point cost turn on for HSI futures
+// 1m, 5m, 30m, and 1h ATR SuperTrend. 1m and 5m read the stored matrix.
+// 30m and 1h have no matrix key yet. Daily, weekly, and monthly runs do not
+// read those slots. By year / custom dates set From and To for every strategy.
+// Entry ATR is shown only when the strategy has an `atrLength` param.
 
 import { isHsiFutures, isIntradayTimeframe } from '../symbols.js';
 
-const MATRIX = 'Applies to HSI futures 1-minute and 5-minute ATR SuperTrend.';
+const MATRIX = 'Applies to HSI futures 1m, 5m, 30m, and 1h ATR SuperTrend.';
 
 function on(reason = '') {
   return { enabled: true, hidden: false, reason };
@@ -54,7 +54,7 @@ export function periodAvailability(strategy, symbol, timeframeId) {
       disabled: true,
       block: true,
       reason: intraday
-        ? '1-minute and 5-minute bars are the stored ATR SuperTrend result for HSI futures.'
+        ? '1m, 5m, 30m, and 1h run on HSI futures ATR SuperTrend.'
         : 'This strategy does not run on that period.',
     };
   }
@@ -62,7 +62,7 @@ export function periodAvailability(strategy, symbol, timeframeId) {
     return {
       disabled: true,
       block: false,
-      reason: '1-minute and 5-minute bars are only available for HSI futures',
+      reason: '1m, 5m, 30m, and 1h are only available for HSI futures',
     };
   }
   return { disabled: false, block: false, reason: '' };
@@ -86,11 +86,11 @@ export function compositionSlots(strategy, ctx = {}) {
 
   let hint;
   if (matrix) {
-    hint = 'Stored HSI futures ATR SuperTrend only. Clock fills at the clock open; Any flip and First flip fill at the next open. After the flip: flat, re-enter, or reverse. Flatten exits at the session close. Point cost is once per closed trade. By year sets From and To.';
+    hint = 'Stored HSI futures ATR SuperTrend for 1m and 5m. 30m and 1h are not stored. Clock fills at the clock open; Any flip and First flip fill at the next open. After the flip: flat, re-enter, or reverse. Flatten exits at the session close. Point cost defaults to 8 on a 1m exit and 6 on 5m, 30m, or 1h, once per closed trade. By year sets From and To.';
   } else if (session) {
-    hint = 'Entry ATR is this study’s length. Clock, exit, confirm, and point cost turn on for HSI futures 1-minute and 5-minute bars. By year sets From and To.';
+    hint = 'Entry ATR is this study’s length. Clock, exit, confirm, and point cost turn on for HSI futures 1m, 5m, 30m, and 1h. By year sets From and To.';
   } else {
-    hint = 'Clock, exit, confirm, and point cost are for HSI futures 1-minute and 5-minute ATR SuperTrend. This strategy runs on the period above. By year sets From and To.';
+    hint = 'Clock, exit, confirm, and point cost are for HSI futures 1m, 5m, 30m, and 1h ATR SuperTrend. This strategy runs on the period above. By year sets From and To.';
   }
 
   return {
@@ -102,7 +102,7 @@ export function compositionSlots(strategy, ctx = {}) {
     exitTf: matrix ? on('') : off(MATRIX),
     clock: !matrix ? off(MATRIX) : entryRule === 'flip' ? off('Clock is not used for Any flip.') : on(''),
     exitRule: matrix ? on('') : off(MATRIX),
-    confirm: matrix ? on('Daily agrees is not in the stored results.') : off('Daily bars are already the signal. A separate daily confirm is only a slot on HSI futures 1-minute and 5-minute bars.'),
+    confirm: matrix ? on('Daily agrees is not in the stored results.') : off('Daily bars are already the signal. A separate daily confirm is only a slot on HSI futures 1m, 5m, 30m, and 1h.'),
     session: on(''),
     entryAtr: hasAtr ? on('') : hide('This strategy has no ATR length.'),
     exitAtr: !hasAtr
@@ -112,11 +112,11 @@ export function compositionSlots(strategy, ctx = {}) {
         : off(matrix ? 'Exit ATR matches Entry ATR while the timeframes match.' : 'Exit ATR applies when the HSI futures exit timeframe differs from the entry.'),
     flatten: matrix
       ? on('Stored results flatten at the Hong Kong session close. Turning this off is not computed yet.')
-      : off('Flatten at the session close applies to HSI futures 1-minute and 5-minute bars.'),
+      : off('Flatten at the session close applies to HSI futures 1m, 5m, 30m, and 1h.'),
     cost: matrix
       ? on('')
       : off(isHsiFutures(symbol)
-        ? 'Point cost applies to the stored 1-minute and 5-minute HSI futures score.'
-        : 'Point cost applies to the stored HSI futures score. Daily runs use commission in Settings.'),
+        ? 'Point cost applies to HSI futures 1m, 5m, 30m, and 1h.'
+        : 'Point cost applies to the HSI futures intraday score. Daily runs use commission in Settings.'),
   };
 }

@@ -90,6 +90,12 @@ test('a combo outside the grid does not name a key', () => {
   assert.equal(prepareHsiLookup({ ...fast, flattenEod: false }, now).message, NOT_COMPUTED);
   assert.equal(prepareHsiLookup({ ...fast, factor: 3 }, now).message, NOT_COMPUTED);
   assert.equal(prepareHsiLookup({ ...fast, strategy: 'td-sequential' }, now).message, NOT_SUPERTREND);
+  for (const tf of ['30m', '1h', '15m']) {
+    const spec = prepareHsiLookup({ ...fast, entryTimeframe: tf, exitTimeframe: tf }, now);
+    assert.equal(spec.ok, false, tf);
+    assert.equal(spec.message, NOT_COMPUTED, tf);
+    assert.equal(spec.key, undefined, tf);
+  }
   assert.equal(prepareHsiLookup({ ...fast, sessionMode: 'year', year: '2024' }, now).ok, true);
   assert.equal(prepareHsiLookup({ ...fast, sessionMode: 'year', year: '2024' }, now).from, '2024-01-01');
   assert.equal(prepareHsiLookup({ ...fast, sessionMode: 'year', year: '2024' }, now).to, '2024-12-31');

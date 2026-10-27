@@ -11,7 +11,7 @@ import { compose } from './composition/index.js';
 import { RECIPES, getRecipe, defaultCostPoints } from './composition/recipes.js';
 import { compositionSlots, periodAvailability, supportedTimeframe } from './composition/slots.js';
 import { deskAssumptions } from './composition/assumptions.js';
-import { HSI_FUTURES, TIMEFRAME_CHOICES, isHsiFutures, isIntradayTimeframe, timeframeChoices, lockedSymbol } from './symbols.js';
+import { HSI_FUTURES, INTRADAY_MINUTES, TIMEFRAME_CHOICES, isHsiFutures, isIntradayTimeframe, timeframeChoices, lockedSymbol } from './symbols.js';
 import { BacktestCharts } from './charts.js';
 import { esc } from '/assets/js/site.js';
 
@@ -28,6 +28,8 @@ const EXIT_RULES = [
 const EXIT_TFS = [
   { id: '1m', label: '1m' },
   { id: '5m', label: '5m' },
+  { id: '30m', label: '30m' },
+  { id: '1h', label: '1h' },
 ];
 
 const $ = (id) => document.getElementById(id);
@@ -534,7 +536,7 @@ function renderSymbols() {
       .filter((s) => s.group === g)
       .map((s) => {
         const disabled = lock && !isHsiFutures(s.symbol);
-        const why = disabled ? ' title="1-minute and 5-minute bars lock the security to HSI futures"' : '';
+        const why = disabled ? ' title="1m, 5m, 30m, and 1h lock the security to HSI futures"' : '';
         return `<option value="${esc(s.symbol)}"${disabled ? ' disabled' : ''}${why}>${esc(s.symbol)} · ${esc(s.name)}</option>`;
       })
       .join('')}</optgroup>`)
@@ -611,9 +613,9 @@ function syncCompose() {
   $('short').disabled = points;
   if (points) $('short').checked = true;
   $('exec-hint').textContent = session
-    ? 'HSI futures score is index points for one unit. Basis-point commission is not applied. Cost defaults to 6 points on a 5-minute exit and 8 on a 1-minute exit. 0 is price movement only.'
+    ? 'HSI futures score is index points for one unit. Basis-point commission is not applied. Cost defaults to 8 points on a 1-minute exit and 6 on a 5-minute, 30-minute, or 1-hour exit. 0 is price movement only.'
     : points
-      ? 'HSI futures on daily, weekly, and monthly bars score index points for one unit. Basis-point commission is not applied. Point cost turns on for 1-minute and 5-minute ATR SuperTrend.'
+      ? 'HSI futures on daily, weekly, and monthly bars score index points for one unit. Basis-point commission is not applied. Point cost turns on for 1m, 5m, 30m, and 1h ATR SuperTrend.'
       : `Fills at the next open. Commission ${state.commission} bps and slippage ${state.slippage} bps on each side. 0 turns that leg off.`;
   $('compose-hint').textContent = slots.hint;
   paintAssumptions(session ? 'matrix' : points ? 'hsi-daily' : 'equity');
@@ -627,6 +629,8 @@ function paintAssumptions(mode) {
     costPoints: state.costPoints,
     confirm: state.confirm,
     flattenEod: state.flattenEod,
+    entryTimeframe: state.tf,
+    exitTimeframe: state.exitTf,
   });
   $('assumptions-line').textContent = copy.line;
   $('assumptions-cost').textContent = copy.cost;
@@ -762,8 +766,12 @@ function schedule(ms = 120) {
 function viewBars(tf) {
   let bars = dataset.bars;
   const intraday = String(bars[0]?.time || '').includes('T');
-  if (tf === '1m') return filterDaySession(bars);
-  if (tf === '5m') return resampleMinutes(filterDaySession(bars), 5);
+  const minutes = INTRADAY_MINUTES[tf];
+  // HSI ATR SuperTrend never reaches this: that run is a stored lookup.
+  if (minutes) {
+    const session = filterDaySession(bars);
+    return minutes === 1 ? session : resampleMinutes(session, minutes);
+  }
   if (intraday) bars = toDaily(filterDaySession(bars));
   if (state.adjust && dataset.hasDividends) bars = adjustForDividends(bars);
   return resample(bars, tf === '1w' || tf === '1mo' ? tf : '1d');
@@ -830,7 +838,7 @@ async function run() {
     const points = isHsiFutures(dataset.symbol);
     const minuteBars = String(dataset.bars[0]?.time || '').includes('T');
     if (isIntradayTimeframe(state.tf) && !minuteBars) {
-      throw new BarsPending('1-minute and 5-minute HSI futures bars are not on this site yet.');
+      throw new BarsPending('1m, 5m, 30m, and 1h HSI futures bars are not on this site yet.');
     }
     const session = sessionActive() && minuteBars;
     let bars;
@@ -943,7 +951,7 @@ function showError(e) {
   $('results').classList.remove('loading');
   clearWorkspace();
   const empty = pending
-    ? 'No curve. 1-minute and 5-minute bars for this selection are not published.'
+    ? 'No curve. 1m, 5m, 30m, and 1h bars for this selection are not published.'
     : missing
       ? 'No curve. This combination is not in the stored result.'
       : 'No curve. This run did not complete.';
@@ -955,7 +963,7 @@ function showError(e) {
       ? e.message || 'This combination is not computed yet.'
       : 'Could not run this backtest';
   $('run-sub').textContent = pending
-    ? 'Daily strategies on the other symbols still run. 1-minute and 5-minute bars show up here when the public packs are published.'
+    ? 'Daily strategies on the other symbols still run. 1m, 5m, 30m, and 1h show up here when a result is published.'
     : missing
       ? 'All years stays available. Another control may already have a stored result.'
       : 'The run stopped before a curve or a statistic was produced.';

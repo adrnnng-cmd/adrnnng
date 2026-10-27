@@ -4,18 +4,18 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Backtest · ADRRR</title>
-  <meta name="description" content="Backtest TD Sequential and ATR SuperTrend on daily history, and HSI futures on 1-minute and 5-minute bars. Strategy analysis chart, profit curve, statistics, trades.">
+  <meta name="description" content="Backtest TD Sequential and ATR SuperTrend on daily history, and HSI futures on 1m, 5m, 30m, and 1h. Strategy analysis chart, profit curve, statistics, trades.">
   <link rel="canonical" href="https://adrnnng.com/backtest/">
   <meta name="theme-color" content="#000000">
   <meta property="og:site_name" content="ADRRR">
   <meta property="og:title" content="Backtest · ADRRR">
-  <meta property="og:description" content="Backtest TD Sequential and ATR SuperTrend on daily history, and HSI futures on 1-minute and 5-minute bars. Strategy analysis chart, profit curve, statistics, trades.">
+  <meta property="og:description" content="Backtest TD Sequential and ATR SuperTrend on daily history, and HSI futures on 1m, 5m, 30m, and 1h. Strategy analysis chart, profit curve, statistics, trades.">
   <meta property="og:url" content="https://adrnnng.com/backtest/">
   <meta property="og:type" content="website">
   <meta property="og:image" content="https://adrnnng.com/assets/brand/og-image.png">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Backtest · ADRRR">
-  <meta name="twitter:description" content="Backtest TD Sequential and ATR SuperTrend on daily history, and HSI futures on 1-minute and 5-minute bars. Strategy analysis chart, profit curve, statistics, trades.">
+  <meta name="twitter:description" content="Backtest TD Sequential and ATR SuperTrend on daily history, and HSI futures on 1m, 5m, 30m, and 1h. Strategy analysis chart, profit curve, statistics, trades.">
   <meta name="twitter:image" content="https://adrnnng.com/assets/brand/og-image.png">
   <link rel="icon" href="/assets/brand/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/assets/brand/apple-touch-icon.png">
@@ -213,7 +213,7 @@
           </ul>
           <h4>Session</h4>
           <ul>
-            <li>The session rules apply only to HSI futures 1-minute and 5-minute ATR SuperTrend. Daily, weekly, and monthly runs ignore clock, exit timeframe, after the flip, confirm, flatten, and point cost.</li>
+            <li>The session rules apply to HSI futures 1m, 5m, 30m, and 1h ATR SuperTrend. Daily, weekly, and monthly runs ignore clock, exit timeframe, after the flip, confirm, flatten, and point cost. 1m and 5m read the stored matrix. 30m and 1h are not stored yet.</li>
             <li>Day session is 09:15–12:00 and 13:00–16:30 Hong Kong time.</li>
             <li>Clock state fills at the clock bar’s open, using the direction of the last completed bar. The clock is not used for Any flip.</li>
             <li>Any flip fills at the next bar’s open. First flip after the clock ignores earlier flips and fills at the next open.</li>
@@ -223,13 +223,13 @@
           <h4>Costs</h4>
           <ul>
             <li>Equities: basis points on each side. HSI futures daily, weekly, and monthly: index points for one unit. Basis-point commission is not applied, and point cost is off.</li>
-            <li>HSI futures 1-minute and 5-minute ATR SuperTrend: round-trip points, once per closed trade. Default is 8 on a 1-minute exit and 6 on a 5-minute exit. 0 is price only. Basis-point commission is not applied.</li>
+            <li>HSI futures 1m, 5m, 30m, and 1h ATR SuperTrend: round-trip points, once per closed trade. Default is 8 on a 1-minute exit and 6 on a 5-minute, 30-minute, or 1-hour exit. 0 is price only. Basis-point commission is not applied.</li>
           </ul>
           <h4>Data</h4>
           <ul id="data-notes">
             <li>Daily OHLCV, dividends and splits, refreshed on a schedule. Weekly and monthly bars are built from the daily bars.</li>
             <li>Prices are split-adjusted. With dividends on, earlier prices are scaled by (1 − D ÷ previous close).</li>
-            <li>HSI futures 1-minute and 5-minute ATR SuperTrend is a stored result. The page reads that matrix. It does not replay the minute tape. Factor 2.5 and EMA smoothing 2 are the stored study. The score is index points for one unit.</li>
+            <li>HSI futures 1m and 5m ATR SuperTrend is a stored result. 30m and 1h use the same controls and say not computed until a matrix is stored. The page does not replay the tape. Factor 2.5 and EMA smoothing 2 are the stored study. The score is index points for one unit.</li>
             <li>Index symbols (^GSPC, ^NDX, ^HSI) are not directly tradable and carry no dividends.</li>
           </ul>
         </div>

@@ -77,10 +77,10 @@ export default {
   id: 'atr-supertrend',
   name: 'ATR SuperTrend',
   short: 'SuperTrend',
-  summary: 'Long while the smoothed close holds above a ratcheting ATR band, short while it holds below. On HSI futures, 1-minute and 5-minute runs add the session clock.',
+  summary: 'Long while the smoothed close holds above a ratcheting ATR band, short while it holds below. On HSI futures, 1m, 5m, 30m, and 1h add the session clock.',
   tags: ['Trend'],
   capabilities: {
-    timeframes: ['1d', '1w', '1mo', '1m', '5m'],
+    timeframes: ['1d', '1w', '1mo', '1m', '5m', '30m', '1h'],
     session: true,
   },
   params: [

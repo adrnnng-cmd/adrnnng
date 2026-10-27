@@ -1,7 +1,7 @@
 // Named compositions the page can select. A recipe fills the controls.
 // It does not nest strategies; it only records slots.
 
-/** Round-trip points until the visitor types their own. 1-minute exits cost 8, 5-minute exits cost 6. */
+/** Round-trip points until the visitor types their own. 1m exits cost 8. 5m, 30m, and 1h cost 6. */
 export function defaultCostPoints(exitTf) {
   return exitTf === '1m' ? 8 : 6;
 }

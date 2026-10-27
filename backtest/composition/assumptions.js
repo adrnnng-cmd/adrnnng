@@ -20,11 +20,14 @@ export function deskAssumptions(ctx = {}) {
   const costPoints = Number.isFinite(Number(ctx.costPoints)) ? Number(ctx.costPoints) : 0;
 
   if (mode === 'matrix') {
-    let data = 'Stored ATR SuperTrend matrix, factor 2.5, EMA smoothing 2. This page does not replay the minute tape.';
+    const coarse = ctx.entryTimeframe === '30m' || ctx.entryTimeframe === '1h' || ctx.exitTimeframe === '30m' || ctx.exitTimeframe === '1h';
+    let data = coarse
+      ? '30m and 1h are not in the stored matrix. This page does not replay the tape.'
+      : 'Stored ATR SuperTrend matrix, factor 2.5, EMA smoothing 2. This page does not replay the minute tape.';
     if (ctx.confirm === 'daily' || ctx.flattenEod === false) data += ' Daily agrees and flatten off are not stored.';
     return {
       line: LINE,
-      cost: `Round-trip cost is ${costPoints} index points, once per closed trade. Default is 8 on a 1-minute exit and 6 on a 5-minute exit. 0 is price only.`,
+      cost: `Round-trip cost is ${costPoints} index points, once per closed trade. Default is 8 on a 1-minute exit and 6 on a 5-minute, 30-minute, or 1-hour exit. 0 is price only.`,
       session: SESSION_ON,
       data,
     };

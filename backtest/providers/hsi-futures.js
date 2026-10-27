@@ -122,7 +122,7 @@ function pack(bars, resolution, asOf) {
     hasDividends: false,
     source: {
       name: 'HSI futures',
-      note: 'Hang Seng futures, continuous. Day session in Hong Kong time. 1-minute and 5-minute bars when the public packs are published.',
+      note: 'Hang Seng futures, continuous. Day session in Hong Kong time. 1m, 5m, 30m, and 1h when a result is published.',
       asOf,
     },
     sample: false,
@@ -135,14 +135,14 @@ const catalog = Object.freeze([{
   group: HSI_FUTURES.group,
   currency: HSI_FUTURES.currency,
   exchange: HSI_FUTURES.exchange,
-  timeframes: ['1d', '1w', '1mo', '1m', '5m'],
+  timeframes: ['1d', '1w', '1mo', '1m', '5m', '30m', '1h'],
 }]);
 
 export default {
   id: 'hsi-futures',
   name: 'HSI futures',
   kind: 'catalog',
-  description: 'Hang Seng futures. 1-minute and 5-minute ATR SuperTrend reads a stored result. Daily bars come from v1/1d/HSImain.csv when that file is published.',
+  description: 'Hang Seng futures. 1m and 5m ATR SuperTrend read a stored result. 30m and 1h are selectable and not stored yet. Daily bars come from v1/1d/HSImain.csv when that file is published.',
   async listSymbols() {
     return catalog.map((s) => ({ ...s }));
   },

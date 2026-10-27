@@ -33,7 +33,7 @@
 import { hsiBarsBase } from './hsi-futures.js';
 
 export const NOT_COMPUTED = 'This combination is not computed yet.';
-export const NOT_SUPERTREND = '1-minute and 5-minute HSI futures use the stored ATR SuperTrend result.';
+export const NOT_SUPERTREND = 'HSI futures 1m, 5m, 30m, and 1h use ATR SuperTrend. 1m and 5m read the stored result.';
 export const OUTSIDE_RANGE = 'That date range is outside the stored results.';
 export const UNREADABLE = 'The stored result could not be read.';
 

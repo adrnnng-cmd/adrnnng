@@ -3,12 +3,12 @@
 // directions into a target[] for the engine. Strategies do not call each other.
 
 import { filterDaySession, resampleMinutes, toDaily, HSI_DAY_SESSION } from '../engine/intraday.js';
-import { isIntradayTimeframe } from '../symbols.js';
+import { INTRADAY_MINUTES, isIntradayTimeframe } from '../symbols.js';
 import { alignSignals } from './align.js';
 import { gateEntries } from './confirm.js';
 import { parseClock, sessionPlan } from './session.js';
 
-const TF_MINUTES = { '1m': 1, '5m': 5 };
+const TF_MINUTES = INTRADAY_MINUTES;
 
 function trendOf(out) {
   return out.signal || out.target || [];

@@ -119,8 +119,9 @@ charts.js / app.js → the one /backtest/ page
 
 `/hsi-lab/` redirects to `/backtest/` with the Fast Response recipe selected. There is not a second UI.
 
-HSI futures 1-minute and 5-minute ATR SuperTrend does not run the minute tape in the browser.
-The page looks up a stored daily score and draws that. Pages Functions in `functions/backtest/data/hsi/`
+HSI futures ATR SuperTrend on 1m, 5m, 30m, and 1h does not run the minute tape in the browser.
+1m and 5m look up a stored score. 30m and 1h are selectable and say not computed until a matrix is stored.
+Pages Functions in `functions/backtest/data/hsi/`
 read the objects from the existing `HSI_BARS` KV binding. The year packs and the result bundles stay
 out of git. A missing result says it is not computed yet. A missing daily file says the bars are not
 on the site yet.
@@ -136,8 +137,8 @@ on the site yet.
 `_routes.json` sends only `/backtest/data/hsi/*` through a Function. The rest of the site stays static.
 Minute objects are `v1/1m/YYYY.bin` (magic `HSI1`). Every equity and index on the page has daily bars
 in the site files. HSI futures daily, weekly, and monthly use `v1/1d/HSImain.csv` when that file is
-published. 1-minute and 5-minute stay disabled for every other ticker, and choosing them locks the
-security to HSI futures. The page never names a data vendor.
+published. 1m, 5m, 30m, and 1h stay disabled for every other ticker, and choosing them locks the
+security to HSI futures. There is no 15-minute choice. The page never names a data vendor.
 
 ### Stored HSI SuperTrend results
 
@@ -206,8 +207,8 @@ select. The composition row (entry, exit, clock, after the flip, confirm, sessio
 From–To, plus Entry ATR / Exit ATR when the study has an ATR length) is on the page for every
 strategy. A slot that does not change that run is disabled, with the reason on the control and in
 the row hint. TD Sequential on daily, weekly, and monthly bars uses By year and From–To. Clock,
-exit, confirm, flatten, and point cost apply to HSI futures 1-minute and 5-minute ATR SuperTrend,
-which reads the stored matrix and does not run the minute tape. The first selectable recipe is
+exit, confirm, flatten, and point cost apply to HSI futures 1m, 5m, 30m, and 1h ATR SuperTrend.
+1m and 5m read the stored matrix. 30m and 1h are not stored yet and do not run the minute tape. The first selectable recipe is
 SuperTrend Fast Response (ATR 10, factor 2.5, smoothing 2, 5-minute clock at 09:30, re-enter, flatten
 at the day-session close). A second recipe adds a daily SuperTrend confirm as a separate signal.
 That confirm is not in the stored results.

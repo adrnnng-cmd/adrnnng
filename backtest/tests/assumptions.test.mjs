@@ -24,7 +24,7 @@ test('assumptions name the cost and the session rules for each book', () => {
   assert.doesNotMatch(daily.session, /Clock|they mean/);
 
   const matrix = deskAssumptions({ mode: 'matrix', costPoints: 6, confirm: 'none', flattenEod: true });
-  assert.equal(matrix.cost, 'Round-trip cost is 6 index points, once per closed trade. Default is 8 on a 1-minute exit and 6 on a 5-minute exit. 0 is price only.');
+  assert.equal(matrix.cost, 'Round-trip cost is 6 index points, once per closed trade. Default is 8 on a 1-minute exit and 6 on a 5-minute, 30-minute, or 1-hour exit. 0 is price only.');
   assert.match(matrix.session, /09:15–12:00 and 13:00–16:30/);
   assert.match(matrix.session, /Clock fills at the clock open/);
   assert.match(matrix.session, /Any flip fills at the next open/);
@@ -35,6 +35,9 @@ test('assumptions name the cost and the session rules for each book', () => {
   assert.match(matrix.session, /Flatten exits at that bar’s close/);
   assert.doesNotMatch(matrix.session, /they mean|Not in force/);
   assert.equal(matrix.data, 'Stored ATR SuperTrend matrix, factor 2.5, EMA smoothing 2. This page does not replay the minute tape.');
+  const coarse = deskAssumptions({ mode: 'matrix', costPoints: 6, entryTimeframe: '30m', exitTimeframe: '30m' });
+  assert.equal(coarse.data, '30m and 1h are not in the stored matrix. This page does not replay the tape.');
+  assert.equal(deskAssumptions({ mode: 'matrix', costPoints: 6, entryTimeframe: '5m', exitTimeframe: '1h' }).data, coarse.data);
 
   const blocked = deskAssumptions({ mode: 'matrix', costPoints: 0, confirm: 'daily', flattenEod: false });
   assert.match(blocked.data, /Daily agrees and flatten off are not stored/);
@@ -49,7 +52,8 @@ test('the page shows assumptions, session rules, and a readable chart scale', ()
   assert.match(html, /id="assumptions-session">Not in force on this run\.</);
   assert.match(html, /id="assumptions-cost">Commission 5 bps and slippage 5 bps each side\. 0 is off\.</);
   assert.match(html, /Clock state fills at the clock bar’s open/);
-  assert.match(html, /8 on a 1-minute exit and 6 on a 5-minute exit/);
+  assert.match(html, /8 on a 1-minute exit and 6 on a 5-minute, 30-minute, or 1-hour exit/);
+  assert.doesNotMatch(html, /\b15m\b/);
   const strip = html.slice(html.indexOf('id="assumptions"'), html.indexOf('id="notices"'));
   assert.doesNotMatch(strip, /they mean/);
   assert.doesNotMatch(strip, /Clock state fills/);
@@ -74,5 +78,6 @@ test('the page shows assumptions, session rules, and a readable chart scale', ()
     entryRule: 'clock',
   }).hint;
   assert.match(hint, /Clock fills at the clock open/);
-  assert.match(hint, /Point cost is once per closed trade/);
+  assert.match(hint, /once per closed trade/);
+  assert.match(hint, /30m and 1h are not stored/);
 });

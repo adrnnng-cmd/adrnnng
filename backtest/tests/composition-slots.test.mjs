@@ -82,6 +82,16 @@ test('HSI minute ATR SuperTrend turns the matrix slots on', () => {
   assert.equal(flip.clock.enabled, false);
   assert.match(flip.clock.reason, /Any flip/);
   assert.equal(flip.clock.hidden, false);
+
+  const half = compositionSlots(st(), { symbol: 'HSImain', timeframe: '30m', exitTimeframe: '1h', entryRule: 'clock' });
+  assert.equal(half.matrix, true);
+  assert.equal(half.exitAtr.enabled, true);
+  assert.equal(periodAvailability(st(), 'HSImain', '30m').disabled, false);
+  assert.equal(periodAvailability(st(), 'HSImain', '1h').block, false);
+  assert.equal(periodAvailability(st(), 'SPY', '30m').disabled, true);
+  assert.equal(periodAvailability(st(), 'SPY', '1h').block, false);
+  assert.equal(periodAvailability(td(), 'HSImain', '30m').block, true);
+  assert.equal(periodAvailability(td(), 'SPY', '1h').block, true);
 });
 
 test('a future plug-in without a session uses the same disabled row', () => {
