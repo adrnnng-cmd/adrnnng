@@ -4,8 +4,8 @@
 // live and ignored.
 //
 // Clock, exit, confirm, flatten, and point cost turn on for HSI futures
-// 1m, 5m, 30m, and 1h ATR SuperTrend. 1m and 5m read the stored matrix.
-// 30m and 1h have no matrix key yet. Daily, weekly, and monthly runs do not
+// 1m, 5m, 30m, and 1h ATR SuperTrend. Those periods read the stored matrix.
+// 1h is stored as 60 minutes. Daily, weekly, and monthly runs do not
 // read those slots. By year / custom dates set From and To for every strategy.
 // Entry ATR is shown only when the strategy has an `atrLength` param.
 
@@ -86,7 +86,7 @@ export function compositionSlots(strategy, ctx = {}) {
 
   let hint;
   if (matrix) {
-    hint = 'Stored HSI futures ATR SuperTrend for 1m and 5m. 30m and 1h are not stored. Clock fills at the clock open; Any flip and First flip fill at the next open. After the flip: flat, re-enter, or reverse. Flatten exits at the session close. Point cost defaults to 8 on a 1m exit and 6 on 5m, 30m, or 1h, once per closed trade. By year sets From and To.';
+    hint = 'Stored HSI futures ATR SuperTrend for 1m, 5m, 30m, and 1h. Clock fills at the clock open; Any flip and First flip fill at the next open. After the flip: flat, re-enter, or reverse. Flatten exits at the session close. Point cost defaults to 8 on a 1m exit and 6 on 5m, 30m, or 1h, once per closed trade. By year sets From and To.';
   } else if (session) {
     hint = 'Entry ATR is this study’s length. Clock, exit, confirm, and point cost turn on for HSI futures 1m, 5m, 30m, and 1h. By year sets From and To.';
   } else {

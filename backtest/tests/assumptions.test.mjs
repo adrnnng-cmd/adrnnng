@@ -36,8 +36,10 @@ test('assumptions name the cost and the session rules for each book', () => {
   assert.doesNotMatch(matrix.session, /they mean|Not in force/);
   assert.equal(matrix.data, 'Stored ATR SuperTrend matrix, factor 2.5, EMA smoothing 2. This page does not replay the minute tape.');
   const coarse = deskAssumptions({ mode: 'matrix', costPoints: 6, entryTimeframe: '30m', exitTimeframe: '30m' });
-  assert.equal(coarse.data, '30m and 1h are not in the stored matrix. This page does not replay the tape.');
-  assert.equal(deskAssumptions({ mode: 'matrix', costPoints: 6, entryTimeframe: '5m', exitTimeframe: '1h' }).data, coarse.data);
+  assert.equal(coarse.data, matrix.data);
+  assert.equal(deskAssumptions({ mode: 'matrix', costPoints: 6, entryTimeframe: '5m', exitTimeframe: '1h' }).data, matrix.data);
+  assert.doesNotMatch(coarse.data, /not in the stored matrix/);
+  assert.match(coarse.data, /does not replay the minute tape/);
 
   const blocked = deskAssumptions({ mode: 'matrix', costPoints: 0, confirm: 'daily', flattenEod: false });
   assert.match(blocked.data, /Daily agrees and flatten off are not stored/);
@@ -81,5 +83,13 @@ test('the page shows assumptions, session rules, and a readable chart scale', ()
   }).hint;
   assert.match(hint, /Clock fills at the clock open/);
   assert.match(hint, /once per closed trade/);
-  assert.match(hint, /30m and 1h are not stored/);
+  assert.match(hint, /1m, 5m, 30m, and 1h/);
+  assert.doesNotMatch(hint, /not stored/);
+  const coarseHint = compositionSlots(getStrategy('atr-supertrend'), {
+    symbol: 'HSImain',
+    timeframe: '30m',
+    exitTimeframe: '1h',
+    entryRule: 'clock',
+  }).hint;
+  assert.equal(coarseHint, hint);
 });

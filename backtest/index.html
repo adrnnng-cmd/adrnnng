@@ -213,7 +213,7 @@
           </ul>
           <h4>Session</h4>
           <ul>
-            <li>The session rules apply to HSI futures 1m, 5m, 30m, and 1h ATR SuperTrend. Daily, weekly, and monthly runs ignore clock, exit timeframe, after the flip, confirm, flatten, and point cost. 1m and 5m read the stored matrix. 30m and 1h are not stored yet.</li>
+            <li>The session rules apply to HSI futures 1m, 5m, 30m, and 1h ATR SuperTrend. Daily, weekly, and monthly runs ignore clock, exit timeframe, after the flip, confirm, flatten, and point cost. 1m, 5m, 30m, and 1h read the stored matrix.</li>
             <li>Day session is 09:15–12:00 and 13:00–16:30 Hong Kong time.</li>
             <li>Clock state fills at the clock bar’s open, using the direction of the last completed bar. The clock is not used for Any flip.</li>
             <li>Any flip fills at the next bar’s open. First flip after the clock ignores earlier flips and fills at the next open.</li>
@@ -229,7 +229,7 @@
           <ul id="data-notes">
             <li>Daily OHLCV, dividends and splits, refreshed on a schedule. Weekly and monthly bars are built from the daily bars.</li>
             <li>Prices are split-adjusted. With dividends on, earlier prices are scaled by (1 − D ÷ previous close).</li>
-            <li>HSI futures 1m and 5m ATR SuperTrend is a stored result. 30m and 1h use the same controls and say not computed until a matrix is stored. The page does not replay the tape. Factor 2.5 and EMA smoothing 2 are the stored study. The score is index points for one unit.</li>
+            <li>HSI futures 1m, 5m, 30m, and 1h ATR SuperTrend is a stored result. A combination outside that matrix says not computed. The page does not replay the tape. Factor 2.5 and EMA smoothing 2 are the stored study. The score is index points for one unit.</li>
             <li>Index symbols (^GSPC, ^NDX, ^HSI) are not directly tradable and carry no dividends.</li>
           </ul>
         </div>

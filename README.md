@@ -120,7 +120,7 @@ charts.js / app.js → the one /backtest/ page
 `/hsi-lab/` redirects to `/backtest/` with the Fast Response recipe selected. There is not a second UI.
 
 HSI futures ATR SuperTrend on 1m, 5m, 30m, and 1h does not run the minute tape in the browser.
-1m and 5m look up a stored score. 30m and 1h are selectable and say not computed until a matrix is stored.
+1m, 5m, 30m, and 1h look up a stored score. 1h is stored as 60 minutes. A combination outside that matrix says it is not computed yet.
 Pages Functions in `functions/backtest/data/hsi/`
 read the objects from the existing `HSI_BARS` KV binding. The year packs and the result bundles stay
 out of git. A missing result says it is not computed yet. A missing daily file says the bars are not
@@ -132,7 +132,7 @@ on the site yet.
 | `HSI_BARS_URL` | Worker or pack environment | Public base URL for that prefix |
 | `HSI_BARS_BASE` | `window.__HSI_BARS_BASE` or `<meta name="hsi-bars-base">` | Same base, read in the browser |
 | bar paths | `/backtest/data/hsi/` | `v1/1m/manifest.json`, `v1/1m/YYYY.bin`, optional `v1/1d/HSImain.csv` |
-| result paths | `/backtest/data/hsi/` | `v1/results/{1\|5}m-{10\|11\|12\|13\|14}/all.json.gz` |
+| result paths | `/backtest/data/hsi/` | `v1/results/{1\|5\|30\|60}m-{10\|11\|12\|13\|14}/all.json.gz` |
 
 `_routes.json` sends only `/backtest/data/hsi/*` through a Function. The rest of the site stays static.
 Minute objects are `v1/1m/YYYY.bin` (magic `HSI1`). Every equity and index on the page has daily bars
@@ -148,15 +148,15 @@ clock 09:30, re-enter:
 - Key and public path: `v1/results/5m-10/all.json.gz`
 - Combo inside the bundle: `5:10:clock:09:30:reenter`
 
-Key shape: `v1/results/{entryTf}m-{entryAtr}/all.json.gz` with `entryTf` of `1` or `5` and
-`entryAtr` of 10, 11, 12, 13, or 14. The body is gzip (magic `1f 8b`) of an HSID v1 daily bundle,
+Key shape: `v1/results/{entryTf}m-{entryAtr}/all.json.gz` with `entryTf` of `1`, `5`, `30`, or `60`
+(`1h` is `60`) and `entryAtr` of 10, 11, 12, 13, or 14. The body is gzip (magic `1f 8b`) of an HSID v1 daily bundle,
 the same bytes `encodeBundle()` in `backtest/providers/hsi-results.js` writes. The name ends in
 `.json.gz`; the payload is not JSON. A year file `v1/results/{entryTf}m-{entryAtr}/{year}.json.gz`
 is served if it is uploaded. The page reads the `all` bundle.
 
 Combo shape: `{exitTf}:{exitAtr}:{entryRule}:{clock}:{exitRule}`.
 
-- `exitTf` is `1` or `5`. `exitAtr` is 10–14, and equals `entryAtr` when the timeframes match.
+- `exitTf` is `1`, `5`, `30`, or `60` (`1h` is `60`). `exitAtr` is 10–14, and equals `entryAtr` when the timeframes match.
 - `entryRule` is `flip`, `clock`, or `firstFlip`. `clock` is `-` for `flip`, otherwise `09:15` or `09:30`.
 - `exitRule` is `flat`, `reenter`, or `reverse`.
 
@@ -169,6 +169,7 @@ equity colors as the other backtests.
 
 The SuperTrend line and Buy/Sell labels are not in that score. They are one extra object per combo,
 `v1/results/{entryTf}m-{entryAtr}/ov/{exitTf}-{exitAtr}-{entryRule}-{clock}-{exitRule}.json.gz`.
+That drawing is still named only for entry and exit timeframes `1` and `5`. A missing line leaves the score on the chart.
 `clock` is `na` for a flip, otherwise `0915` or `0930`. Fast Response is
 `v1/results/5m-10/ov/5-10-clock-0930-reenter.json.gz`. The body is gzip of the bytes
 `encodeOverlay()` in `backtest/providers/hsi-overlay.js` writes. Sample the session line and price
@@ -208,7 +209,7 @@ From–To, plus Entry ATR / Exit ATR when the study has an ATR length) is on the
 strategy. A slot that does not change that run is disabled, with the reason on the control and in
 the row hint. TD Sequential on daily, weekly, and monthly bars uses By year and From–To. Clock,
 exit, confirm, flatten, and point cost apply to HSI futures 1m, 5m, 30m, and 1h ATR SuperTrend.
-1m and 5m read the stored matrix. 30m and 1h are not stored yet and do not run the minute tape. The first selectable recipe is
+1m, 5m, 30m, and 1h read the stored matrix and do not run the minute tape. The first selectable recipe is
 SuperTrend Fast Response (ATR 10, factor 2.5, smoothing 2, 5-minute clock at 09:30, re-enter, flatten
 at the day-session close). A second recipe adds a daily SuperTrend confirm as a separate signal.
 That confirm is not in the stored results.
