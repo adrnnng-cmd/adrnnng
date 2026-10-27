@@ -84,18 +84,108 @@ test('Fast Response names the lab key and combo', () => {
   assert.equal(spec.to, '2026-10-23');
 });
 
+function dayRow(gross, trades, wins, grossWin, grossLoss, hold) {
+  return {
+    g: [gross],
+    t: [trades],
+    w: [wins],
+    gw: [grossWin],
+    gl: [grossLoss],
+    h: [hold],
+    mn: [0],
+    hours: { all: [], years: {} },
+  };
+}
+
+test('30m and 1h name the same bundle and combo shape', () => {
+  const half = prepareHsiLookup({ ...fast, entryTimeframe: '30m', exitTimeframe: '30m' }, now);
+  assert.equal(half.ok, true);
+  assert.equal(half.entryTimeframe, 30);
+  assert.equal(half.exitTimeframe, 30);
+  assert.equal(half.key, 'v1/results/30m-10/all.json.gz');
+  assert.equal(half.key, resultBundleKey('30m', 10));
+  assert.equal(half.key, resultBundleKey(30, 10));
+  assert.equal(half.combo, '30:10:clock:09:30:reenter');
+  assert.equal(half.combo, comboKey({ exitTimeframe: '30m', exitAtrLength: 10, entryRule: 'clock', clock: '09:30', exitRule: 'reenter' }));
+
+  const hour = prepareHsiLookup({ ...fast, entryTimeframe: '1h', exitTimeframe: '1h' }, now);
+  assert.equal(hour.ok, true);
+  assert.equal(hour.entryTimeframe, 60);
+  assert.equal(hour.exitTimeframe, 60);
+  assert.equal(hour.key, 'v1/results/60m-10/all.json.gz');
+  assert.equal(hour.key, resultBundleKey('1h', 10));
+  assert.equal(hour.key, resultBundleKey('60m', 10));
+  assert.equal(hour.key, resultBundleKey(60, 10));
+  assert.equal(hour.combo, '60:10:clock:09:30:reenter');
+  assert.equal(hour.combo, comboKey({ exitTimeframe: '1h', exitAtrLength: 10, entryRule: 'clock', clock: '09:30', exitRule: 'reenter' }));
+
+  for (const entry of [30, '30', '30m']) {
+    const spec = prepareHsiLookup({ ...fast, entryTimeframe: entry, exitTimeframe: '30m' }, now);
+    assert.equal(spec.ok, true, String(entry));
+    assert.equal(spec.entryTimeframe, 30, String(entry));
+    assert.equal(spec.key, 'v1/results/30m-10/all.json.gz', String(entry));
+  }
+  for (const entry of [60, '60', '60m', '1h']) {
+    const spec = prepareHsiLookup({ ...fast, entryTimeframe: entry, exitTimeframe: '1h' }, now);
+    assert.equal(spec.ok, true, String(entry));
+    assert.equal(spec.entryTimeframe, 60, String(entry));
+    assert.equal(spec.exitTimeframe, 60, String(entry));
+    assert.equal(spec.key, 'v1/results/60m-10/all.json.gz', String(entry));
+    assert.equal(spec.combo, '60:10:clock:09:30:reenter', String(entry));
+  }
+
+  const split = prepareHsiLookup({
+    ...fast,
+    entryTimeframe: '30m',
+    exitTimeframe: '1h',
+    atrLength: 12,
+    exitAtrLength: 14,
+    entryRule: 'flip',
+    exitRule: 'flat',
+  }, now);
+  assert.equal(split.ok, true);
+  assert.equal(split.clock, null);
+  assert.equal(split.key, 'v1/results/30m-12/all.json.gz');
+  assert.equal(split.combo, '60:14:flip:-:flat');
+
+  const sameTf = prepareHsiLookup({
+    ...fast,
+    entryTimeframe: '1h',
+    exitTimeframe: '1h',
+    atrLength: 12,
+    exitAtrLength: 14,
+  }, now);
+  assert.equal(sameTf.ok, false);
+  assert.equal(sameTf.message, NOT_COMPUTED);
+  assert.equal(sameTf.key, undefined);
+
+  for (const patch of [
+    { entryTimeframe: '30m', exitTimeframe: '30m', atrLength: 9 },
+    { entryTimeframe: '1h', exitTimeframe: '1h', confirm: 'daily' },
+    { entryTimeframe: '30m', exitTimeframe: '30m', flattenEod: false },
+    { entryTimeframe: '1h', exitTimeframe: '1h', factor: 3 },
+    { entryTimeframe: '30m', exitTimeframe: '30m', smoothing: 3 },
+    { entryTimeframe: '1h', exitTimeframe: '1h', entryRule: 'signal' },
+    { entryTimeframe: '30m', exitTimeframe: '2h' },
+    { entryTimeframe: '15m', exitTimeframe: '30m' },
+  ]) {
+    const spec = prepareHsiLookup({ ...fast, ...patch }, now);
+    assert.equal(spec.ok, false, JSON.stringify(patch));
+    assert.equal(spec.message, NOT_COMPUTED, JSON.stringify(patch));
+    assert.equal(spec.key, undefined, JSON.stringify(patch));
+  }
+});
+
 test('a combo outside the grid does not name a key', () => {
   assert.equal(prepareHsiLookup({ ...fast, atrLength: 9 }, now).ok, false);
   assert.equal(prepareHsiLookup({ ...fast, confirm: 'daily' }, now).message, NOT_COMPUTED);
   assert.equal(prepareHsiLookup({ ...fast, flattenEod: false }, now).message, NOT_COMPUTED);
   assert.equal(prepareHsiLookup({ ...fast, factor: 3 }, now).message, NOT_COMPUTED);
   assert.equal(prepareHsiLookup({ ...fast, strategy: 'td-sequential' }, now).message, NOT_SUPERTREND);
-  for (const tf of ['30m', '1h', '15m']) {
-    const spec = prepareHsiLookup({ ...fast, entryTimeframe: tf, exitTimeframe: tf }, now);
-    assert.equal(spec.ok, false, tf);
-    assert.equal(spec.message, NOT_COMPUTED, tf);
-    assert.equal(spec.key, undefined, tf);
-  }
+  const quarter = prepareHsiLookup({ ...fast, entryTimeframe: '15m', exitTimeframe: '15m' }, now);
+  assert.equal(quarter.ok, false);
+  assert.equal(quarter.message, NOT_COMPUTED);
+  assert.equal(quarter.key, undefined);
   assert.equal(prepareHsiLookup({ ...fast, sessionMode: 'year', year: '2024' }, now).ok, true);
   assert.equal(prepareHsiLookup({ ...fast, sessionMode: 'year', year: '2024' }, now).from, '2024-01-01');
   assert.equal(prepareHsiLookup({ ...fast, sessionMode: 'year', year: '2024' }, now).to, '2024-12-31');
@@ -190,6 +280,59 @@ test('lookup fetches only the one bundle and slices the selected year', async ()
   assert.equal(urls.length, 1);
 });
 
+test('a 30m lookup fetches the stored bundle and does not replay bars', async () => {
+  resetHsiResultCache();
+  const gz = gzipSync(encodeBundle({
+    entryTimeframe: 30,
+    atrLength: 10,
+    days: ['2024-03-04'],
+    rows: {
+      '30:10:clock:09:30:reenter': dayRow(12, 3, 2, 18, 6, 90),
+    },
+  }));
+  const urls = [];
+  const fetchImpl = async (url) => {
+    urls.push(String(url));
+    if (String(url).endsWith('v1/results/30m-10/all.json.gz')) {
+      return { status: 200, ok: true, arrayBuffer: async () => gz.buffer.slice(gz.byteOffset, gz.byteOffset + gz.byteLength) };
+    }
+    return { status: 404, ok: false, arrayBuffer: async () => new ArrayBuffer(0) };
+  };
+  const view = await lookupHsiResult({
+    ...fast,
+    entryTimeframe: '30m',
+    exitTimeframe: '30m',
+    sessionMode: 'dates',
+    from: '2024-03-04',
+    to: '2024-03-04',
+    costPoints: 6,
+  }, { base: 'https://bars.example/', fetchImpl, now });
+  assert.deepEqual(urls, ['https://bars.example/v1/results/30m-10/all.json.gz']);
+  assert.equal(view.params.entryTimeframe, 30);
+  assert.equal(view.params.exitTimeframe, 30);
+  assert.equal(view.combo, '30:10:clock:09:30:reenter');
+  assert.equal(view.metrics.trades, 3);
+  assert.equal(view.metrics.grossPoints, 12);
+  assert.equal(view.metrics.netPoints, -6);
+  assert.ok(!urls.some((url) => url.includes('.bin') || url.includes('/1m/')));
+
+  resetHsiResultCache();
+  const hourUrls = [];
+  const hourFetch = async (url) => {
+    hourUrls.push(String(url));
+    return { status: 404, ok: false, arrayBuffer: async () => new ArrayBuffer(0) };
+  };
+  await assert.rejects(
+    () => lookupHsiResult({
+      ...fast,
+      entryTimeframe: '1h',
+      exitTimeframe: '1h',
+    }, { base: 'https://bars.example/', fetchImpl: hourFetch, now }),
+    (err) => err instanceof ResultMissing && err.message === NOT_COMPUTED,
+  );
+  assert.deepEqual(hourUrls, ['https://bars.example/v1/results/60m-10/all.json.gz']);
+});
+
 test('a missing bundle or combo is not computed, and a bad combo is not fetched', async () => {
   resetHsiResultCache();
   const urls = [];
@@ -265,6 +408,10 @@ test('custom dates slice the all bundle even when year is still all', async () =
 test('the results function serves the bundle key and refuses anything else', async () => {
   assert.equal(hsiResultKey('5m-10', 'all.json.gz'), 'v1/results/5m-10/all.json.gz');
   assert.equal(hsiResultKey('1m-14', '2024.json.gz'), 'v1/results/1m-14/2024.json.gz');
+  assert.equal(hsiResultKey('30m-10', 'all.json.gz'), 'v1/results/30m-10/all.json.gz');
+  assert.equal(hsiResultKey('60m-14', '2024.json.gz'), 'v1/results/60m-14/2024.json.gz');
+  assert.equal(hsiResultKey('1h-10', 'all.json.gz'), null);
+  assert.equal(hsiResultKey('15m-10', 'all.json.gz'), null);
   assert.equal(hsiResultKey('5m-9', 'all.json.gz'), null);
   assert.equal(hsiResultKey('5m-10', '../secret.json.gz'), null);
 
@@ -296,7 +443,18 @@ test('the results function serves the bundle key and refuses anything else', asy
   assert.equal(missing.status, 404);
   const odd = await serveHsiResult({ method: 'GET', slug: 'notes', file: 'all.json.gz', kv });
   assert.equal(odd.status, 404);
-  assert.deepEqual(calls, ['v1/results/5m-14/all.json.gz', 'v1/results/5m-10/all.json.gz']);
+  const quarter = await serveHsiResult({ method: 'GET', slug: '15m-10', file: 'all.json.gz', kv });
+  assert.equal(quarter.status, 404);
+  const half = await serveHsiResult({ method: 'GET', slug: '30m-12', file: 'all.json.gz', kv });
+  assert.equal(half.status, 404);
+  const hour = await serveHsiResult({ method: 'GET', slug: '60m-10', file: 'all.json.gz', kv });
+  assert.equal(hour.status, 404);
+  assert.deepEqual(calls, [
+    'v1/results/5m-14/all.json.gz',
+    'v1/results/5m-10/all.json.gz',
+    'v1/results/30m-12/all.json.gz',
+    'v1/results/60m-10/all.json.gz',
+  ]);
 
   const text = readFileSync(join(root, 'functions/backtest/data/hsi/v1/results/[slug]/[file].js'), 'utf8');
   const page = readFileSync(join(root, 'backtest/providers/hsi-results.js'), 'utf8');

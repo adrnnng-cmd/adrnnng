@@ -142,7 +142,7 @@ export default {
   id: 'hsi-futures',
   name: 'HSI futures',
   kind: 'catalog',
-  description: 'Hang Seng futures. 1m and 5m ATR SuperTrend read a stored result. 30m and 1h are selectable and not stored yet. Daily bars come from v1/1d/HSImain.csv when that file is published.',
+  description: 'Hang Seng futures. 1m, 5m, 30m, and 1h ATR SuperTrend read a stored result. Daily bars come from v1/1d/HSImain.csv when that file is published.',
   async listSymbols() {
     return catalog.map((s) => ({ ...s }));
   },

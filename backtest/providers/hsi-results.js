@@ -3,7 +3,7 @@
 //
 // KV key (binding HSI_BARS), also the public path under /backtest/data/hsi/:
 //   v1/results/{entryTf}m-{entryAtr}/all.json.gz
-//     entryTf   1 or 5
+//     entryTf   1, 5, 30, or 60 (the 1h choice is 60)
 //     entryAtr  10, 11, 12, 13, or 14
 //   Body is gzip (magic 1f 8b) of an HSID v1 daily bundle. The name ends in
 //   .json.gz so it matches the lab key. The bytes are not JSON.
@@ -12,7 +12,7 @@
 //
 // Combo key inside the bundle, one row per cell:
 //   {exitTf}:{exitAtr}:{entryRule}:{clock}:{exitRule}
-//     exitTf     1 or 5
+//     exitTf     1, 5, 30, or 60 (the 1h choice is 60)
 //     exitAtr    10–14, and equal to entryAtr when the timeframes match
 //     entryRule  flip | clock | firstFlip
 //     clock      "-" for flip, otherwise 09:15 or 09:30
@@ -33,7 +33,7 @@
 import { hsiBarsBase } from './hsi-futures.js';
 
 export const NOT_COMPUTED = 'This combination is not computed yet.';
-export const NOT_SUPERTREND = 'HSI futures 1m, 5m, 30m, and 1h use ATR SuperTrend. 1m and 5m read the stored result.';
+export const NOT_SUPERTREND = 'HSI futures 1m, 5m, 30m, and 1h use ATR SuperTrend and read the stored result.';
 export const OUTSIDE_RANGE = 'That date range is outside the stored results.';
 export const UNREADABLE = 'The stored result could not be read.';
 
@@ -65,13 +65,21 @@ export class ArchiveError extends Error {
   }
 }
 
+function asTf(value) {
+  if (value === 1 || value === '1' || value === '1m') return 1;
+  if (value === 5 || value === '5' || value === '5m') return 5;
+  if (value === 30 || value === '30' || value === '30m') return 30;
+  if (value === 60 || value === '60' || value === '60m' || value === '1h') return 60;
+  return null;
+}
+
 export function resultBundleKey(entryTimeframe, atrLength) {
-  return `v1/results/${entryTimeframe}m-${atrLength}/all.json.gz`;
+  return `v1/results/${asTf(entryTimeframe)}m-${atrLength}/all.json.gz`;
 }
 
 export function comboKey({ exitTimeframe, exitAtrLength, entryRule, clock, exitRule }) {
   const at = entryRule === 'flip' ? '-' : clock;
-  return `${exitTimeframe}:${exitAtrLength}:${entryRule}:${at}:${exitRule}`;
+  return `${asTf(exitTimeframe)}:${exitAtrLength}:${entryRule}:${at}:${exitRule}`;
 }
 
 function roundTo(n, dp) {
@@ -145,12 +153,6 @@ function rangeBounds(range, now) {
     from: start < RESULT_DATA_START ? RESULT_DATA_START : start,
     to: end < cap ? end : cap,
   };
-}
-
-function asTf(value) {
-  if (value === 1 || value === '1' || value === '1m') return 1;
-  if (value === 5 || value === '5' || value === '5m') return 5;
-  return null;
 }
 
 function asAtr(value) {

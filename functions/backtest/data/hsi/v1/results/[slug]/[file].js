@@ -1,10 +1,10 @@
 // Public read of one stored HSI result from the Pages KV binding HSI_BARS.
 // Routes:
 //   GET /backtest/data/hsi/v1/results/5m-10/all.json.gz
-//   GET /backtest/data/hsi/v1/results/{1|5}m-{10|11|12|13|14}/{all|YYYY}.json.gz
-// The KV key is the same path under v1/results/. The body is the stored gzip.
+//   GET /backtest/data/hsi/v1/results/{1|5|30|60}m-{10|11|12|13|14}/{all|YYYY}.json.gz
+// 1h is stored as 60m. The KV key is the same path under v1/results/. The body is the stored gzip.
 
-const SLUG = /^(1|5)m-(10|11|12|13|14)$/;
+const SLUG = /^(1|5|30|60)m-(10|11|12|13|14)$/;
 const FILE = /^(all|\d{4})\.json\.gz$/;
 
 export function hsiResultKey(slug, file) {

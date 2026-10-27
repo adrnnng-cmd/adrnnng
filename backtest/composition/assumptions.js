@@ -20,10 +20,7 @@ export function deskAssumptions(ctx = {}) {
   const costPoints = Number.isFinite(Number(ctx.costPoints)) ? Number(ctx.costPoints) : 0;
 
   if (mode === 'matrix') {
-    const coarse = ctx.entryTimeframe === '30m' || ctx.entryTimeframe === '1h' || ctx.exitTimeframe === '30m' || ctx.exitTimeframe === '1h';
-    let data = coarse
-      ? '30m and 1h are not in the stored matrix. This page does not replay the tape.'
-      : 'Stored ATR SuperTrend matrix, factor 2.5, EMA smoothing 2. This page does not replay the minute tape.';
+    let data = 'Stored ATR SuperTrend matrix, factor 2.5, EMA smoothing 2. This page does not replay the minute tape.';
     if (ctx.confirm === 'daily' || ctx.flattenEod === false) data += ' Daily agrees and flatten off are not stored.';
     return {
       line: LINE,
