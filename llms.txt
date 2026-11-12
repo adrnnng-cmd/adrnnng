@@ -1,4 +1,4 @@
-# ADRRR
+# News Chart
 
 > Adrian Ng's trading and investing site. Morning Report, a congressional-trading tracker, and a TD Sequential backtest. Research and education, not investment advice.
 

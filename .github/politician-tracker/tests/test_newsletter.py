@@ -7,9 +7,9 @@ from tracker.render import render_page
 
 ACTION = "https://buttondown.com/api/emails/embed-subscribe/adrrr"
 COPY = [
-    "ADRRR · NEWSLETTER",
+    "News Chart · NEWSLETTER",
     "每朝 9 點前，港美股早報直送信箱",
-    "ADRRR News Lab — 隔夜美股、港股盤前、經濟數據與異動股，5 分鐘掌握開市前重點。",
+    "News Chart — 隔夜美股、港股盤前、經濟數據與異動股，5 分鐘掌握開市前重點。",
     "免費訂閱",
     "免費 · 隨時取消 · 由",
     "Buttondown",
