@@ -107,7 +107,8 @@ test('archive patch aligns the title, adds the description, and is idempotent', 
   const once = patchNewsArchive(raw);
   const twice = patchNewsArchive(once);
   assert.equal(twice, once);
-  assert.match(once, /<title>港股美股盤前早報 往期｜HK &amp; US Stocks Morning Report Archive — ADRRR<\/title>/);
+  assert.match(once, /<title>港股美股盤前早報 往期｜HK &amp; US Stocks Morning Report Archive — News Chart<\/title>/);
+  assert.match(once, /property="og:site_name" content="News Chart"/);
   assert.match(once, new RegExp(`name="description" content="${ARCHIVE_DESCRIPTION}"`));
   assert.match(once, /embed-subscribe\/adrrr/);
   assert.match(once, /\/assets\/css\/newsletter\.css/);
@@ -125,7 +126,7 @@ test('committed home, backtest, and redirects are crawlable', async () => {
   assert.match(home, /<html lang="zh-Hant-HK">/);
   assert.match(home, /<title>港股美股盤前早報｜News Chart<\/title>/);
   assert.match(home, /每日港美股晨報，爭取每朝 9 點前更新。News Chart by Adrian Ng — 訂閱電郵，追蹤盤前重點、政治人物持股與回測工具。/);
-  assert.equal(HOME_TITLE, '港股美股盤前早報｜ADRRR News Lab');
+  assert.equal(HOME_TITLE, '港股美股盤前早報｜News Chart');
   assert.match(home, /<h1 id="report-lead"><a href="\/news\/\d{8}\/">港股美股盤前早報<\/a><\/h1>/);
   const dek = /<p class="dek" id="report-dek">([^<]+)<\/p>/.exec(home);
   assert.ok(dek && [...dek[1]].length > 40, 'static dek');

@@ -13,6 +13,7 @@ export const SITE_ORIGIN = 'https://adrnnng.com';
 export const ORG_ID = `${SITE_ORIGIN}/#organization`;
 export const LOCALE = 'zh_HK';
 export const TWITTER_SITE = '@adrnnng';
+export const PRODUCT_NAME = 'News Chart';
 export const LOGO = {
   '@type': 'ImageObject',
   url: `${SITE_ORIGIN}/assets/brand/apple-touch-icon.png`,
@@ -20,7 +21,7 @@ export const LOGO = {
   height: 180,
 };
 export const RSS_HREF = `${SITE_ORIGIN}/news/feed.xml`;
-export const RSS_TITLE = 'ADRRR Morning Report';
+export const RSS_TITLE = `${PRODUCT_NAME} Morning Report`;
 
 const SECTION_PAGES = [
   { rel: 'backtest/index.html', crumb: 'Backtest', url: `${SITE_ORIGIN}/backtest/` },
@@ -32,7 +33,7 @@ export function organizationNode() {
   return {
     '@type': 'Organization',
     '@id': ORG_ID,
-    name: 'ADRRR',
+    name: PRODUCT_NAME,
     url: `${SITE_ORIGIN}/`,
     logo: LOGO,
   };
@@ -42,7 +43,7 @@ export function websiteNode() {
   return {
     '@type': 'WebSite',
     '@id': `${SITE_ORIGIN}/#website`,
-    name: 'ADRRR',
+    name: PRODUCT_NAME,
     url: `${SITE_ORIGIN}/`,
     inLanguage: 'zh-Hant-HK',
     publisher: { '@id': ORG_ID },
@@ -220,9 +221,9 @@ export function patchNewsArticleScripts(html) {
       if (!isArticle(node)) return;
       const pub = node.publisher && typeof node.publisher === 'object' && !Array.isArray(node.publisher)
         ? { ...node.publisher }
-        : { '@type': 'Organization', name: 'ADRRR' };
+        : { '@type': 'Organization', name: PRODUCT_NAME };
       pub['@type'] = pub['@type'] || 'Organization';
-      if (!pub.name) pub.name = 'ADRRR';
+      if (!pub.name) pub.name = PRODUCT_NAME;
       if (!pub['@id']) pub['@id'] = ORG_ID;
       pub.logo = { ...LOGO };
       if (!logoReady(node.publisher) || JSON.stringify(node.publisher) !== JSON.stringify(pub)) {
@@ -257,6 +258,7 @@ function editionCrumbName(html, ymd) {
 export function stampHtml(html, { kind = 'home', crumb = '', url = '', ymd = '' } = {}) {
   let out = html;
   out = ensureMeta(out, 'property', 'og:locale', LOCALE);
+  out = ensureMeta(out, 'property', 'og:site_name', PRODUCT_NAME);
   out = ensureMeta(out, 'name', 'twitter:site', TWITTER_SITE);
   if (kind === 'home' || kind === 'archive' || kind === 'edition') out = ensureRssLink(out);
   if (kind === 'edition') {

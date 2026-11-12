@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { test } from 'node:test';
-import { HOME_TITLE, ARCHIVE_TITLE, ARCHIVE_DESCRIPTION } from '../home-preview.mjs';
-import { organizationNode, websiteNode, RSS_TITLE, SITE_ORIGIN, TWITTER_SITE } from '../seo-meta.mjs';
+import { join } from 'node:path';
+import { HOME_TITLE, ARCHIVE_TITLE, ARCHIVE_DESCRIPTION, HOME_DESCRIPTION } from '../home-preview.mjs';
+import { organizationNode, websiteNode, RSS_TITLE, SITE_ORIGIN, TWITTER_SITE, PRODUCT_NAME } from '../seo-meta.mjs';
 
 const read = (rel) => readFileSync(new URL(`../../${rel}`, import.meta.url), 'utf8');
 
@@ -100,19 +101,49 @@ test('domain files, price data, and News Analyst stampers stay on the old contra
   assert.doesNotMatch(prices, /News Chart|ADRRR/);
   assert.doesNotMatch(read('politician-tracker/data.json'), /News Chart/);
 
-  assert.equal(HOME_TITLE, '港股美股盤前早報｜ADRRR News Lab');
-  assert.match(ARCHIVE_TITLE, /— ADRRR$/);
-  assert.match(ARCHIVE_DESCRIPTION, /^ADRRR /);
-  assert.equal(RSS_TITLE, 'ADRRR Morning Report');
+  assert.equal(PRODUCT_NAME, 'News Chart');
+  assert.equal(HOME_TITLE, '港股美股盤前早報｜News Chart');
+  assert.equal(HOME_DESCRIPTION, '每日港美股晨報，爭取每朝 9 點前更新。News Chart by Adrian Ng — 訂閱電郵，追蹤盤前重點、政治人物持股與回測工具。');
+  assert.match(ARCHIVE_TITLE, /— News Chart$/);
+  assert.match(ARCHIVE_DESCRIPTION, /^News Chart /);
+  assert.equal(RSS_TITLE, 'News Chart Morning Report');
   assert.equal(SITE_ORIGIN, 'https://adrnnng.com');
   assert.equal(TWITTER_SITE, '@adrnnng');
-  assert.equal(organizationNode().name, 'ADRRR');
-  assert.equal(websiteNode().name, 'ADRRR');
-  assert.match(organizationNode().url, /^https:\/\/adrnnng\.com\//);
-  assert.match(read('scripts/news-feed.mjs'), /<title>ADRRR Morning Report<\/title>/);
-  assert.match(read('scripts/sitemap.mjs'), /<news:name>ADRRR Morning Report<\/news:name>/);
+  assert.equal(organizationNode().name, 'News Chart');
+  assert.equal(websiteNode().name, 'News Chart');
+  assert.equal(organizationNode().url, 'https://adrnnng.com/');
+  assert.match(websiteNode().url, /^https:\/\/adrnnng\.com\//);
+  assert.match(read('scripts/seo-meta.mjs'), /export const SITE_ORIGIN = 'https:\/\/adrnnng\.com';/);
+  assert.match(read('scripts/sitemap.mjs'), /base = 'https:\/\/adrnnng\.com'/);
+  assert.match(read('scripts/build-sitemap.mjs'), /flag\('--base', 'https:\/\/adrnnng\.com'\)/);
+  assert.match(read('scripts/indexnow.mjs'), /const HOST = 'adrnnng\.com';/);
+  assert.match(read('scripts/news-feed.mjs'), /\$\{xmlEscape\(RSS_TITLE\)\}/);
+  assert.match(read('scripts/news-feed.mjs'), /\$\{SITE_ORIGIN\}\/news\//);
   assert.match(read('scripts/home-preview.mjs'), /ADRRR_DIGEST_DIR/);
   assert.match(read('scripts/assemble-deploy.sh'), /--project-name adrnnng/);
-  assert.match(read('assets/brand/adrrr-wordmark.svg'), /aria-label="ADRRR"/);
-  assert.match(read('assets/brand/adrrr-wordmark-white.svg'), /aria-label="ADRRR"/);
+  assert.doesNotMatch(read('_redirects'), /news-chart\.com/);
+
+  const root = new URL('../..', import.meta.url);
+  const retired = `adrrr-${'wordmark'}`;
+  const hits = [];
+  const walk = (dir) => {
+    for (const name of readdirSync(dir)) {
+      if (name === 'node_modules' || name === '.git' || name.startsWith(retired)) continue;
+      const abs = join(dir, name);
+      if (statSync(abs).isDirectory()) {
+        walk(abs);
+        continue;
+      }
+      if (name.endsWith('.test.mjs') || name.startsWith('test_')) continue;
+      if (!/\.(html|js|mjs|py|css|json|xml|txt|sh|md)$/.test(name)) continue;
+      const text = readFileSync(abs, 'utf8');
+      if (text.includes(retired)) hits.push(abs);
+    }
+  };
+  walk(root.pathname);
+  assert.deepEqual(hits, []);
+  assert.match(read('assets/brand/favicon.svg'), /News Chart/);
+  assert.match(read('assets/brand/og-image.svg'), /News Chart/);
+  assert.doesNotMatch(read('assets/brand/favicon.svg'), /港美股新聞/);
+  assert.doesNotMatch(read('assets/brand/og-image.svg'), /ADRRR/);
 });

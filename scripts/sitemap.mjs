@@ -6,6 +6,7 @@
 import { existsSync, readFileSync, readdirSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join, relative, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { RSS_TITLE } from './seo-meta.mjs';
 
 const SKIP_DIRS = new Set(['.git', '.github', 'scripts', 'node_modules', 'tests', 'img', 'assets']);
 const SITEMAP_FILES = ['sitemap.xml', 'sitemap-pages.xml', 'sitemap-news.xml', 'news-sitemap.xml'];
@@ -179,7 +180,7 @@ function newsUrlset(urls) {
     <lastmod>${u.lastmod}</lastmod>
     <news:news>
       <news:publication>
-        <news:name>ADRRR Morning Report</news:name>
+        <news:name>${xmlEscape(RSS_TITLE)}</news:name>
         <news:language>zh-Hant</news:language>
       </news:publication>
       <news:publication_date>${u.lastmod}</news:publication_date>

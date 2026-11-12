@@ -126,11 +126,13 @@ test('assemble-deploy writes the sitemap from the merged news tree', async () =>
     assert.doesNotMatch(pages, /\/thanks/);
     assert.match(editions, new RegExp(`/news/${today}/`));
     assert.match(recent, new RegExp(`<news:title>Edition ${today}</news:title>`));
+    assert.match(recent, /<news:name>News Chart Morning Report<\/news:name>/);
     assert.match(recent, /<news:language>zh-Hant<\/news:language>/);
     assert.doesNotMatch(recent, /<news:language>en<\/news:language>/);
     assert.match(await readFile(join(out, '404.html'), 'utf8'), /noindex/);
     const editionHtml = await readFile(join(out, 'news', today, 'index.html'), 'utf8');
     assert.match(editionHtml, new RegExp(`<title>Edition ${today}</title>`));
+    assert.match(editionHtml, /property="og:site_name" content="News Chart"/);
     assert.match(editionHtml, /property="og:locale" content="zh_HK"/);
     assert.match(editionHtml, /name="twitter:site" content="@adrnnng"/);
     assert.match(editionHtml, /id="adrnnng-site"/);
@@ -140,6 +142,8 @@ test('assemble-deploy writes the sitemap from the merged news tree', async () =>
     assert.equal(homeBlock?.[1], `${today.slice(0, 4)}-${today.slice(4, 6)}-${today.slice(6, 8)}`);
     const feed = await readFile(join(out, 'news/feed.xml'), 'utf8');
     assert.equal((feed.match(/<item>/g) || []).length, 1);
+    assert.match(feed, /<channel>\s*<title>News Chart Morning Report<\/title>/);
+    assert.match(feed, /<link>https:\/\/adrnnng\.com\/news\/<\/link>/);
     assert.match(feed, new RegExp(`<title>Edition ${today}</title>`));
     assert.match(feed, new RegExp(`<dc:date>${today.slice(0, 4)}-${today.slice(4, 6)}-${today.slice(6, 8)}</dc:date>`));
     assert.doesNotMatch(feed, /<pubDate>/);
@@ -150,8 +154,13 @@ test('assemble-deploy writes the sitemap from the merged news tree', async () =>
     const home = await readFile(join(out, 'index.html'), 'utf8');
     assert.match(home, new RegExp(`href="/news/${today}/"`));
     assert.match(home, /港股美股盤前早報/);
+    assert.match(home, /<title>港股美股盤前早報｜News Chart<\/title>/);
+    assert.match(home, /property="og:site_name" content="News Chart"/);
+    assert.match(home, /rel="canonical" href="https:\/\/adrnnng\.com\/"/);
+    assert.match(home, /property="og:url" content="https:\/\/adrnnng\.com\/"/);
     const archive = await readFile(join(out, 'news/index.html'), 'utf8');
-    assert.match(archive, /name="description" content="ADRRR 港股美股晨報往期全文。每朝 9 點前更新；訂閱 Newsletter 收最新盤前摘要。"/);
+    assert.match(archive, /name="description" content="News Chart 港股美股晨報往期全文。每朝 9 點前更新；訂閱 Newsletter 收最新盤前摘要。"/);
+    assert.match(archive, /property="og:site_name" content="News Chart"/);
     assert.match(archive, /<title>[^<]*港股美股[^<]*<\/title>/);
     assert.match(archive, /embed-subscribe\/adrrr/);
   } finally {
