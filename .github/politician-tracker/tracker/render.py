@@ -339,7 +339,8 @@ def render_page(cfg: dict, payload: dict, now: datetime) -> str:
     site = cfg["site"]
     trades = payload["trades"]
     today = now.date()
-    canonical = f"{site['base_url']}/{site['path']}/"
+    origin = str(site["base_url"]).rstrip("/")
+    canonical = f"{origin}/{site['path']}/"
     stamp = f"{now:%Y-%m-%d %H:%M} HKT"
     by_id: dict[str, list[dict]] = {}
     for t in trades:
@@ -420,7 +421,7 @@ def render_page(cfg: dict, payload: dict, now: datetime) -> str:
         "STOCK Act disclosures from a VIP list of members of Congress, "
         "plus any trade that hits Adrian's Watchlist. Updated daily."
     )
-    image = f"{site['base_url']}/assets/brand/og-image.png"
+    image = f"{origin}/assets/brand/og-image.png"
     seo = (
         f"<title>{_e(title)}</title>\n"
         f'<meta name="description" content="{_e(description)}">\n'
@@ -439,15 +440,15 @@ def render_page(cfg: dict, payload: dict, now: datetime) -> str:
         '<meta name="twitter:site" content="@adrnnng">\n'
         '<script type="application/ld+json" id="adrnnng-breadcrumb">'
         '{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":['
-        '{"@type":"ListItem","position":1,"name":"Home","item":"https://adrnnng.com/"},'
-        '{"@type":"ListItem","position":2,"name":"Politician Tracker","item":"https://adrnnng.com/politician-tracker/"}'
+        f'{{"@type":"ListItem","position":1,"name":"Home","item":"{origin}/"}},'
+        f'{{"@type":"ListItem","position":2,"name":"Politician Tracker","item":"{canonical}"}}'
         ']}</script>\n'
         '<script type="application/ld+json" id="adrnnng-site">'
         '{"@context":"https://schema.org","@graph":['
-        '{"@type":"Organization","@id":"https://adrnnng.com/#organization","name":"ADRRR","url":"https://adrnnng.com/",'
-        '"logo":{"@type":"ImageObject","url":"https://adrnnng.com/assets/brand/apple-touch-icon.png","width":180,"height":180}},'
-        '{"@type":"WebSite","@id":"https://adrnnng.com/#website","name":"ADRRR","url":"https://adrnnng.com/","inLanguage":"zh-Hant-HK",'
-        '"publisher":{"@id":"https://adrnnng.com/#organization"}}'
+        f'{{"@type":"Organization","@id":"{origin}/#organization","name":"ADRRR","url":"{origin}/",'
+        f'"logo":{{"@type":"ImageObject","url":"{origin}/assets/brand/apple-touch-icon.png","width":180,"height":180}}}},'
+        f'{{"@type":"WebSite","@id":"{origin}/#website","name":"ADRRR","url":"{origin}/","inLanguage":"zh-Hant-HK",'
+        f'"publisher":{{"@id":"{origin}/#organization"}}}}'
         ']}</script>\n'
     )
     empty_hidden = " hidden" if trades else ""

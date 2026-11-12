@@ -1,7 +1,8 @@
 // Write sitemap.xml (an index) plus page and news fragments for one site directory.
-//   node scripts/build-sitemap.mjs --site <dir> [--base https://adrnnng.com] [--now YYYY-MM-DD] [--check]
+//   node scripts/build-sitemap.mjs --site <dir> [--base https://news-chart.com] [--now YYYY-MM-DD] [--check]
 
 import { resolve } from 'node:path';
+import { SITE_ORIGIN } from './seo-meta.mjs';
 import { repoRoot, sitemapDrift, writeSitemaps } from './sitemap.mjs';
 
 const args = process.argv.slice(2);
@@ -12,7 +13,7 @@ function flag(name, fallback) {
 }
 
 const site = resolve(flag('--site', repoRoot()));
-const opts = { base: flag('--base', 'https://adrnnng.com'), now: flag('--now', '') || undefined };
+const opts = { base: flag('--base', SITE_ORIGIN), now: flag('--now', '') || undefined };
 
 if (check) {
   const problems = sitemapDrift(site, opts);

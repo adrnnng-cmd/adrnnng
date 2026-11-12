@@ -1,3 +1,9 @@
+# Production canonical is https://news-chart.com. Do not add a rule that sends
+# traffic there until that host serves working HTTPS. A /* splat to the new
+# origin also matches news-chart.com and loops. Old-host redirects
+# (adrnnng.com, www.adrnnng.com, newsandchart.com) are path-by-path at the
+# host, after HTTPS, and do not belong in this file.
+# Rules below stay: www.adrnnng.com to the current apex, plus path aliases.
 https://www.adrnnng.com/* https://adrnnng.com/:splat 301
 http://www.adrnnng.com/* https://adrnnng.com/:splat 301
 /backtesting/* /backtest/:splat 301

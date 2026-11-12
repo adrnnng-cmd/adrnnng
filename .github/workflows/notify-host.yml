@@ -1,6 +1,7 @@
 name: Notify host
 
-# Tells the host to redeploy https://adrnnng.com after every push to main.
+# Tells the host to redeploy https://news-chart.com after every push to main.
+# Pages project name stays adrnnng. This workflow does not upload.
 # Also callable from other workflows, because pushes made with GITHUB_TOKEN
 # (e.g. the scheduled data refresh) do not trigger `on: push`.
 on:

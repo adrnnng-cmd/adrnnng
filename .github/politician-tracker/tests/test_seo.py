@@ -9,7 +9,7 @@ from tracker.render import render_page
 def _page(noindex: bool) -> str:
     cfg = {
         "site": {
-            "base_url": "https://adrnnng.com",
+            "base_url": "https://news-chart.com",
             "path": "politician-tracker",
             "home_url": "/",
             "archive_url": "/news/",
@@ -24,10 +24,16 @@ class SeoTests(unittest.TestCase):
     def test_default_page_is_indexable_and_has_social_tags(self):
         html = _page(False)
         self.assertNotIn("noindex", html)
-        self.assertIn('<link rel="canonical" href="https://adrnnng.com/politician-tracker/">', html)
+        self.assertIn('<link rel="canonical" href="https://news-chart.com/politician-tracker/">', html)
         self.assertIn('<meta property="og:title" content="Politician Tracker', html)
-        self.assertIn('<meta property="og:url" content="https://adrnnng.com/politician-tracker/">', html)
-        self.assertIn('<meta property="og:image" content="https://adrnnng.com/assets/brand/og-image.png">', html)
+        self.assertIn('<meta property="og:url" content="https://news-chart.com/politician-tracker/">', html)
+        self.assertIn('<meta property="og:image" content="https://news-chart.com/assets/brand/og-image.png">', html)
+        self.assertIn('"@id":"https://news-chart.com/#organization"', html)
+        self.assertIn('"item":"https://news-chart.com/"', html)
+        self.assertNotIn("adrnnng.com", html)
+        self.assertIn("Adrian&#x27;s Watchlist", html)
+        self.assertIn('alt="ADRRR"', html)
+        self.assertIn("/assets/brand/adrrr-wordmark-white.svg", html)
         self.assertIn('<meta name="twitter:card" content="summary_large_image">', html)
         self.assertIn('name="description"', html)
         self.assertIn('<meta property="og:locale" content="zh_HK">', html)

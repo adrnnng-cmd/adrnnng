@@ -6,6 +6,7 @@
 import { existsSync, readFileSync, readdirSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join, relative, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { SITE_ORIGIN } from './seo-meta.mjs';
 
 const SKIP_DIRS = new Set(['.git', '.github', 'scripts', 'node_modules', 'tests', 'img', 'assets']);
 const SITEMAP_FILES = ['sitemap.xml', 'sitemap-pages.xml', 'sitemap-news.xml', 'news-sitemap.xml'];
@@ -198,7 +199,7 @@ function maxLastmod(urls, fallback) {
   return urls.reduce((max, u) => (u.lastmod > max ? u.lastmod : max), fallback);
 }
 
-export function buildSitemaps(siteDir, { base = 'https://adrnnng.com', now } = {}) {
+export function buildSitemaps(siteDir, { base = SITE_ORIGIN, now } = {}) {
   const today = now || hongKongToday();
   const { pages, news, recent } = collectPages(siteDir, { now: today });
   const pageUrls = pages.map((p) => ({ loc: locOf(base, p.locPath), lastmod: p.lastmod }));

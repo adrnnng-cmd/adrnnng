@@ -22,7 +22,7 @@ class NewsletterTests(unittest.TestCase):
     def test_rendered_page_posts_to_buttondown(self):
         cfg = {
             "site": {
-                "base_url": "https://adrnnng.com",
+                "base_url": "https://news-chart.com",
                 "path": "politician-tracker",
                 "home_url": "/",
                 "archive_url": "/news/",

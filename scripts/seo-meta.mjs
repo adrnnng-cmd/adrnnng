@@ -9,7 +9,7 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-export const SITE_ORIGIN = 'https://adrnnng.com';
+export const SITE_ORIGIN = 'https://news-chart.com';
 export const ORG_ID = `${SITE_ORIGIN}/#organization`;
 export const LOCALE = 'zh_HK';
 export const TWITTER_SITE = '@adrnnng';
@@ -255,6 +255,9 @@ function editionCrumbName(html, ymd) {
 }
 
 export function stampHtml(html, { kind = 'home', crumb = '', url = '', ymd = '' } = {}) {
+  // Chrome only. Does not change an existing canonical, og:url, or body.
+  // Historical Morning Report HTML keeps the canonical the builder wrote.
+  // Replacing those hosts is an explicit metadata pass after HTTPS, not --all.
   let out = html;
   out = ensureMeta(out, 'property', 'og:locale', LOCALE);
   out = ensureMeta(out, 'name', 'twitter:site', TWITTER_SITE);
