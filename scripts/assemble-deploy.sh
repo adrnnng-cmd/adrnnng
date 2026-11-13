@@ -68,7 +68,8 @@ fi
 node "$root/scripts/home-preview.mjs" --site "$out" "${digest_args[@]}"
 
 # Organization + WebSite JSON-LD, locale, twitter:site, breadcrumbs, publisher.logo,
-# and article:published_time. Does not rewrite day-page titles or headlines.
+# and article:published_time. Does not rewrite day-page titles, headlines, prose,
+# or an existing canonical / og:url. Historical editions are not rebuilt here.
 node "$root/scripts/seo-meta.mjs" --site "$out"
 
 # /news/feed.xml from the edition HTML in this upload. No items are invented.

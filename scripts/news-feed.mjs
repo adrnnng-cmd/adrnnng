@@ -78,6 +78,8 @@ export function collectFeedItems(siteDir) {
       iso,
       title,
       description: pageDescription(html),
+      // Discovery link follows SITE_ORIGIN. It does not read or rewrite the
+      // edition's canonical, which on historical journals may still be the old host.
       link: `${SITE_ORIGIN}/news/${name}/`,
       published: isPublishTime(published) ? published : '',
     });

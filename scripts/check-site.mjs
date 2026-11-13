@@ -7,6 +7,7 @@ import { join, dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { indexingHeaderErrors } from './headers.mjs';
 import { findIndexNowKey } from './indexnow.mjs';
+import { SITE_ORIGIN } from './seo-meta.mjs';
 import { sitemapDrift } from './sitemap.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -64,6 +65,9 @@ for (const t of reg.tools) {
   }
 }
 notes.push(`${reg.tools.length} tools registered (${reg.tools.filter((t) => t.href).length} with pages)`);
+if (reg.site?.url !== SITE_ORIGIN) err(`tools.json site.url must be ${SITE_ORIGIN}`);
+if (reg.site?.name !== 'News Chart' || reg.site?.owner !== 'ADRRR') err('tools.json name must be News Chart and owner ADRRR');
+if (reg.site?.tagline !== 'Systematic markets research from Hong Kong') err('tools.json tagline is owned by the brand preview and must stay unchanged');
 
 // A root 404.html is what stops Cloudflare Pages from serving index.html with 200 for unknown paths.
 const notFound = join(ROOT, '404.html');
@@ -138,7 +142,7 @@ const robotsPath = join(ROOT, 'robots.txt');
 const robots = existsSync(robotsPath) ? readFileSync(robotsPath, 'utf8') : '';
 if (!robots) err('robots.txt missing');
 else {
-  if (!robots.includes('Sitemap: https://adrnnng.com/sitemap.xml')) err('robots.txt must point at https://adrnnng.com/sitemap.xml');
+  if (!robots.includes(`Sitemap: ${SITE_ORIGIN}/sitemap.xml`)) err(`robots.txt must point at ${SITE_ORIGIN}/sitemap.xml`);
   if (/^disallow:\s*\/\s*$/im.test(robots)) err('robots.txt must not Disallow: /');
   if (!robots.includes('Disallow: /api/')) err('robots.txt must disallow /api/');
   for (const agent of ['*', 'Googlebot', 'Bingbot', 'GPTBot', 'OAI-SearchBot', 'ChatGPT-User', 'PerplexityBot', 'ClaudeBot']) {
@@ -162,10 +166,11 @@ const brandIcon = join(ROOT, 'assets/brand/favicon.ico');
 const rootIcon = join(ROOT, 'favicon.ico');
 if (!existsSync(rootIcon) || !existsSync(brandIcon)) err('favicon.ico missing at / or /assets/brand/favicon.ico');
 else if (!readFileSync(rootIcon).equals(readFileSync(brandIcon))) err('favicon.ico must match assets/brand/favicon.ico');
+if (SITE_ORIGIN !== 'https://news-chart.com') err(`SITE_ORIGIN must stay https://news-chart.com (got ${SITE_ORIGIN})`);
 const indexable = [
-  ['index.html', 'https://adrnnng.com/'],
-  ['backtest/index.html', 'https://adrnnng.com/backtest/'],
-  ['politician-tracker/index.html', 'https://adrnnng.com/politician-tracker/'],
+  ['index.html', `${SITE_ORIGIN}/`],
+  ['backtest/index.html', `${SITE_ORIGIN}/backtest/`],
+  ['politician-tracker/index.html', `${SITE_ORIGIN}/politician-tracker/`],
 ];
 const titles = [];
 for (const [file, canonical] of indexable) {
@@ -175,6 +180,14 @@ for (const [file, canonical] of indexable) {
   if (!title) err(`${file}: missing <title>`);
   if (!/name="description" content="[^"]+"/.test(html)) err(`${file}: missing meta description`);
   if (!html.includes(`rel="canonical" href="${canonical}"`)) err(`${file}: missing canonical ${canonical}`);
+  if (!html.includes(`property="og:url" content="${canonical}"`)) err(`${file}: og:url must match canonical ${canonical}`);
+  if (!html.includes(`property="og:image" content="${SITE_ORIGIN}/assets/brand/og-image.png"`)) err(`${file}: og:image must use ${SITE_ORIGIN}`);
+  if (!html.includes(`"@id":"${SITE_ORIGIN}/#organization"`)) err(`${file}: Organization @id must use ${SITE_ORIGIN}`);
+  if (html.includes('https://adrnnng.com')) err(`${file}: absolute public URL still uses https://adrnnng.com`);
+  if (file === 'index.html') {
+    if (!html.includes('https://buttondown.com/api/emails/embed-subscribe/adrrr')) err('index.html must keep the Buttondown /adrrr sender');
+    if (!html.includes('https://buttondown.com/adrrr')) err('index.html must keep the Buttondown /adrrr subscribe link');
+  }
   for (const prop of ['og:title', 'og:description', 'og:url', 'og:image']) {
     if (!html.includes(`property="${prop}"`)) err(`${file}: missing ${prop}`);
   }
@@ -194,6 +207,28 @@ if (existsSync(notFound) && !/\bnoindex\b/i.test(readFileSync(notFound, 'utf8'))
 const thanksPage = join(ROOT, 'thanks/index.html');
 if (!existsSync(thanksPage)) err('thanks/index.html missing');
 else if (!/\bnoindex\b/i.test(readFileSync(thanksPage, 'utf8'))) err('thanks/index.html must stay noindex');
+const redirectPath = join(ROOT, '_redirects');
+const redirectText = existsSync(redirectPath) ? readFileSync(redirectPath, 'utf8') : '';
+const redirectRules = redirectText.split('\n').map((line) => line.trim()).filter((line) => line && !line.startsWith('#'));
+if (!redirectText) err('_redirects missing');
+else {
+  // Pages applies _redirects on every attached hostname. A /* rule to the new
+  // origin loops once news-chart.com is on this project. Host-specific rules
+  // for adrnnng.com / newsandchart.com would fire on the next upload, before
+  // that hostname is known to serve HTTPS, so they stay out of this file.
+  if (redirectRules.some((line) => line.includes('news-chart.com'))) err('_redirects rules must not mention news-chart.com');
+  if (redirectRules.some((line) => /^\/\*/.test(line))) err('_redirects must not use an unconditional /* rule');
+  for (const rule of [
+    'https://www.adrnnng.com/* https://adrnnng.com/:splat 301',
+    'http://www.adrnnng.com/* https://adrnnng.com/:splat 301',
+    '/backtesting/* /backtest/:splat 301',
+    '/backtesting /backtest/ 301',
+  ]) {
+    if (!redirectRules.includes(rule)) err(`_redirects missing ${rule}`);
+  }
+  if (!redirectRules.some((line) => line.startsWith('/hsi-lab /backtest/?strategy='))) err('_redirects must keep the /hsi-lab alias');
+  if (!redirectRules.some((line) => line.startsWith('/hsi-lab/ /backtest/?strategy='))) err('_redirects must keep the /hsi-lab/ alias');
+}
 for (const problem of sitemapDrift(ROOT)) err(problem);
 
 for (const n of notes) console.log(`  · ${n}`);

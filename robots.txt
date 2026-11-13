@@ -1,4 +1,4 @@
-# https://adrnnng.com
+# https://news-chart.com
 # Public pages are crawlable. /api/ is not.
 
 User-agent: *
@@ -33,4 +33,4 @@ User-agent: ClaudeBot
 Allow: /
 Disallow: /api/
 
-Sitemap: https://adrnnng.com/sitemap.xml
+Sitemap: https://news-chart.com/sitemap.xml

@@ -1,6 +1,6 @@
 # Politician Tracker · 政治人物持股動向
 
-A static section of the Morning Report site, published at **https://adrnnng.com/politician-tracker/**.
+A static section of the Morning Report site, published at **https://news-chart.com/politician-tracker/**.
 It lists new STOCK Act disclosures from a VIP list of members of Congress, plus any member's trade in a
 ticker on Adrian's Watchlist. Each row shows the politician, ticker/company, Buy/Sell/Exchange, size band,
 trade date, filing date, **lag days** (filing − trade) and a link to the official filing.

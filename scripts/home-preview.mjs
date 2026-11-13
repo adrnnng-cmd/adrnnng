@@ -14,7 +14,7 @@ import { PRODUCT_NAME } from './seo-meta.mjs';
 
 export const HOME_H1 = '港股美股盤前早報';
 export const HOME_TITLE = `港股美股盤前早報｜${PRODUCT_NAME}`;
-export const HOME_DESCRIPTION = `每日港美股晨報，爭取每朝 9 點前更新。${PRODUCT_NAME} by Adrian Ng — 訂閱電郵，追蹤盤前重點、政治人物持股與回測工具。`;
+export const HOME_DESCRIPTION = `每日港美股晨報，爭取每朝 9 點前更新。${PRODUCT_NAME} by ADRRR — 訂閱電郵，追蹤盤前重點、政治人物持股與回測工具。`;
 export const ARCHIVE_TITLE = `港股美股盤前早報 往期｜HK & US Stocks Morning Report Archive — ${PRODUCT_NAME}`;
 export const ARCHIVE_DESCRIPTION = `${PRODUCT_NAME} 港股美股晨報往期全文。每朝 9 點前更新；訂閱 Newsletter 收最新盤前摘要。`;
 
