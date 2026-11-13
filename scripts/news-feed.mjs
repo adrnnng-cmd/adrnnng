@@ -7,7 +7,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ARCHIVE_DESCRIPTION } from './home-preview.mjs';
-import { SITE_ORIGIN, articlePublishedTime, isPublishTime, metaContent } from './seo-meta.mjs';
+import { RSS_TITLE, SITE_ORIGIN, articlePublishedTime, isPublishTime, metaContent } from './seo-meta.mjs';
 
 export const FEED_PATH = 'news/feed.xml';
 export const FEED_URL = `${SITE_ORIGIN}/news/feed.xml`;
@@ -78,6 +78,8 @@ export function collectFeedItems(siteDir) {
       iso,
       title,
       description: pageDescription(html),
+      // Discovery link follows SITE_ORIGIN. It does not read or rewrite the
+      // edition's canonical, which on historical journals may still be the old host.
       link: `${SITE_ORIGIN}/news/${name}/`,
       published: isPublishTime(published) ? published : '',
     });
@@ -105,7 +107,7 @@ export function renderFeed(items) {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/elements/1.1/">
   <channel>
-    <title>ADRRR Morning Report</title>
+    <title>${xmlEscape(RSS_TITLE)}</title>
     <link>${SITE_ORIGIN}/news/</link>
     <description>${xmlEscape(ARCHIVE_DESCRIPTION)}</description>
     <language>zh-Hant</language>

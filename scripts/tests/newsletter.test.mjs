@@ -104,7 +104,8 @@ test('thanks page is the on-site confirmation and does not ask to subscribe agai
   assert.match(html, /data-newsletter="off"/);
   assert.match(html, /name="robots" content="noindex, nofollow"/);
   assert.match(html, /<h1>訂閱成功<\/h1>/);
-  assert.match(html, /ADRRR News Lab/);
+  assert.match(html, /<p class="kicker">News Chart<\/p>/);
+  assert.doesNotMatch(html, /ADRRR News Lab/);
   assert.match(html, /下一個工作天起，每朝 9 點前送到你的信箱。現在可以先讀今日晨報。/);
   assert.match(html, /href="\/latest"[^>]*>讀今日晨報/);
   assert.match(html, /href="\/news\/"[^>]*>往期 Archive/);

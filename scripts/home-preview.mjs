@@ -10,13 +10,17 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { newsletterCardHtml } from '../assets/js/newsletter.js';
+import { PRODUCT_NAME } from './seo-meta.mjs';
 
 export const HOME_H1 = '港股美股盤前早報';
-export const HOME_TITLE = '港股美股盤前早報｜ADRRR News Lab';
-export const ARCHIVE_TITLE = '港股美股盤前早報 往期｜HK & US Stocks Morning Report Archive — ADRRR';
-export const ARCHIVE_DESCRIPTION = 'ADRRR 港股美股晨報往期全文。每朝 9 點前更新；訂閱 Newsletter 收最新盤前摘要。';
+export const HOME_TITLE = `港股美股盤前早報｜${PRODUCT_NAME}`;
+export const HOME_DESCRIPTION = `每日港美股晨報，爭取每朝 9 點前更新。${PRODUCT_NAME} by ADRRR — 訂閱電郵，追蹤盤前重點、政治人物持股與回測工具。`;
+export const ARCHIVE_TITLE = `港股美股盤前早報 往期｜HK & US Stocks Morning Report Archive — ${PRODUCT_NAME}`;
+export const ARCHIVE_DESCRIPTION = `${PRODUCT_NAME} 港股美股晨報往期全文。每朝 9 點前更新；訂閱 Newsletter 收最新盤前摘要。`;
 
-const HOOK_TITLE = /^(.+?)｜(\d{1,2})月(\d{1,2})日港股美股盤前早報 — ADRRR$/;
+// Reads a day title. This file does not rewrite day titles. ADRRR stays
+// readable so an already published title still yields its hook.
+const HOOK_TITLE = /^(.+?)｜(\d{1,2})月(\d{1,2})日港股美股盤前早報 — (?:News Chart|ADRRR)$/;
 
 export function tidy(s) {
   return String(s || '').replace(/\s+/g, ' ').trim();
@@ -309,10 +313,26 @@ function setTitle(html, title) {
   return `${tag}\n${html}`;
 }
 
+function brandedTitle(title) {
+  return title.replaceAll('ADRRR News Lab', PRODUCT_NAME).replaceAll('ADRRR', PRODUCT_NAME);
+}
+
+export function applyHomeChrome(html) {
+  let out = setTitle(html, HOME_TITLE);
+  out = upsertMeta(out, { kind: 'property', key: 'og:site_name', content: PRODUCT_NAME });
+  out = upsertMeta(out, { kind: 'property', key: 'og:title', content: HOME_TITLE });
+  out = upsertMeta(out, { kind: 'name', key: 'twitter:title', content: HOME_TITLE });
+  out = upsertMeta(out, { kind: 'name', key: 'description', content: HOME_DESCRIPTION });
+  out = upsertMeta(out, { kind: 'property', key: 'og:description', content: HOME_DESCRIPTION });
+  out = upsertMeta(out, { kind: 'name', key: 'twitter:description', content: HOME_DESCRIPTION });
+  return out;
+}
+
 export function patchNewsArchive(html) {
   const og = metaByProperty(html, 'og:title');
-  const title = og.includes('港股美股') ? og : ARCHIVE_TITLE;
+  const title = brandedTitle(og.includes('港股美股') ? og : ARCHIVE_TITLE);
   let out = setTitle(html, title);
+  out = upsertMeta(out, { kind: 'property', key: 'og:site_name', content: PRODUCT_NAME });
   out = upsertMeta(out, { kind: 'property', key: 'og:title', content: title });
   out = upsertMeta(out, { kind: 'name', key: 'twitter:title', content: title });
   out = upsertMeta(out, { kind: 'name', key: 'description', content: ARCHIVE_DESCRIPTION });
@@ -340,7 +360,7 @@ export function syncSite(siteDir, { digestDir } = {}) {
   writeFileSync(join(siteDir, 'assets', 'news-preview.json'), `${JSON.stringify(preview, null, 2)}\n`);
   const indexPath = join(siteDir, 'index.html');
   if (existsSync(indexPath)) {
-    writeFileSync(indexPath, applyHomePreview(readFileSync(indexPath, 'utf8'), preview));
+    writeFileSync(indexPath, applyHomeChrome(applyHomePreview(readFileSync(indexPath, 'utf8'), preview)));
   }
   const archivePath = join(siteDir, 'news', 'index.html');
   if (existsSync(archivePath)) {

@@ -46,8 +46,22 @@ test('edition stamp adds publisher.logo and published_time without touching the 
   assert.equal(article.publisher.logo.width, 180);
   assert.equal(article.publisher.logo.height, 180);
   assert.match(once, /"name":"晨報摘要｜2026年10月26日（一）"/);
-  assert.match(once, /https:\/\/adrnnng\.com\/news\/20261026\//);
+  assert.match(once, /https:\/\/news-chart\.com\/news\/20261026\//);
   assert.doesNotMatch(once, /SearchAction|FAQPage/);
+});
+
+test('stamp leaves a historical canonical, og:url, prose, author, and mailbox', () => {
+  const raw = `<html><head>
+<link rel="canonical" href="https://adrnnng.com/news/20200101/">
+<meta property="og:url" content="https://adrnnng.com/news/20200101/">
+<title>舊日晨報</title>
+</head><body><p>Adrian Ng wrote this. 收市 19234. Mail news@adrnnng.com. See https://adrnnng.com/backtest/ in the sentence.</p></body></html>`;
+  const out = stampHtml(raw, { kind: 'edition', ymd: '20200101' });
+  assert.match(out, /rel="canonical" href="https:\/\/adrnnng\.com\/news\/20200101\/"/);
+  assert.match(out, /property="og:url" content="https:\/\/adrnnng\.com\/news\/20200101\/"/);
+  assert.match(out, /Adrian Ng wrote this\. 收市 19234\. Mail news@adrnnng\.com\. See https:\/\/adrnnng\.com\/backtest\/ in the sentence\./);
+  assert.match(out, /https:\/\/news-chart\.com\/#organization/);
+  assert.doesNotMatch(out, /rel="canonical" href="https:\/\/news-chart\.com/);
 });
 
 test('an edition without a timestamp does not get an invented published_time or NewsArticle', () => {
@@ -88,6 +102,7 @@ test('feed items are the editions on disk and pubDate follows a real timestamp',
   assert.deepEqual(items.map((item) => item.ymd), ['20261026', '20261007']);
   assert.equal(items[0].title, '真實標題');
   assert.equal(items[0].description, '真實摘要');
+  assert.equal(items[0].link, 'https://news-chart.com/news/20261026/');
   assert.equal(items[0].published, '2026-10-26T08:15:00+08:00');
   assert.equal(items[1].published, '');
   const xml = renderFeed(items);
@@ -121,13 +136,13 @@ test('preview edition date bumps home and /news/ lastmod only', async () => {
   await writeFile(join(dir, 'assets/news-preview.json'), JSON.stringify({ href: '/news/20261026/' }));
   const bumped = buildSitemaps(dir, { now: '2026-10-26' });
   const lastmod = (loc) => bumped.pages.find((page) => page.loc === loc)?.lastmod;
-  assert.equal(lastmod('https://adrnnng.com/'), '2026-10-26');
-  assert.equal(lastmod('https://adrnnng.com/news/'), '2026-10-26');
-  assert.equal(lastmod('https://adrnnng.com/backtest/'), '2026-10-22');
+  assert.equal(lastmod('https://news-chart.com/'), '2026-10-26');
+  assert.equal(lastmod('https://news-chart.com/news/'), '2026-10-26');
+  assert.equal(lastmod('https://news-chart.com/backtest/'), '2026-10-22');
 
   await writeFile(join(dir, 'assets/news-preview.json'), JSON.stringify({ href: '/news/20261020/' }));
   const older = buildSitemaps(dir, { now: '2026-10-26' });
-  assert.equal(older.pages.find((page) => page.loc === 'https://adrnnng.com/')?.lastmod, '2026-10-22');
+  assert.equal(older.pages.find((page) => page.loc === 'https://news-chart.com/')?.lastmod, '2026-10-22');
 });
 
 test('news titles cannot put forbidden XML characters into the sitemap', async () => {
@@ -152,7 +167,7 @@ test('committed key pages carry the site graph, locale, twitter site, and root f
   }
   const home = await readFile(join(root, 'index.html'), 'utf8');
   assert.match(home, /application\/rss\+xml/);
-  assert.match(home, /https:\/\/adrnnng\.com\/news\/feed\.xml/);
+  assert.match(home, /https:\/\/news-chart\.com\/news\/feed\.xml/);
   const icon = await readFile(join(root, 'favicon.ico'));
   const brand = await readFile(join(root, 'assets/brand/favicon.ico'));
   assert.ok(icon.equals(brand));

@@ -1,7 +1,7 @@
 {
   "name": "adrnnng-site",
   "private": true,
-  "description": "adrnnng.com: static site, no build step. These scripts are for tests and checks only.",
+  "description": "news-chart.com public site (Cloudflare Pages project adrnnng). Static files, no build step. These scripts are for tests and checks only.",
   "type": "module",
   "engines": {
     "node": ">=20"

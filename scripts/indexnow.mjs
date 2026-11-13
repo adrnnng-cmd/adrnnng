@@ -3,10 +3,11 @@
 
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { SITE_ORIGIN } from './seo-meta.mjs';
 import { extractLocs } from './sitemap.mjs';
 
-const HOST = 'adrnnng.com';
-const BASE = `https://${HOST}`;
+const HOST = new URL(SITE_ORIGIN).host;
+const BASE = SITE_ORIGIN;
 const POLICY_FILES = new Set(['robots.txt', '_headers']);
 const SECTION_URLS = [`${BASE}/`, `${BASE}/backtest/`, `${BASE}/politician-tracker/`, `${BASE}/news/`, `${BASE}/robots.txt`, `${BASE}/sitemap.xml`, `${BASE}/llms.txt`];
 

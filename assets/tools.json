@@ -1,10 +1,10 @@
 {
   "site": {
-    "name": "ADRRR",
-    "owner": "Adrian Ng",
-    "url": "https://adrnnng.com",
+    "name": "News Chart",
+    "owner": "ADRRR",
+    "url": "https://news-chart.com",
     "tagline": "Systematic markets research from Hong Kong",
-    "description": "Adrian Ng's open trading workbench: follow the flow, test ideas against real history, read the tape every morning."
+    "description": "ADRRR's open trading workbench: follow the flow, test ideas against real history, read the tape every morning."
   },
   "tools": [
     {

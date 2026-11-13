@@ -13,9 +13,9 @@ WEEKDAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
 # Same card as assets/js/newsletter.js. /news/ keeps its own signup.
 NEWSLETTER_CARD = """<aside class="nl-card" id="newsletter" aria-labelledby="nl-heading">
 <div class="nl-card-in">
-<p class="nl-eye">ADRRR · NEWSLETTER</p>
+<p class="nl-eye">News Chart · NEWSLETTER</p>
 <h2 id="nl-heading">每朝 9 點前，港美股早報直送信箱</h2>
-<p class="nl-lead">ADRRR News Lab — 隔夜美股、港股盤前、經濟數據與異動股，5 分鐘掌握開市前重點。</p>
+<p class="nl-lead">News Chart — 隔夜美股、港股盤前、經濟數據與異動股，5 分鐘掌握開市前重點。</p>
 <form class="nl-form" action="https://buttondown.com/api/emails/embed-subscribe/adrrr" method="post">
 <label class="nl-sr" for="nl-email">Email</label>
 <input id="nl-email" class="nl-email" type="email" name="email" required autocomplete="email" inputmode="email" maxlength="200" placeholder="Email" spellcheck="false">
@@ -339,7 +339,8 @@ def render_page(cfg: dict, payload: dict, now: datetime) -> str:
     site = cfg["site"]
     trades = payload["trades"]
     today = now.date()
-    canonical = f"{site['base_url']}/{site['path']}/"
+    origin = str(site["base_url"]).rstrip("/")
+    canonical = f"{origin}/{site['path']}/"
     stamp = f"{now:%Y-%m-%d %H:%M} HKT"
     by_id: dict[str, list[dict]] = {}
     for t in trades:
@@ -415,17 +416,17 @@ def render_page(cfg: dict, payload: dict, now: datetime) -> str:
 
     stale = '<span class="stale">Data may be stale — sources unavailable at last build</span>' if payload.get("stale") else ""
     robots = '<meta name="robots" content="noindex,nofollow,noarchive">' if site.get("noindex") else ""
-    title = "Politician Tracker · 政治人物持股動向 — ADRRR"
+    title = "Politician Tracker · 政治人物持股動向 — News Chart"
     description = (
         "STOCK Act disclosures from a VIP list of members of Congress, "
         "plus any trade that hits Adrian's Watchlist. Updated daily."
     )
-    image = f"{site['base_url']}/assets/brand/og-image.png"
+    image = f"{origin}/assets/brand/og-image.png"
     seo = (
         f"<title>{_e(title)}</title>\n"
         f'<meta name="description" content="{_e(description)}">\n'
         f'<link rel="canonical" href="{_e(canonical)}">\n'
-        f'<meta property="og:site_name" content="ADRRR">\n'
+        f'<meta property="og:site_name" content="News Chart">\n'
         f'<meta property="og:title" content="{_e(title)}">\n'
         f'<meta property="og:description" content="{_e(description)}">\n'
         f'<meta property="og:url" content="{_e(canonical)}">\n'
@@ -439,15 +440,15 @@ def render_page(cfg: dict, payload: dict, now: datetime) -> str:
         '<meta name="twitter:site" content="@adrnnng">\n'
         '<script type="application/ld+json" id="adrnnng-breadcrumb">'
         '{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":['
-        '{"@type":"ListItem","position":1,"name":"Home","item":"https://adrnnng.com/"},'
-        '{"@type":"ListItem","position":2,"name":"Politician Tracker","item":"https://adrnnng.com/politician-tracker/"}'
+        f'{{"@type":"ListItem","position":1,"name":"Home","item":"{origin}/"}},'
+        f'{{"@type":"ListItem","position":2,"name":"Politician Tracker","item":"{canonical}"}}'
         ']}</script>\n'
         '<script type="application/ld+json" id="adrnnng-site">'
         '{"@context":"https://schema.org","@graph":['
-        '{"@type":"Organization","@id":"https://adrnnng.com/#organization","name":"ADRRR","url":"https://adrnnng.com/",'
-        '"logo":{"@type":"ImageObject","url":"https://adrnnng.com/assets/brand/apple-touch-icon.png","width":180,"height":180}},'
-        '{"@type":"WebSite","@id":"https://adrnnng.com/#website","name":"ADRRR","url":"https://adrnnng.com/","inLanguage":"zh-Hant-HK",'
-        '"publisher":{"@id":"https://adrnnng.com/#organization"}}'
+        f'{{"@type":"Organization","@id":"{origin}/#organization","name":"News Chart","url":"{origin}/",'
+        f'"logo":{{"@type":"ImageObject","url":"{origin}/assets/brand/apple-touch-icon.png","width":180,"height":180}}}},'
+        f'{{"@type":"WebSite","@id":"{origin}/#website","name":"News Chart","url":"{origin}/","inLanguage":"zh-Hant-HK",'
+        f'"publisher":{{"@id":"{origin}/#organization"}},"author":{{"@type":"Organization","name":"ADRRR"}}}}'
         ']}</script>\n'
     )
     empty_hidden = " hidden" if trades else ""
@@ -462,7 +463,7 @@ def render_page(cfg: dict, payload: dict, now: datetime) -> str:
 <style>{CSS}</style></head>
 <body data-today="{today.isoformat()}">
 <header class="mast"><div class="wrap mast-in">
-<a class="logo" href="{_e(site.get('home_url', '/'))}"><img src="/assets/brand/adrrr-wordmark-white.svg" alt="ADRRR" height="17"><span class="zh">政治人物持股動向</span></a>
+<a class="logo" href="{_e(site.get('home_url', '/'))}"><img src="/assets/brand/news-chart-white.svg" alt="News Chart" height="17"><span class="zh">政治人物持股動向</span></a>
 <div class="mast-r"><span class="d">{today:%Y-%m-%d} · {weekday}</span>{_site_nav(site)}<a href="{_e(site['archive_url'])}">Morning Report →</a></div>
 </div></header>
 <main class="wrap">

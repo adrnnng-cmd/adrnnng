@@ -1,4 +1,6 @@
-# adrnnng.com
+# adrnnng
+
+Public site: **https://news-chart.com**. Cloudflare Pages project: `adrnnng` (not `adrnnng-bot-office`).
 
 Adrian Ng's trading and investing site. It is plain static files with **no build step**: the repo
 root is the site root, and whatever is committed is what Cloudflare Pages (project `adrnnng`)
@@ -289,12 +291,61 @@ applies all of them.
   the engine on real SPY data for four configurations (daily/weekly, long-only/long-short, costs,
   stop loss), plus a printed walk-through of the first TD trade for checking by hand.
 
+## Host migration to news-chart.com
+
+`SITE_ORIGIN` in `scripts/seo-meta.mjs` is `https://news-chart.com`. Repo pages, `robots.txt`, `llms.txt`, the committed sitemap, IndexNow, and the politician-tracker `base_url` use that origin. `newsandchart.com` and `adrnnng.com` are later aliases. They redirect path-by-path at the host, not in `_redirects`.
+
+This repo does not deploy, attach a domain, or edit DNS. News Analyst remains the only production assembler. `publish.sh` / `check_sections.sh` (outside this repo) fetch `main`, assemble this tree with `news/` and the `/latest` rules, and upload to Pages project `adrnnng`. A repo-only `wrangler pages deploy` replaces the deployment and deletes `news/` and `/latest`. Do not run it. Do not target project `adrnnng-bot-office`.
+
+Leave these identifiers as they are: Pages project `adrnnng`, the `HSI_BARS` KV binding and its namespace id, the IndexNow key file, `notify-host.yml` webhook secret names, Buttondown sender `https://buttondown.com/adrrr` and embed action `https://buttondown.com/api/emails/embed-subscribe/adrrr`, Buttondown mail records, `news@adrnnng.com` and any other mailbox, author Adrian Ng, the ADRRR name, wordmarks, and the tools.json tagline. X stays `https://x.com/adrnnng` and `twitter:site` stays `@adrnnng`.
+
+### Historical canonicals
+
+Morning Report HTML for dates already published lives outside this repo. Those journals already carry `https://adrnnng.com` canonicals. This change does not read them, rewrite them, or rebuild them. Do not run the news builder with `--all`.
+
+`stampHtml` refreshes site chrome only: `og:locale`, `twitter:site`, the `adrnnng-site` and `adrnnng-breadcrumb` JSON-LD blocks, NewsArticle `publisher.logo` when a NewsArticle is already present, and `article:published_time` when the page already has a timestamp. It does not change an existing `<link rel="canonical">`, `og:url`, title, headline, or body. Assemble of a historical file therefore keeps the old canonical attribute and the prose, including finance figures and mailboxes.
+
+`/sitemap.xml` and `/news/feed.xml` are generated from `SITE_ORIGIN` plus the edition path. They do not copy the canonical attribute. After the first assemble of this commit, a historical edition can still say `canonical = https://adrnnng.com/news/YYYYMMDD/` while the sitemap and feed list `https://news-chart.com/news/YYYYMMDD/`. That split is expected until the metadata pass below. Do that assemble only after `https://news-chart.com` serves HTTPS, so the new locs resolve.
+
+The explicit metadata pass is a separate News Analyst edit, after HTTPS, and it is not `--all`. On historical files only, replace the host inside absolute site URLs. Leave every sentence, number, and byline as written. Fields in scope when the value is on `https://adrnnng.com`: `link rel=canonical`, `og:url`, `og:image`, `twitter:image`, JSON-LD `url` / `mainEntityOfPage` / `@id` / logo that the builder wrote, and absolute internal links the builder wrote (including politician-tracker reader links). Out of scope: article prose, finance data, Adrian Ng, mailboxes, Buttondown, and external citations.
+
+### Outside this repo, after HTTPS only
+
+Switch these news-builder inputs together, for new editions, only after `https://news-chart.com` answers with a working certificate. Do not switch them in advance, and do not rebuild history to apply them:
+
+- `SITE_URL`
+- `BASE`
+- `base_url`
+- `latest_json`, when a field is an absolute URL on the old host (`report_url` in `scripts/preview/latest.json` is a path, `/news/YYYYMMDD/`)
+- politician-tracker reader links written into news HTML
+
+New editions published after that switch use `https://news-chart.com` from the start.
+
+### Staged cutover
+
+1. Land this PR. It does not deploy.
+2. Attach `news-chart.com` to Pages project `adrnnng` and take it off the parking redirect. A certificate alone is not enough: at the time of this change `https://news-chart.com/` 302s to `https://news-chart-com.l.ink/`, and `https://newsandchart.com/` 302s to `https://newsandchart-com.l.ink/`. `https://adrnnng.com/` still returns 200. Step 2 is done only when `https://news-chart.com/` returns this site with 200 on `/`, `/backtest/`, `/politician-tracker/`, `/news/`, `/sitemap.xml`, `/robots.txt`, `/news/feed.xml`, and one existing `/news/YYYYMMDD/`. No old-host redirect yet. The deploy that proves those URLs can be the current production upload (old canonicals). Do not assemble this commit until that 200 is real.
+3. Switch the outside-repo inputs listed above. Do not run `--all`.
+4. News Analyst production assemble: `publish.sh` / `check_sections.sh` only, project `adrnnng`, repo plus `news/` plus `/latest`.
+5. Optional metadata pass on historical journals, same window or immediately after, fields listed above only.
+6. Fetch the new host again: a new edition and an old edition path, both HTTPS 200, routes unchanged.
+7. Only then, at the host, 301 `adrnnng.com`, `www.adrnnng.com`, `newsandchart.com`, and `www.newsandchart.com` to the same path on `https://news-chart.com`. Do not put those rules in `_redirects`. A `/*` redirect to `https://news-chart.com` loops once that hostname is on this project.
+8. Ping IndexNow after the live host is `news-chart.com` (`scripts/ping-indexnow.mjs` submits `SITE_ORIGIN`).
+
+### Rollback
+
+Revert this commit. News Analyst republishes the previous `main` the same way: assemble repo plus `news/` plus `/latest` to project `adrnnng`. If step 7 has not run, the old host is still the serving host. If step 7 has run, remove those host redirects before republishing the old canonical. Do not delete the Pages project, the KV namespace, or the IndexNow key. Do not upload the repo without `news/`.
+
+### Tests
+
+`npm test` and `npm run check`. The suite pins `SITE_ORIGIN`, refuses a `news-chart.com` rule in `_redirects`, keeps the Buttondown `/adrrr` sender, and checks that assemble leaves a historical canonical, `og:url`, and prose in place while the sitemap uses the new origin.
+
 ## Deploying, and how the News Analyst upload fits in
 
 Nothing in this repo deploys to Cloudflare. Pushes to `main` trigger `notify-host.yml`, which
 pings the host; the News Analyst uploads `/news/` with Wrangler around 08:15 HKT. A Pages direct
 upload replaces the entire deployment, so every upload must contain both this repo's files and
-`news/`:
+`news/`. The project name in the command below stays `adrnnng`. Run it only after `https://news-chart.com` serves HTTPS, and only on the assembled folder:
 
 ```bash
 git -C adrnnng pull origin main
@@ -317,7 +368,7 @@ written into `news-preview.json` is taken from `news/latest.json`, a JSON sideca
 `<meta name="serp_hook">` tag, or the edition `<title>`. An empty string is kept when the
 field is present but blank.
 
-It then stamps public HTML with Organization and WebSite JSON-LD (`og:locale=zh_HK`, `twitter:site=@adrnnng`, breadcrumbs on sections and editions). Day pages keep their News Analyst titles and headlines. If a day page already has `NewsArticle` JSON-LD, the stamp adds `publisher.logo` (the apple-touch icon) and copies `datePublished` into `article:published_time` when that timestamp is already on the page. It does not add `SearchAction` or `FAQPage`. There is no site search.
+It then stamps public HTML with Organization and WebSite JSON-LD (`og:locale=zh_HK`, `twitter:site=@adrnnng`, breadcrumbs on sections and editions). Day pages keep their News Analyst titles, headlines, prose, and any canonical or `og:url` already on the file. If a day page already has `NewsArticle` JSON-LD, the stamp adds `publisher.logo` (the apple-touch icon) and copies `datePublished` into `article:published_time` when that timestamp is already on the page. It does not add `SearchAction` or `FAQPage`. There is no site search. Historical canonicals are not rebuilt; see the host-migration section.
 
 `/news/feed.xml` is written from the edition files in that upload: one item per `/news/YYYYMMDD/`, using that page's title and description. `pubDate` is set only when the page already has a timestamp. `dc:date` is the edition date in the path.
 
@@ -355,7 +406,7 @@ noindex. After `wrangler pages deploy`, ping IndexNow with
 `node scripts/ping-indexnow.mjs --site <deploy_dir>`.
 `404.html` must be in every upload. Without it, Pages treats the site as a single-page app and serves `index.html`
 with status 200 for unknown paths, including `/backtest/tests/`. `_redirects` only aliases
-`/backtesting` to `/backtest/` and `www` to the apex. `/favicon.ico` is the same file as
+`/backtesting` to `/backtest/`, `/hsi-lab` to the HSI futures recipe, and `www.adrnnng.com` to `https://adrnnng.com`. It does not redirect to `news-chart.com`. `/favicon.ico` is the same file as
 `assets/brand/favicon.ico`, so browsers that request the root icon get the real one. The News
 Analyst merges the `/latest` redirect rules at upload time and does not write a root `index.html`.
 

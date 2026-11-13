@@ -1,21 +1,21 @@
-# ADRRR
+# News Chart
 
-> Adrian Ng's trading and investing site. Morning Report, a congressional-trading tracker, and a TD Sequential backtest. Research and education, not investment advice.
+> ADRRR's trading and investing site. Morning Report, a congressional-trading tracker, and a TD Sequential backtest. Research and education, not investment advice.
 
-The public site is https://adrnnng.com. Pages are static HTML on Cloudflare Pages. Crawlers may fetch every public URL. `/api/` is not a public page. There is no site search. Discovery files: `/robots.txt`, `/sitemap.xml` (a sitemap index), and `/news/feed.xml` (RSS for Morning Report editions). Daily Morning Report editions are `/news/YYYYMMDD/`.
+The public site is https://news-chart.com. Pages are static HTML on Cloudflare Pages. Crawlers may fetch every public URL. `/api/` is not a public page. There is no site search. Discovery files: `/robots.txt`, `/sitemap.xml` (a sitemap index), and `/news/feed.xml` (RSS for Morning Report editions). Daily Morning Report editions are `/news/YYYYMMDD/`.
 
 ## Sections
 
-- [Home](https://adrnnng.com/): Landing page. The latest Morning Report lead, a market tape, and doors into each section.
-- [Backtest](https://adrnnng.com/backtest/): Run TD Sequential or ATR SuperTrend on daily history, and HSI futures on 1-minute and 5-minute bars. The chart, profit curve, and statistics run in the browser.
-- [Politician Tracker](https://adrnnng.com/politician-tracker/): STOCK Act disclosures from a VIP list of members of Congress, plus any member's trade in a Watchlist ticker. Refreshed about 07:05 HKT. Members are listed on this one page; there is no separate URL per member unless a static member page is published later.
-- [Morning Report](https://adrnnng.com/news/): The daily market briefing, published around 08:15 HKT, and its archive. Each edition is `/news/YYYYMMDD/`.
-- [Morning Report RSS](https://adrnnng.com/news/feed.xml): One item per edition that exists under `/news/YYYYMMDD/`. Titles, links, and descriptions come from those pages. A publish time is included only when the page already has one.
+- [Home](https://news-chart.com/): Landing page. The latest Morning Report lead, a market tape, and doors into each section.
+- [Backtest](https://news-chart.com/backtest/): Run TD Sequential or ATR SuperTrend on daily history, and HSI futures on 1-minute and 5-minute bars. The chart, profit curve, and statistics run in the browser.
+- [Politician Tracker](https://news-chart.com/politician-tracker/): STOCK Act disclosures from a VIP list of members of Congress, plus any member's trade in a Watchlist ticker. Refreshed about 07:05 HKT. Members are listed on this one page; there is no separate URL per member unless a static member page is published later.
+- [Morning Report](https://news-chart.com/news/): The daily market briefing, published around 08:15 HKT, and its archive. Each edition is `/news/YYYYMMDD/`.
+- [Morning Report RSS](https://news-chart.com/news/feed.xml): One item per edition that exists under `/news/YYYYMMDD/`. Titles, links, and descriptions come from those pages. A publish time is included only when the page already has one.
 
-`/hsi-lab/` redirects to [Backtest](https://adrnnng.com/backtest/) with the HSI futures SuperTrend recipe. That is the only strategy lab URL.
+`/hsi-lab/` redirects to [Backtest](https://news-chart.com/backtest/) with the HSI futures SuperTrend recipe. That is the only strategy lab URL.
 
 ## Discovery
 
-- [Sitemap index](https://adrnnng.com/sitemap.xml): Points at the page sitemap and, when editions exist, the news archive sitemap. A Google News sitemap is added for editions from today or yesterday in Hong Kong.
-- [RSS](https://adrnnng.com/news/feed.xml): Morning Report editions only. Written when the site is assembled with `news/`.
-- [robots.txt](https://adrnnng.com/robots.txt): Allows all crawlers, names the major search and AI crawlers, and disallows `/api/`.
+- [Sitemap index](https://news-chart.com/sitemap.xml): Points at the page sitemap and, when editions exist, the news archive sitemap. A Google News sitemap is added for editions from today or yesterday in Hong Kong.
+- [RSS](https://news-chart.com/news/feed.xml): Morning Report editions only. Written when the site is assembled with `news/`.
+- [robots.txt](https://news-chart.com/robots.txt): Allows all crawlers, names the major search and AI crawlers, and disallows `/api/`.

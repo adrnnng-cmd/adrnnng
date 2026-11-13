@@ -177,8 +177,13 @@ async function renderTape() {
   const by = Object.fromEntries(m.symbols.map((s) => [s.symbol, s]));
   const items = TAPE.map((s) => by[s]).filter(Boolean);
   const arrow = (p) => (p > 0 ? '▲' : p < 0 ? '▼' : '');
+  let brand = 'News Chart';
+  try {
+    const reg = await loadRegistry();
+    if (reg?.site?.name) brand = reg.site.name;
+  } catch { /* header uses the same registry; keep the wordmark if it is unreachable */ }
   const html =
-    `<span class="lbl">ADRRR</span>` +
+    `<span class="lbl">${esc(brand)}</span>` +
     items
       .map((s) => {
         const cls = s.change_pct > 0 ? 'up' : s.change_pct < 0 ? 'down' : 'muted';

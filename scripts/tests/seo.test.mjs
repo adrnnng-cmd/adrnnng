@@ -48,27 +48,27 @@ test('sitemap index lists pages, member pages, hsi-lab, and news fragments', asy
     const built = buildSitemaps(dir, { now: '2026-10-22' });
     const locs = (name) => extractLocs(built.files[name]);
     assert.deepEqual(locs('sitemap.xml'), [
-      'https://adrnnng.com/sitemap-pages.xml',
-      'https://adrnnng.com/sitemap-news.xml',
-      'https://adrnnng.com/news-sitemap.xml',
+      'https://news-chart.com/sitemap-pages.xml',
+      'https://news-chart.com/sitemap-news.xml',
+      'https://news-chart.com/news-sitemap.xml',
     ]);
     assert.deepEqual(locs('sitemap-pages.xml'), [
-      'https://adrnnng.com/',
-      'https://adrnnng.com/backtest/',
-      'https://adrnnng.com/hsi-lab/',
-      'https://adrnnng.com/news/',
-      'https://adrnnng.com/news/not-a-date/',
-      'https://adrnnng.com/politician-tracker/',
-      'https://adrnnng.com/politician-tracker/members/P000197/',
+      'https://news-chart.com/',
+      'https://news-chart.com/backtest/',
+      'https://news-chart.com/hsi-lab/',
+      'https://news-chart.com/news/',
+      'https://news-chart.com/news/not-a-date/',
+      'https://news-chart.com/politician-tracker/',
+      'https://news-chart.com/politician-tracker/members/P000197/',
     ]);
     assert.deepEqual(locs('sitemap-news.xml'), [
-      'https://adrnnng.com/news/20261020/',
-      'https://adrnnng.com/news/20261021/',
-      'https://adrnnng.com/news/20261022/',
+      'https://news-chart.com/news/20261020/',
+      'https://news-chart.com/news/20261021/',
+      'https://news-chart.com/news/20261022/',
     ]);
     assert.deepEqual(locs('news-sitemap.xml'), [
-      'https://adrnnng.com/news/20261021/',
-      'https://adrnnng.com/news/20261022/',
+      'https://news-chart.com/news/20261021/',
+      'https://news-chart.com/news/20261022/',
     ]);
     assert.match(built.files['news-sitemap.xml'], /xmlns:news="http:\/\/www.google.com\/schemas\/sitemap-news\/0.9"/);
     assert.match(built.files['news-sitemap.xml'], /<news:language>zh-Hant<\/news:language>/);
@@ -92,8 +92,8 @@ test('news fragment is omitted when every edition is older than yesterday', asyn
     const built = buildSitemaps(dir, { now: '2026-11-01' });
     assert.equal(built.files['news-sitemap.xml'], undefined);
     assert.deepEqual(extractLocs(built.files['sitemap.xml']), [
-      'https://adrnnng.com/sitemap-pages.xml',
-      'https://adrnnng.com/sitemap-news.xml',
+      'https://news-chart.com/sitemap-pages.xml',
+      'https://news-chart.com/sitemap-news.xml',
     ]);
     assert.equal(built.recent.length, 0);
     assert.equal(built.news.length, 3);
@@ -111,7 +111,10 @@ test('assemble-deploy writes the sitemap from the merged news tree', async () =>
   try {
     await mkdir(join(news, today), { recursive: true });
     await writeFile(join(news, 'index.html'), '<html><head><title>Archive</title></head></html>');
-    await writeFile(join(news, today, 'index.html'), `<html><head><title>Edition ${today}</title></head></html>`);
+    await writeFile(join(news, today, 'index.html'), `<html><head><title>Edition ${today}</title>
+<link rel="canonical" href="https://adrnnng.com/news/${today}/">
+<meta property="og:url" content="https://adrnnng.com/news/${today}/">
+</head><body><p>Adrian Ng. 收市 19234. news@adrnnng.com</p></body></html>`);
     await exec('bash', ['scripts/assemble-deploy.sh', out, '--news', news], { cwd: root });
     const index = await readFile(join(out, 'sitemap.xml'), 'utf8');
     const pages = await readFile(join(out, 'sitemap-pages.xml'), 'utf8');
@@ -120,26 +123,35 @@ test('assemble-deploy writes the sitemap from the merged news tree', async () =>
     assert.match(index, /sitemap-pages\.xml/);
     assert.match(index, /sitemap-news\.xml/);
     assert.match(index, /news-sitemap\.xml/);
-    assert.match(pages, /https:\/\/adrnnng\.com\/news\//);
-    assert.match(pages, /https:\/\/adrnnng\.com\/backtest\//);
-    assert.match(pages, /https:\/\/adrnnng\.com\/politician-tracker\//);
+    assert.match(pages, /https:\/\/news-chart\.com\/news\//);
+    assert.match(pages, /https:\/\/news-chart\.com\/backtest\//);
+    assert.match(pages, /https:\/\/news-chart\.com\/politician-tracker\//);
     assert.doesNotMatch(pages, /\/thanks/);
-    assert.match(editions, new RegExp(`/news/${today}/`));
+    assert.match(editions, new RegExp(`<loc>https://news-chart.com/news/${today}/</loc>`));
     assert.match(recent, new RegExp(`<news:title>Edition ${today}</news:title>`));
+    assert.match(recent, /<news:name>News Chart Morning Report<\/news:name>/);
     assert.match(recent, /<news:language>zh-Hant<\/news:language>/);
     assert.doesNotMatch(recent, /<news:language>en<\/news:language>/);
     assert.match(await readFile(join(out, '404.html'), 'utf8'), /noindex/);
     const editionHtml = await readFile(join(out, 'news', today, 'index.html'), 'utf8');
     assert.match(editionHtml, new RegExp(`<title>Edition ${today}</title>`));
+    assert.match(editionHtml, /property="og:site_name" content="News Chart"/);
+    assert.match(editionHtml, new RegExp(`rel="canonical" href="https://adrnnng.com/news/${today}/"`));
+    assert.match(editionHtml, new RegExp(`property="og:url" content="https://adrnnng.com/news/${today}/"`));
+    assert.match(editionHtml, /Adrian Ng\. 收市 19234\. news@adrnnng\.com/);
+    assert.match(editionHtml, /https:\/\/news-chart\.com\/#organization/);
+    assert.match(editionHtml, /"name":"News Chart"/);
     assert.match(editionHtml, /property="og:locale" content="zh_HK"/);
     assert.match(editionHtml, /name="twitter:site" content="@adrnnng"/);
     assert.match(editionHtml, /id="adrnnng-site"/);
     assert.match(editionHtml, /"@type":"WebSite"/);
     assert.doesNotMatch(editionHtml, /SearchAction|FAQPage|article:published_time/);
-    const homeBlock = /<loc>https:\/\/adrnnng\.com\/<\/loc>\s*<lastmod>([^<]+)<\/lastmod>/.exec(pages);
+    const homeBlock = /<loc>https:\/\/news-chart\.com\/<\/loc>\s*<lastmod>([^<]+)<\/lastmod>/.exec(pages);
     assert.equal(homeBlock?.[1], `${today.slice(0, 4)}-${today.slice(4, 6)}-${today.slice(6, 8)}`);
     const feed = await readFile(join(out, 'news/feed.xml'), 'utf8');
     assert.equal((feed.match(/<item>/g) || []).length, 1);
+    assert.match(feed, /<channel>\s*<title>News Chart Morning Report<\/title>/);
+    assert.match(feed, /<link>https:\/\/news-chart\.com\/news\/<\/link>/);
     assert.match(feed, new RegExp(`<title>Edition ${today}</title>`));
     assert.match(feed, new RegExp(`<dc:date>${today.slice(0, 4)}-${today.slice(4, 6)}-${today.slice(6, 8)}</dc:date>`));
     assert.doesNotMatch(feed, /<pubDate>/);
@@ -150,8 +162,14 @@ test('assemble-deploy writes the sitemap from the merged news tree', async () =>
     const home = await readFile(join(out, 'index.html'), 'utf8');
     assert.match(home, new RegExp(`href="/news/${today}/"`));
     assert.match(home, /港股美股盤前早報/);
+    assert.match(home, /<title>港股美股盤前早報｜News Chart<\/title>/);
+    assert.match(home, /property="og:site_name" content="News Chart"/);
+    assert.match(home, /rel="canonical" href="https:\/\/news-chart\.com\/"/);
+    assert.match(home, /property="og:url" content="https:\/\/news-chart\.com\/"/);
+    assert.match(home, /News Chart by ADRRR/);
     const archive = await readFile(join(out, 'news/index.html'), 'utf8');
-    assert.match(archive, /name="description" content="ADRRR 港股美股晨報往期全文。每朝 9 點前更新；訂閱 Newsletter 收最新盤前摘要。"/);
+    assert.match(archive, /name="description" content="News Chart 港股美股晨報往期全文。每朝 9 點前更新；訂閱 Newsletter 收最新盤前摘要。"/);
+    assert.match(archive, /property="og:site_name" content="News Chart"/);
     assert.match(archive, /<title>[^<]*港股美股[^<]*<\/title>/);
     assert.match(archive, /embed-subscribe\/adrrr/);
   } finally {
@@ -170,36 +188,36 @@ test('changed paths become public URLs and IndexNow submits the new ones', async
     'thanks/index.html',
     '404.html',
   ]), [
-    'https://adrnnng.com/hsi-lab/',
-    'https://adrnnng.com/news/',
-    'https://adrnnng.com/news/20261022/',
-    'https://adrnnng.com/politician-tracker/',
+    'https://news-chart.com/hsi-lab/',
+    'https://news-chart.com/news/',
+    'https://news-chart.com/news/20261022/',
+    'https://news-chart.com/politician-tracker/',
   ]);
   const policy = urlsForChangedPaths(['robots.txt']);
-  assert.ok(policy.includes('https://adrnnng.com/backtest/'));
-  assert.ok(policy.includes('https://adrnnng.com/news/'));
-  assert.ok(!policy.includes('https://adrnnng.com/hsi-lab/'));
+  assert.ok(policy.includes('https://news-chart.com/backtest/'));
+  assert.ok(policy.includes('https://news-chart.com/news/'));
+  assert.ok(!policy.includes('https://news-chart.com/hsi-lab/'));
 
   const current = [
-    'https://adrnnng.com/',
-    'https://adrnnng.com/backtest/',
-    'https://adrnnng.com/news/20261022/',
+    'https://news-chart.com/',
+    'https://news-chart.com/backtest/',
+    'https://news-chart.com/news/20261022/',
   ];
   assert.deepEqual(selectPingUrls({
     siteLocs: current,
-    newsLocs: ['https://adrnnng.com/news/20261022/'],
-    previous: ['https://adrnnng.com/', 'https://adrnnng.com/backtest/'],
-    pathUrls: ['https://adrnnng.com/politician-tracker/'],
+    newsLocs: ['https://news-chart.com/news/20261022/'],
+    previous: ['https://news-chart.com/', 'https://news-chart.com/backtest/'],
+    pathUrls: ['https://news-chart.com/politician-tracker/'],
   }), [
-    'https://adrnnng.com/news/20261022/',
-    'https://adrnnng.com/politician-tracker/',
+    'https://news-chart.com/news/20261022/',
+    'https://news-chart.com/politician-tracker/',
   ]);
   assert.deepEqual(selectPingUrls({ siteLocs: current, previous: null, pathUrls: [] }), current);
 
-  const payload = buildPayload({ key: 'abc12345', urlList: ['https://adrnnng.com/'] });
-  assert.equal(payload.host, 'adrnnng.com');
-  assert.equal(payload.keyLocation, 'https://adrnnng.com/abc12345.txt');
-  assert.deepEqual(payload.urlList, ['https://adrnnng.com/']);
+  const payload = buildPayload({ key: 'abc12345', urlList: ['https://news-chart.com/'] });
+  assert.equal(payload.host, 'news-chart.com');
+  assert.equal(payload.keyLocation, 'https://news-chart.com/abc12345.txt');
+  assert.deepEqual(payload.urlList, ['https://news-chart.com/']);
 
   const calls = [];
   const ok = await postIndexNow(payload, {
@@ -229,7 +247,7 @@ test('committed indexing files allow public pages and keep /api private', async 
       current = { agent: t.split(':').slice(1).join(':').trim(), rules: [] };
       groups.push(current);
     } else if (/^sitemap:/i.test(t)) {
-      assert.equal(t, 'Sitemap: https://adrnnng.com/sitemap.xml');
+      assert.equal(t, 'Sitemap: https://news-chart.com/sitemap.xml');
     } else if (current) current.rules.push(t);
   }
   for (const agent of ['*', 'Googlebot', 'Bingbot', 'GPTBot', 'OAI-SearchBot', 'ChatGPT-User', 'PerplexityBot', 'ClaudeBot']) {
@@ -259,7 +277,7 @@ test('committed indexing files allow public pages and keep /api private', async 
   assert.equal(applyHeaders(headers, '/news/feed.xml').get('content-type'), 'application/rss+xml; charset=utf-8');
 
   const llms = await readFile(join(root, 'llms.txt'), 'utf8');
-  for (const needle of ['Backtest', 'Politician Tracker', 'Morning Report', '/hsi-lab/', 'https://adrnnng.com/news/', '/news/feed.xml', 'no site search']) {
+  for (const needle of ['Backtest', 'Politician Tracker', 'Morning Report', '/hsi-lab/', 'https://news-chart.com/news/', '/news/feed.xml', 'no site search']) {
     assert.ok(llms.includes(needle), needle);
   }
 
