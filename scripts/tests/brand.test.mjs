@@ -152,6 +152,44 @@ test('domain files, price data, and News Analyst stampers stay on the old contra
   assert.equal(createHash('sha256').update(white).digest('hex'), '92971e763695a5bf08c2545f6f20b267eb46774570b0c2abcf735d5d44a7c022');
   assert.match(black.toString('utf8'), /viewBox="0.0 -36.0 10503.0 1548.0"/);
   assert.match(white.toString('utf8'), /fill="#fff"/);
-  assert.match(read('assets/brand/favicon.svg'), /10503/);
-  assert.doesNotMatch(read('assets/brand/favicon.svg'), /港美股新聞/);
+  assert.equal(createHash('sha256').update(readFileSync(new URL('../../assets/brand/og-image.png', import.meta.url))).digest('hex'), '3ed90ba291fd2061ffecdbf99dc6e5d52705850400bd67a37ec3f89ddc30ebd9');
+  assert.equal(createHash('sha256').update(readFileSync(new URL('../../assets/brand/og-image.svg', import.meta.url))).digest('hex'), 'a64fe45ca0db5b6cfd4d497e2ad26e0539be363ba69ff83b07d32ddd8a2d3ec5');
+  assert.equal(createHash('sha256').update(readFileSync(new URL('../../assets/brand/apple-touch-icon.png', import.meta.url))).digest('hex'), '1b286c897a1ba91a801af6e24fdf216c0188d477efc0dc22f66f76e92dabe28e');
+  const favicon = read('assets/brand/favicon.svg');
+  const markPaths = [...white.toString('utf8').matchAll(/<path d="([^"]+)"/g)].map((m) => m[1]);
+  const iconPaths = [...favicon.matchAll(/<path d="([^"]+)"/g)].map((m) => m[1]);
+  assert.equal(iconPaths.length, 2);
+  assert.equal(iconPaths[1], markPaths[4], 'C path stays the wordmark C');
+  assert.notEqual(iconPaths[0], markPaths[0], 'N hairlines are opened for 16px');
+  assert.match(iconPaths[0], /L233\.5 1500H603/);
+  assert.match(iconPaths[0], /H33\.5/);
+  assert.match(iconPaths[0], /M1463 /);
+  assert.match(favicon, /stroke-width="200"/);
+  assert.match(favicon, /hairlines opened to 460/);
+  assert.equal(favicon.includes('aria-label="NC"'), true);
+  assert.doesNotMatch(favicon, /港美股新聞/);
+  const iconHref = '/assets/brand/favicon.svg?v=nc-2026-11-13';
+  const icoHref = '/assets/brand/favicon.ico?v=nc-2026-11-13';
+  for (const rel of [
+    'index.html',
+    '404.html',
+    'thanks/index.html',
+    'backtest/index.html',
+    'politician-tracker/index.html',
+    'scripts/templates/tool/index.html',
+    '.github/politician-tracker/tracker/render.py',
+  ]) {
+    const html = read(rel);
+    assert.equal(html.includes(iconHref), true, rel);
+    assert.equal(html.includes(icoHref), true, rel);
+    assert.equal(html.includes('href="/assets/brand/favicon.svg"'), false, rel);
+    assert.equal(html.includes('href="/assets/brand/favicon.ico"'), false, rel);
+  }
+  for (const rel of ['index.html', '404.html', 'thanks/index.html', 'backtest/index.html', 'scripts/templates/tool/index.html']) {
+    assert.match(read(rel), /rel="apple-touch-icon" href="\/assets\/brand\/apple-touch-icon\.png"/);
+  }
+  const rootIcon = readFileSync(new URL('../../favicon.ico', import.meta.url));
+  const brandIcon = readFileSync(new URL('../../assets/brand/favicon.ico', import.meta.url));
+  assert.ok(rootIcon.equals(brandIcon));
+  assert.ok(rootIcon.length > 100);
 });

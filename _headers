@@ -122,3 +122,14 @@
 /thanks/*
   ! X-Robots-Tag
   X-Robots-Tag: noindex, nofollow
+
+# Favicon URLs also carry ?v=nc-2026-11-13 in HTML. Root /favicon.ico is still
+# requested with no query by browsers, so it must revalidate after this NC swap.
+/favicon.ico
+  Cache-Control: public, max-age=3600, must-revalidate
+
+/assets/brand/favicon.ico
+  Cache-Control: public, max-age=3600, must-revalidate
+
+/assets/brand/favicon.svg
+  Cache-Control: public, max-age=3600, must-revalidate

@@ -407,7 +407,7 @@ noindex. After `wrangler pages deploy`, ping IndexNow with
 `404.html` must be in every upload. Without it, Pages treats the site as a single-page app and serves `index.html`
 with status 200 for unknown paths, including `/backtest/tests/`. `_redirects` only aliases
 `/backtesting` to `/backtest/`, `/hsi-lab` to the HSI futures recipe, and `www.adrnnng.com` to `https://adrnnng.com`. It does not redirect to `news-chart.com`. `/favicon.ico` is the same file as
-`assets/brand/favicon.ico`, so browsers that request the root icon get the real one. The News
+`assets/brand/favicon.ico`. Both are the NC mark built by `scripts/build-nc-favicon.py` from the N and C in `news-chart-white.svg`, with the N hairlines opened and a stroke on the C so the letters hold at 16 and 32 pixels. HTML links use `?v=nc-2026-11-13`. The header wordmark, OG image, and apple-touch icon stay the full News Chart mark. The News
 Analyst merges the `/latest` redirect rules at upload time and does not write a root `index.html`.
 
 Sitemap files are static XML written at assemble time. This repo has no Pages Function that
