@@ -158,7 +158,14 @@ test('domain files, price data, and News Analyst stampers stay on the old contra
   const favicon = read('assets/brand/favicon.svg');
   const markPaths = [...white.toString('utf8').matchAll(/<path d="([^"]+)"/g)].map((m) => m[1]);
   const iconPaths = [...favicon.matchAll(/<path d="([^"]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(iconPaths, [markPaths[0], markPaths[4]]);
+  assert.equal(iconPaths.length, 2);
+  assert.equal(iconPaths[1], markPaths[4], 'C path stays the wordmark C');
+  assert.notEqual(iconPaths[0], markPaths[0], 'N hairlines are opened for 16px');
+  assert.match(iconPaths[0], /L233\.5 1500H603/);
+  assert.match(iconPaths[0], /H33\.5/);
+  assert.match(iconPaths[0], /M1463 /);
+  assert.match(favicon, /stroke-width="200"/);
+  assert.match(favicon, /hairlines opened to 460/);
   assert.equal(favicon.includes('aria-label="NC"'), true);
   assert.doesNotMatch(favicon, /港美股新聞/);
   const iconHref = '/assets/brand/favicon.svg?v=nc-2026-11-13';

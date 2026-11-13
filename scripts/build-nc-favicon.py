@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
-"""Build the NC favicon from the accepted News Chart wordmark strokes.
+"""Build the NC favicon from the accepted News Chart wordmark.
 
-Reads the N and C path data out of assets/brand/news-chart-white.svg and writes
-assets/brand/favicon.svg. It does not redraw the letters and does not write the
-wordmark, OG image, or apple-touch icon. Re-run this after an intentional
-wordmark edit; the favicon test rejects a generic outline that is not these paths.
+The N and C paths come from assets/brand/news-chart-white.svg. Two micro-size
+edits, and nothing else:
+
+- The N's verticals are 4-unit hairlines beside a heavy diagonal. Each hairline
+  is opened into a stem wide enough to survive 16 device pixels. The diagonal
+  anchors and the outer serif ends stay.
+- The C keeps its path and gains a white stroke so the spine holds and the
+  opening stays open.
+
+The wordmark, OG image, and apple-touch icon are not written.
 """
 from __future__ import annotations
 
@@ -16,12 +22,13 @@ ROOT = Path(__file__).resolve().parents[1]
 WORDMARK = ROOT / "assets/brand/news-chart-white.svg"
 OUT = ROOT / "assets/brand/favicon.svg"
 
-# Ink-to-ink gap in the wordmark's font units. Wider than the "Ch" gap (36)
-# and narrower than the word space (360), so the two capitals stay separate
-# and still fill a 16px square.
 GAP = 120
-# Padding around the ink, as a fraction of the square side.
-PAD_FRAC = 0.08
+PAD_FRAC = 0.06
+# Hairline is ~4 units. 460 units is a little over two pixels at 16px in the
+# square this layout produces. Smaller and the stem aliases back to gray.
+N_STEM = 460
+# Centered stroke on the original C. Half of this is about one extra pixel.
+C_STROKE = 200
 
 def paths(svg: str) -> list[tuple[str, float]]:
     found = re.findall(
@@ -70,21 +77,45 @@ def bbox(d: str) -> tuple[float, float, float, float]:
     return min(xs), min(ys), max(xs), max(ys)
 
 
-def shift(box, dx):
+def refine_n(d: str) -> str:
+    """Open the two 4-unit vertical hairlines into stems. Diagonal anchors stay."""
+    if "M235.5 1500" not in d or "H231.5" not in d or "H1253" not in d:
+        raise SystemExit("N path is not the accepted wordmark N")
+    if "L233.5 1500" not in d or "H603" not in d:
+        raise SystemExit("N is missing the diagonal anchors")
+    left_edge = 33.5
+    left_right = left_edge + N_STEM
+    serif_right = left_right + 36
+    # Right hairline sits at 1249/1253. Grow it left into the counter and a
+    # little right toward the existing serif end at 1463.
+    right_outer = min(1463.0 - 20, 1253.0 + 160)
+    right_inner = right_outer - N_STEM
+    left = (
+        f"M{left_right:.1f} 1500V22H{serif_right:.1f}V0H{left_edge:.1f}V22"
+        f"H{left_edge + 8:.1f}V1476H{left_edge:.1f}V1500Z"
+    )
+    right = (
+        f"M1463 1500V1476H{right_outer:.1f}V-20H{right_inner:.1f}"
+        f"L233.5 1500H603L{right_inner:.1f} 509V1476"
+        f"H{right_inner - 28:.1f}V1500Z"
+    )
+    return f"{left} {right}"
+
+
+def shift(box, dx, extra=0.0):
     x0, y0, x1, y1 = box
-    return x0 + dx, y0, x1 + dx, y1
+    return x0 + dx - extra, y0 - extra, x1 + dx + extra, y1 + extra
 
 
 def build(svg: str) -> str:
     items = paths(svg)
-    n_d, n_tx = items[0]
-    c_d, c_tx = items[4]
-    if not n_d.startswith("M235.5 1500"):
-        raise SystemExit("path 1 is not the accepted N")
-    if not c_d.startswith("M801.5 -20"):
+    n_src, n_tx = items[0]
+    c_src, c_tx = items[4]
+    if not c_src.startswith("M801.5 -20"):
         raise SystemExit("path 5 is not the accepted C")
+    n_d = refine_n(n_src)
     n_box = shift(bbox(n_d), n_tx)
-    c_box = shift(bbox(c_d), c_tx)
+    c_box = shift(bbox(c_src), c_tx, C_STROKE / 2)
     n_dx = -n_box[0]
     c_dx = (n_box[2] + n_dx) + GAP - c_box[0]
     placed_n = shift(n_box, n_dx)
@@ -99,14 +130,13 @@ def build(svg: str) -> str:
     ox = (side - ink_w) / 2 - x0
     n_out = n_tx + n_dx + ox
     c_out = c_tx + c_dx + ox
-    # y-up ink: y1 is the cap, y0 is the lowest overshoot. Flip so the cap sits
-    # one equal pad below the top of the square.
     origin = y1 + (side - ink_h) / 2
     comment = (
-        "<!-- NC favicon. The N and C path data are copied from "
-        "assets/brand/news-chart-white.svg (refined 2026-11-13.1). "
-        "Do not replace them with a font outline. Regenerate with "
-        "scripts/build-nc-favicon.py. -->"
+        "<!-- NC favicon. Source paths: N and C in assets/brand/news-chart-white.svg "
+        "(refined 2026-11-13.1). Micro-size only: N vertical hairlines opened to "
+        f"{N_STEM:.0f} font units, C path unchanged plus stroke-width {C_STROKE:.0f}. "
+        "Diagonal anchors 233.5 and 603 stay. Not a new font. "
+        "Regenerate with scripts/build-nc-favicon.py. -->"
     )
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {side:.1f} {side:.1f}" '
@@ -115,14 +145,14 @@ def build(svg: str) -> str:
         f'<rect width="{side:.1f}" height="{side:.1f}" fill="#000"/>\n'
         f'<g transform="translate(0 {origin:.1f}) scale(1 -1)">\n'
         f'<path d="{n_d}" transform="translate({n_out:.1f} 0)"/>\n'
-        f'<path d="{c_d}" transform="translate({c_out:.1f} 0)"/>\n'
+        f'<path d="{c_src}" transform="translate({c_out:.1f} 0)" '
+        f'fill="#fff" stroke="#fff" stroke-width="{C_STROKE:.0f}" stroke-linejoin="round"/>\n'
         f"</g>\n</svg>\n"
     )
 
 
 def main() -> None:
-    svg = WORDMARK.read_text()
-    OUT.write_text(build(svg))
+    OUT.write_text(build(WORDMARK.read_text()))
     print(OUT.relative_to(ROOT))
 
 

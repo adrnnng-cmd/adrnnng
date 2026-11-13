@@ -1,8 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3320.8 3320.8" fill="#fff" role="img" aria-label="NC">
-<!-- NC favicon. The N and C path data are copied from assets/brand/news-chart-white.svg (refined 2026-11-13.1). Do not replace them with a font outline. Regenerate with scripts/build-nc-favicon.py. -->
-<rect width="3320.8" height="3320.8" fill="#000"/>
-<g transform="translate(0 2410.4) scale(1 -1)">
-<path d="M235.5 1500V22H467.5V0H33.5V22H231.5V1476H33.5V1500Z M1463 1500V1476H1253V-20H1249.0L233.5 1500H603L1249 509V1476H1019V1500Z" transform="translate(232.2 0)"/>
-<path d="M801.5 -20Q578.5 -20 417.2 79.5Q256 179 168.8 353.0Q81.5 527 81.5 750Q81.5 973 168.8 1147.0Q256 1321 417.2 1420.5Q578.5 1520 801.5 1520Q895 1520 974.0 1487.8Q1053 1455.5 1114 1397L1297.5 1500H1301.5V1060H1295.5Q1262 1189.5 1193.5 1291.2Q1125 1393 1030.0 1451.5Q935 1510 821.5 1510Q710 1510 634.5 1443.5Q559 1377 514.8 1266.5Q470.5 1156 451.0 1021.5Q431.5 887 431.5 750Q431.5 614 451.0 479.0Q470.5 344 514.8 233.5Q559 123 634.5 56.5Q710 -10 821.5 -10Q924 -10 1006.0 25.5Q1088 61 1150.2 123.5Q1212.5 186 1254.0 267.2Q1295.5 348.5 1316.5 440H1321.5V0H1317.5L1150.5 114.5Q1086.5 52 998.5 16.0Q910.5 -20 801.5 -20Z" transform="translate(1733.7 0)"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3397.2 3397.2" fill="#fff" role="img" aria-label="NC">
+<!-- NC favicon. Source paths: N and C in assets/brand/news-chart-white.svg (refined 2026-11-13.1). Micro-size only: N vertical hairlines opened to 460 font units, C path unchanged plus stroke-width 200. Diagonal anchors 233.5 and 603 stay. Not a new font. Regenerate with scripts/build-nc-favicon.py. -->
+<rect width="3397.2" height="3397.2" fill="#000"/>
+<g transform="translate(0 2448.6) scale(1 -1)">
+<path d="M493.5 1500V22H529.5V0H33.5V22H41.5V1476H33.5V1500Z M1463 1500V1476H1413.0V-20H953.0L233.5 1500H603L953.0 509V1476H925.0V1500Z" transform="translate(170.3 0)"/>
+<path d="M801.5 -20Q578.5 -20 417.2 79.5Q256 179 168.8 353.0Q81.5 527 81.5 750Q81.5 973 168.8 1147.0Q256 1321 417.2 1420.5Q578.5 1520 801.5 1520Q895 1520 974.0 1487.8Q1053 1455.5 1114 1397L1297.5 1500H1301.5V1060H1295.5Q1262 1189.5 1193.5 1291.2Q1125 1393 1030.0 1451.5Q935 1510 821.5 1510Q710 1510 634.5 1443.5Q559 1377 514.8 1266.5Q470.5 1156 451.0 1021.5Q431.5 887 431.5 750Q431.5 614 451.0 479.0Q470.5 344 514.8 233.5Q559 123 634.5 56.5Q710 -10 821.5 -10Q924 -10 1006.0 25.5Q1088 61 1150.2 123.5Q1212.5 186 1254.0 267.2Q1295.5 348.5 1316.5 440H1321.5V0H1317.5L1150.5 114.5Q1086.5 52 998.5 16.0Q910.5 -20 801.5 -20Z" transform="translate(1771.8 0)" fill="#fff" stroke="#fff" stroke-width="200" stroke-linejoin="round"/>
 </g>
 </svg>
