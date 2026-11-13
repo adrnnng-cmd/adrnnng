@@ -95,7 +95,8 @@ body.has-story-hero .dek a:hover { text-decoration: underline; text-underline-of
 .sc-price { text-align: right; }
 .sc-price #sc-last { display: block; font-size: 18px; font-weight: 600; }
 .sc-chg { font-size: 12px; }
-.sc-chips { margin-top: 10px; }
+.sc-chips { margin-top: 10px; max-width: 100%; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.sc-chips::-webkit-scrollbar { display: none; }
 .sc-chart { height: 248px; margin-top: 4px; }
 .sc-chart svg { width: 100%; height: 100%; overflow: visible; }
 .sc-chart .grid line { stroke: var(--line); }
@@ -132,7 +133,7 @@ body.has-story-hero .dek a:hover { text-decoration: underline; text-underline-of
 .door .go { margin-top: auto; padding-top: 16px; font-size: 13px; font-weight: 600; }
 .door:hover h2 { text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1px; }
 .door-photo {
-  display: flex; align-items: center; gap: 12px; margin-top: 8px; min-height: 70px;
+  display: flex; align-items: center; gap: 12px; margin-top: 8px; min-height: 70px; min-width: 0;
 }
 .door-photo picture { display: block; flex: 0 0 auto; }
 .door-photo > div { min-width: 0; }
@@ -154,9 +155,10 @@ body.has-story-hero .dek a:hover { text-decoration: underline; text-underline-of
 .door-photo span.down { color: var(--down); }
 
 @media (max-width: 960px) {
-  .cover { grid-template-columns: 1fr; gap: 32px; padding-top: 28px; }
+  .cover { grid-template-columns: minmax(0, 1fr); gap: 32px; padding-top: 28px; }
   .cover-rail { border-left: 0; padding-left: 0; border-top: 1px solid var(--line); padding-top: 24px; }
-  .doors { grid-template-columns: 1fr; }
+  .doors { grid-template-columns: minmax(0, 1fr); }
+  .door { min-width: 0; }
   .door, .door + .door { border-right: 0; padding: 20px 0; border-bottom: 1px solid var(--line); }
   .door:last-child { border-bottom-color: transparent; }
 }
