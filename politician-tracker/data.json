@@ -1,6 +1,6 @@
 {
- "generated_at": "2026-11-16T10:40:53+08:00",
- "window_start": "2026-07-19",
+ "generated_at": "2026-11-17T13:01:45+08:00",
+ "window_start": "2026-07-20",
  "stale": false,
  "sources": [
   {
@@ -17,9 +17,15 @@
   },
   {
    "name": "Senate eFD filings",
-   "ok": false,
-   "count": 0,
-   "note": "GET https://efdsearch.senate.gov/search/home/ failed: HTTP Error 403: Forbidden"
+   "ok": true,
+   "count": 50,
+   "note": ""
+  },
+  {
+   "name": "Senate eFD transactions",
+   "ok": true,
+   "count": 1171,
+   "note": ""
   },
   {
    "name": "Quiver recent feed",
@@ -30,13 +36,13 @@
   {
    "name": "Quiver VIP pages",
    "ok": true,
-   "count": 36764,
-   "note": "Cleo Fields: GET https://www.quiverquant.com/congresstrading/politician/Cleo%20Fields-F000110 failed: HTTP Error 429: Too Many Requests; Mitch McConnell: GET ht"
+   "count": 5446,
+   "note": "Lisa McClain: GET https://www.quiverquant.com/congresstrading/politician/Lisa%20McClain-M001136 failed: HTTP Error 429: Too Many Requests; Cleo Fields: GET http"
   },
   {
    "name": "House Clerk index 2026",
    "ok": true,
-   "count": 468,
+   "count": 472,
    "note": ""
   }
  ],
@@ -692,7 +698,7 @@
    "owner": "",
    "asset_type": "ST",
    "comment": "",
-   "filing_id": "House-F000110-240",
+   "filing_id": "House-F000110-239",
    "source_url": "https://disclosures-clerk.house.gov/public_disc/ptr-pdfs/2026/20035669.pdf",
    "source_label": "House PTR",
    "alt_url": "https://www.quiverquant.com/congresstrading/politician/Cleo%20Fields-F000110",
@@ -718,7 +724,7 @@
    "owner": "",
    "asset_type": "ST",
    "comment": "",
-   "filing_id": "House-F000110-239",
+   "filing_id": "House-F000110-240",
    "source_url": "https://disclosures-clerk.house.gov/public_disc/ptr-pdfs/2026/20035669.pdf",
    "source_label": "House PTR",
    "alt_url": "https://www.quiverquant.com/congresstrading/politician/Cleo%20Fields-F000110",
@@ -1333,32 +1339,6 @@
    "ticker": "MSFT",
    "company": "Microsoft Corporation - Common Stock",
    "tx": "Buy",
-   "amount": "$500K–$1M",
-   "trade_date": "2026-08-14",
-   "filed_date": "2026-09-14",
-   "party": "D",
-   "state": "NJ-05",
-   "bioguide": "G000583",
-   "owner": "",
-   "asset_type": "Options",
-   "comment": "",
-   "filing_id": "House-G000583-3599",
-   "source_url": "https://disclosures-clerk.house.gov/public_disc/ptr-pdfs/2026/20035455.pdf",
-   "source_label": "House PTR",
-   "alt_url": "https://www.quiverquant.com/congresstrading/politician/Josh%20Gottheimer-G000583",
-   "vip": true,
-   "watchlist": true,
-   "watchlist_symbol": "MSFT",
-   "former": false,
-   "lag_days": 31
-  },
-  {
-   "source": "quiver",
-   "name": "Josh Gottheimer",
-   "chamber": "House",
-   "ticker": "MSFT",
-   "company": "Microsoft Corporation - Common Stock",
-   "tx": "Buy",
    "amount": "$250K–$500K",
    "trade_date": "2026-08-14",
    "filed_date": "2026-09-14",
@@ -1421,6 +1401,32 @@
    "asset_type": "Options",
    "comment": "",
    "filing_id": "House-G000583-3600",
+   "source_url": "https://disclosures-clerk.house.gov/public_disc/ptr-pdfs/2026/20035455.pdf",
+   "source_label": "House PTR",
+   "alt_url": "https://www.quiverquant.com/congresstrading/politician/Josh%20Gottheimer-G000583",
+   "vip": true,
+   "watchlist": true,
+   "watchlist_symbol": "MSFT",
+   "former": false,
+   "lag_days": 31
+  },
+  {
+   "source": "quiver",
+   "name": "Josh Gottheimer",
+   "chamber": "House",
+   "ticker": "MSFT",
+   "company": "Microsoft Corporation - Common Stock",
+   "tx": "Buy",
+   "amount": "$500K–$1M",
+   "trade_date": "2026-08-14",
+   "filed_date": "2026-09-14",
+   "party": "D",
+   "state": "NJ-05",
+   "bioguide": "G000583",
+   "owner": "",
+   "asset_type": "Options",
+   "comment": "",
+   "filing_id": "House-G000583-3599",
    "source_url": "https://disclosures-clerk.house.gov/public_disc/ptr-pdfs/2026/20035455.pdf",
    "source_label": "House PTR",
    "alt_url": "https://www.quiverquant.com/congresstrading/politician/Josh%20Gottheimer-G000583",
