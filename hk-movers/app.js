@@ -1,9 +1,10 @@
 import {
-  IMPACT_LABEL, SESSION_LABELS, SORTS,
-  arrow, breadth, esc, fmtHkd, fmtPct, fmtPoints, fmtPrice, fmtSigned, fmtUpdated,
-  heatColor, impactOf, isStale, layoutGroups, rankStocks, safeUrl, sectorName, squarify,
-  tone, validateSnapshot, weightedChange,
+  BREADTH_COLORS, IMPACT_LABEL, NEWS_EMPTY_TEXT, SESSION_LABELS, SORTS,
+  ageMinutes, arrow, breadthSegments, esc, fmtAge, fmtHkd, fmtPct, fmtPoints, fmtPrice, fmtSigned, fmtUpdated,
+  heatColor, impactOf, isStale, layoutGroups, newsReference, rankStocks, rankSummary, reconcileSelection,
+  safeUrl, sectorName, squarify, tone, usableNews, validateSnapshot, weightedChange,
 } from './lib.js';
+import { createRefresher } from './poll.js';
 
 const LIVE_URL = '/hk-movers/data/latest';
 const SAMPLE_URL = '/hk-movers/data/sample.json';
@@ -25,21 +26,36 @@ let lastMapWidth = 0;
 
 // ------------------------------------------------------------------ loading
 
+const FETCH_TIMEOUT_MS = 10_000;
+
 async function fetchJson(url) {
-  const res = await fetch(url, { headers: { Accept: 'application/json' } });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, { headers: { Accept: 'application/json' }, cache: 'no-store', signal: ctl.signal });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
-async function loadData() {
+/**
+ * First load falls back to the labelled demo document. Background refreshes are strict:
+ * a failed or invalid fetch rejects, so the page keeps the snapshot it already has.
+ */
+async function loadData({ strict = false } = {}) {
   let fellBack = false;
   if (params.get('demo') !== '1') {
     try {
       const doc = await fetchJson(LIVE_URL);
-      if (validateSnapshot(doc).ok) return { data: doc, fellBack: false };
-    } catch {
-      /* use the demo document below */
+      const check = validateSnapshot(doc);
+      if (check.ok) return { data: doc, fellBack: false };
+      if (strict) throw new Error(`快照格式不正確：${check.errors[0]}`);
+    } catch (e) {
+      if (strict) throw e;
     }
+    if (strict) throw new Error('live data unavailable');
     fellBack = true;
   }
   const sample = await fetchJson(SAMPLE_URL);
@@ -57,11 +73,10 @@ const heatStyle = (pct, cap) => {
 };
 
 function newsHtml(code) {
-  const item = state.data.news?.[code];
-  const href = item ? safeUrl(item.url) : '';
-  if (!item || !item.title || !href) return '<span class="news news-empty">暫無相關新聞</span>';
-  const meta = [item.source, item.published_at_hkt].filter(Boolean).map(esc).join(' · ');
-  return `<a class="news" href="${esc(href)}" target="_blank" rel="noopener noreferrer"><span class="news-t">${esc(item.title)}</span><span class="news-m">${meta} <span aria-hidden="true">↗</span><span class="sr-only">（在新分頁開啟原文）</span></span></a>`;
+  const item = usableNews(state.data.news?.[code], newsReference(state.data));
+  if (!item) return `<span class="news news-empty">${NEWS_EMPTY_TEXT}</span>`;
+  const meta = [item.source, item.published_at_hkt, item.sameDay ? '今日' : ''].filter(Boolean).map(esc).join(' · ');
+  return `<a class="news" href="${esc(safeUrl(item.url))}" target="_blank" rel="noopener noreferrer"><span class="news-t">${esc(item.title)}</span><span class="news-m">${meta} <span aria-hidden="true">↗</span><span class="sr-only">（在新分頁開啟原文）</span></span></a>`;
 }
 
 function statHtml(label, value, sub, cls = '') {
@@ -69,7 +84,24 @@ function statHtml(label, value, sub, cls = '') {
 }
 
 function breadthHtml(b) {
-  return `<span class="up">${b.up}</span> / <span class="down">${b.down}</span> / <span class="flat">${b.flat}</span>`;
+  return `<span class="hkm-bt" aria-label="上升 ${b.up}、下跌 ${b.down}、平盤 ${b.flat}"><span class="up" aria-hidden="true">${b.up}</span> / <span class="down" aria-hidden="true">${b.down}</span> / <span class="flat" aria-hidden="true">${b.flat}</span></span>`;
+}
+
+/** Advance / flat / decline stacked bar, same look as the morning report's market breadth. Safe for a zero total. */
+function breadthBarHtml(b, label, unit) {
+  const { total, segments, aria } = breadthSegments(b);
+  const bar = total
+    ? segments.filter((x) => x.count > 0)
+      .map((x) => `<span class="${x.key}" style="flex-grow:${x.count};background:${BREADTH_COLORS[x.key]}">${x.count}</span>`).join('')
+    : '<span class="empty">暫無資料</span>';
+  const legend = segments
+    .map((x) => `<li style="color:${BREADTH_COLORS[x.key]}"><i style="background:${BREADTH_COLORS[x.key]}" aria-hidden="true"></i>${x.label} <b class="num">${x.count}</b> ${unit}${total ? ` <span class="pct num">（${x.pct.toFixed(1)}%）</span>` : ''}</li>`)
+    .join('');
+  return `<section class="hkm-sb" aria-label="${esc(label)}">
+    <div class="hkm-sb-l"><span class="nm">${esc(label)}</span><span class="tot num">共 ${total} ${unit}</span></div>
+    <div class="hkm-sb-bar" role="img" aria-label="${esc(`${label}：${aria}`)}">${bar}</div>
+    <ul class="hkm-sb-leg">${legend}</ul>
+  </section>`;
 }
 
 function seg(group, options, current, label) {
@@ -93,20 +125,23 @@ function stockRows(rows, { showImpact = true } = {}) {
     .join('');
 }
 
-function listHtml(title, rows, emptyText, id) {
+function listHtml(sum, rows, id) {
   const table = rows.length
     ? `<div class="table-wrap"><table class="hkm-table" aria-labelledby="${id}"><thead><tr>
         <th class="c-rank">#</th><th>股票</th><th class="r">現價</th><th class="r">漲跌幅</th><th class="r">成交額</th><th class="r">總市值</th>
         <th class="r" title="${esc(IMPACT_LABEL)}">近似影響度<small>漲跌幅 × 總市值</small></th>
       </tr></thead><tbody>${stockRows(rows)}</tbody></table></div>`
-    : `<div class="hkm-empty"><b>${esc(emptyText)}</b>調整排序或清除板塊篩選後再試。</div>`;
-  return `<section class="hkm-list"><h3 id="${id}">${esc(title)}<span class="n num">${rows.length} 隻</span></h3>${table}</section>`;
+    : `<div class="hkm-empty"><b>沒有符合條件的${sum.dir === 'up' ? '升幅' : '跌幅'}股</b>${state.sector ? '清除板塊篩選後再試。' : '待下一次快照更新後再看。'}</div>`;
+  const count = sum.countLabel || `${rows.length} 隻`;
+  const note = sum.reason ? `<p class="hkm-note${sum.short ? ' is-short' : ''}" role="note">${esc(sum.reason)}</p>` : '';
+  return `<section class="hkm-list" data-dir="${sum.dir}"><h3 class="hkm-list-h is-${sum.dir}" id="${id}"><span class="t">${esc(sum.title)}</span><span class="n num">${esc(count)}</span></h3>${note}${table}</section>`;
 }
 
-function moversHtml(rows, scopeNote) {
+function moversHtml(rows, scopeNote, universeLabel) {
   const sector = state.sector ? sectorName(state.data, state.sector) : null;
   const up = rankStocks(rows, { dir: 'up', sort: state.sort, sector: state.sector });
   const down = rankStocks(rows, { dir: 'down', sort: state.sort, sector: state.sector });
+  const summary = (dir) => rankSummary(rows, { dir, sector: state.sector, sectorLabel: sector || '', universeLabel });
   const scope = sector ? `${esc(sector)}` : '全部板塊';
   return `<section class="hkm-movers" aria-labelledby="hkm-movers-h">
     <div class="sh"><h2 id="hkm-movers-h">升幅榜與跌幅榜</h2><span class="aux">${esc(scopeNote)}</span></div>
@@ -116,8 +151,8 @@ function moversHtml(rows, scopeNote) {
         <span class="hkm-scope">${scope}${sector ? ' <button type="button" class="btn btn-sm btn-ghost" data-clear-sector data-fk="clear-sector">清除篩選</button>' : ''}</span>
       </div>
     </div>
-    ${listHtml('升幅榜 Top 10', up, '沒有符合條件的升幅股', 'hkm-up-h')}
-    ${listHtml('跌幅榜 Top 10', down, '沒有符合條件的跌幅股', 'hkm-down-h')}
+    ${listHtml(summary('up'), up, 'hkm-up-h')}
+    ${listHtml(summary('down'), down, 'hkm-down-h')}
   </section>`;
 }
 
@@ -145,10 +180,10 @@ function hsiHtml() {
   return `
     <section class="hkm-stats" aria-label="恒生指數概況">
       ${statHtml('恒生指數', fmtPoints(idx.last), `<span class="${tone(idx.change_pct)}">${arrow(idx.change_pct)} ${fmtSigned(idx.change)} (${fmtPct(idx.change_pct)})</span>`, tone(idx.change_pct))}
-      ${statHtml('升／跌／平 家數', breadthHtml(hsi.breadth), `成分股 ${rows.length} 隻`)}
-      ${statHtml('總成交額', fmtHkd(hsi.turnover_hkd), '恒指成分股合計')}
-      ${statHtml('更新時間（HKT）', esc(fmtUpdated(state.data.updated_at_hkt).slice(5)), esc(SESSION_LABELS[state.data.market_session] || ''))}
+      ${statHtml('總成交額', fmtHkd(hsi.turnover_hkd), `恒指成分股 ${rows.length} 隻合計`)}
+      ${statHtml('更新快照（HKT）', esc(fmtUpdated(state.data.updated_at_hkt).slice(5)), esc(SESSION_LABELS[state.data.market_session] || ''))}
     </section>
+    ${breadthBarHtml(hsi.breadth, '恒指成分股 升跌家數', '隻')}
     <section class="panel hkm-panel" aria-labelledby="hkm-heat-h">
       <div class="panel-head"><h2 class="panel-title" id="hkm-heat-h">恒指成分股熱力圖</h2>
         <div class="field hkm-inline"><span class="field-label">面積</span>${seg('weight', [{ id: 'market_cap', label: '總市值' }, { id: 'impact', label: '影響度（絕對值）' }], state.weight.hsi, '熱力圖面積')}</div>
@@ -161,7 +196,7 @@ function hsiHtml() {
       </div>
     </section>
     ${detail}
-    ${moversHtml(rows, `恒指成分股 ${rows.length} 隻 · 近似影響度＝漲跌幅 × 總市值，非官方指數貢獻點數`)}`;
+    ${moversHtml(rows, `恒指成分股 ${rows.length} 隻 · 近似影響度＝漲跌幅 × 總市值，非官方指數貢獻點數`, '恒指成分股')}`;
 }
 
 function detailHtml() {
@@ -194,10 +229,10 @@ function hkHtml() {
   return `
     <section class="hkm-stats" aria-label="港股全市場概況">
       ${statHtml('合資格股票', `${hk.qualified_count.toLocaleString('en-US')}`, `全市場 ${hk.universe_count.toLocaleString('en-US')} 隻`)}
-      ${statHtml('升／跌／平 家數', breadthHtml(hk.breadth), '合資格股票')}
       ${statHtml('合資格成交額', fmtHkd(hk.turnover_hkd), '合資格股票合計')}
-      ${statHtml('更新時間（HKT）', esc(fmtUpdated(state.data.updated_at_hkt).slice(5)), esc(SESSION_LABELS[state.data.market_session] || ''))}
+      ${statHtml('更新快照（HKT）', esc(fmtUpdated(state.data.updated_at_hkt).slice(5)), esc(SESSION_LABELS[state.data.market_session] || ''))}
     </section>
+    ${breadthBarHtml(hk.breadth, '合資格股票 升跌家數', '隻')}
     <div class="hkm-criteria" role="note" aria-label="篩選條件">
       <b>篩選條件</b>
       <span class="hkm-tag">成交額 ≥ ${esc(fmtHkd(f.min_turnover_hkd, { digits: 0 }))}</span>
@@ -221,7 +256,7 @@ function hkHtml() {
       </tr></thead><tbody>${rows}</tbody></table></div>
     </section>
     ${sectorDetailHtml()}
-    ${moversHtml(hk.stocks, `成交額 ≥ ${fmtHkd(f.min_turnover_hkd, { digits: 0 })} 且 總市值 > ${fmtHkd(f.min_market_cap_hkd, { digits: 0 })} · 合資格 ${hk.qualified_count.toLocaleString('en-US')} 隻`)}`;
+    ${moversHtml(hk.stocks, `成交額 ≥ ${fmtHkd(f.min_turnover_hkd, { digits: 0 })} 且 總市值 > ${fmtHkd(f.min_market_cap_hkd, { digits: 0 })} · 合資格 ${hk.qualified_count.toLocaleString('en-US')} 隻`, '合資格股票')}`;
 }
 
 function sectorTable(sectors) {
@@ -339,19 +374,57 @@ function drawMap() {
 
 // -------------------------------------------------------------------- render
 
-function noticesHtml() {
+const refreshState = () => refresher?.status() ?? { fails: 0, inFlight: false, lastCheckedAt: 0 };
+const clock = (ms) => new Date(ms + 8 * 3600 * 1000).toISOString().slice(11, 19);
+
+function noticesHtml(now) {
   const out = [];
   const d = state.data;
+  const rs = refreshState();
   if (d.data_source === 'demo') {
     const why = state.load.fellBack
       ? '即時資料暫時無法取得，目前改為顯示示範資料。'
       : '尚未接入即時資料，目前顯示示範資料供預覽。';
     out.push(`<div class="notice notice-warn" role="status"><span class="badge badge-sample">示範數據</span><span>${esc(why)}${esc(d.notice || '價格、成交額、市值與新聞標題均為模擬，並非即時報價。')}</span></div>`);
   }
-  if (isStale(d)) {
-    out.push(`<div class="notice notice-warn" role="status"><span>資料可能已延遲，最後更新時間為 ${esc(fmtUpdated(d.updated_at_hkt))}（HKT）。</span></div>`);
+  const retry = `<button type="button" class="btn btn-sm" data-refresh${rs.inFlight ? ' disabled' : ''}>${rs.inFlight ? '更新中…' : '立即重試'}</button>`;
+  if (d.data_source === 'live' && rs.fails > 0) {
+    out.push(`<div class="notice notice-error hkm-alert" role="status"><span class="badge badge-stale">更新失敗</span><span>無法取得最新快照（已連續失敗 ${rs.fails} 次，最近一次嘗試 ${esc(clock(rs.lastAttemptAt))} HKT）。畫面仍是 <b>${esc(fmtUpdated(d.updated_at_hkt))}（HKT）</b>的舊快照，並非最新資料；系統會自動重試。</span>${retry}</div>`);
+  }
+  if (isStale(d, now)) {
+    const age = ageMinutes(d.updated_at_hkt, now);
+    out.push(`<div class="notice notice-warn hkm-alert" role="status"><span class="badge badge-stale">快照過時</span><span>最新快照時間為 ${esc(fmtUpdated(d.updated_at_hkt))}（HKT），距今 ${esc(fmtAge(age))}，超過預期的更新間隔。目前顯示的並非最新資料。</span>${rs.fails > 0 ? '' : retry}</div>`);
   }
   return out.join('');
+}
+
+let lastNotice = '';
+let lastUpdated = '';
+
+/** Header line and notices. Cheap and idempotent, so the interval can call it to age the stale state. */
+function renderStatus() {
+  if (!state.data) return;
+  const now = new Date();
+  const d = state.data;
+  const rs = refreshState();
+  const stale = isStale(d, now);
+  const failing = d.data_source === 'live' && rs.fails > 0;
+  const checked = rs.lastCheckedAt ? ` · 上次檢查 <span class="num">${esc(clock(rs.lastCheckedAt))}</span>` : '';
+  const html = `快照更新：<span class="num">${esc(fmtUpdated(d.updated_at_hkt))}</span>（HKT） · ${esc(SESSION_LABELS[d.market_session] || '')}${d.data_source === 'demo' ? ' <span class="badge badge-sample">示範數據</span>' : ''}${stale ? ' <span class="badge badge-stale">資料已過時</span>' : failing ? ' <span class="badge badge-stale">更新失敗</span>' : ''}${checked}`;
+  if (html !== lastUpdated) {
+    $('#hkm-updated').innerHTML = html;
+    lastUpdated = html;
+  }
+  const notice = noticesHtml(now);
+  if (notice !== lastNotice) {
+    $('#hkm-notice').innerHTML = notice;
+    lastNotice = notice;
+  }
+  const btn = $('#hkm-refresh');
+  if (btn) {
+    btn.disabled = rs.inFlight;
+    btn.textContent = rs.inFlight ? '更新中…' : '立即更新';
+  }
 }
 
 function render() {
@@ -363,9 +436,7 @@ function render() {
   }
   body.setAttribute('aria-labelledby', `tab-${state.view}`);
   if (state.data) {
-    const d = state.data;
-    $('#hkm-updated').innerHTML = `資料更新：<span class="num">${esc(fmtUpdated(d.updated_at_hkt))}</span>（HKT） · ${esc(SESSION_LABELS[d.market_session] || '')}${d.data_source === 'demo' ? ' <span class="badge badge-sample">示範數據</span>' : ''}`;
-    $('#hkm-notice').innerHTML = noticesHtml();
+    renderStatus();
     body.innerHTML = state.view === 'hsi' ? hsiHtml() : hkHtml();
     drawMap();
     if (active) document.querySelector(`[data-fk="${CSS.escape(active)}"]`)?.focus({ preventScroll: true });
@@ -375,6 +446,8 @@ function render() {
 function renderError(message) {
   $('#hkm-updated').textContent = '資料無法載入';
   $('#hkm-notice').innerHTML = '';
+  lastNotice = '';
+  lastUpdated = '';
   body.innerHTML = `<div class="hkm-empty hkm-error" role="alert"><b>暫時無法載入港股異動資料</b>${esc(message)}<br><button type="button" class="btn btn-sm" data-retry>重新載入</button></div>`;
 }
 
@@ -390,17 +463,81 @@ function setView(view) {
   render();
 }
 
+// ------------------------------------------------------------------- refresh
+
+/** A newer snapshot arrived. The view, sector, stock, sort and weight choices stay; only the data changes. */
+function applyData(doc, { changed, meta }) {
+  const wasFallback = state.load?.fellBack;
+  state.load = { fellBack: Boolean(meta?.fellBack), data: doc };
+  if (!changed && wasFallback === state.load.fellBack) return;
+  const keep = reconcileSelection(state, doc);
+  state.data = doc;
+  state.sector = keep.sector;
+  state.selected = keep.selected;
+  const y = window.scrollY;
+  render();
+  window.scrollTo(0, y);
+}
+
+const polling = params.get('demo') !== '1';
+const refresher = polling
+  ? createRefresher({
+    load: () => loadData({ strict: true }),
+    getCurrent: () => state.data,
+    onData: applyData,
+    onStatus: () => renderStatus(),
+  })
+  : null;
+
+let starting = false;
+let startFailedAt = 0;
+
 async function start() {
-  body.innerHTML = '<p class="hkm-loading">資料載入中…</p>';
+  if (starting) return;
+  starting = true;
+  if (!state.data) body.innerHTML = '<p class="hkm-loading">資料載入中…</p>';
   try {
     state.load = await loadData();
     state.data = state.load.data;
+    startFailedAt = 0;
+    refresher?.seed();
     render();
   } catch (e) {
+    startFailedAt = Date.now();
     renderError('請稍後再試，或重新整理此頁。');
     console.warn('hk-movers:', e);
+  } finally {
+    starting = false;
   }
 }
+
+function pageTick() {
+  if (document.hidden) return;
+  if (!state.data) {
+    if (!starting && startFailedAt && Date.now() - startFailedAt >= 30_000) start();
+    return;
+  }
+  refresher?.tick({ visible: true });
+  renderStatus();
+}
+
+function pageRecover() {
+  if (document.hidden) return;
+  if (!state.data) {
+    if (!starting) start();
+    return;
+  }
+  refresher?.recover({ visible: true });
+  renderStatus();
+}
+
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-refresh]');
+  if (!t) return;
+  if (!refresher) return;
+  refresher.refresh();
+  renderStatus();
+});
 
 body.addEventListener('click', (e) => {
   const t = e.target.closest('button');
@@ -436,5 +573,12 @@ window.addEventListener('resize', () => {
     if (el && el.clientWidth !== lastMapWidth) drawMap();
   }, 120);
 });
+
+const TICK_MS = 15_000;
+setInterval(pageTick, TICK_MS);
+document.addEventListener('visibilitychange', pageRecover);
+window.addEventListener('focus', pageRecover);
+window.addEventListener('online', pageRecover);
+window.addEventListener('pageshow', (e) => { if (e.persisted) pageRecover(); });
 
 start();
