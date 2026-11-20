@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
-const LONG = '輝達董事會罷免黃仁勳；股價收跌，盤中一度重挫約百分之十四並更換臨時執行長人選';
+const LONG = '輝達董事會罷免黃仁勳；股價收跌，盤中一度重挫約百分之十四並更換臨時執行長人選'.repeat(2);
 
 const types = {
   '.html': 'text/html; charset=utf-8',
@@ -168,16 +168,16 @@ test('home has no document overflow at phone widths', { timeout: 60000 }, async 
     for (let i = 0; i < 40; i++) {
       const result = await send('Runtime.evaluate', { expression: PROBE, returnByValue: true });
       sample = result.result.value;
-      if (sample && sample.doors >= 3 && sample.chipCount >= 6 && sample.tape) break;
+      if (sample && sample.doors >= 4 && sample.chipCount >= 6 && sample.tape) break;
       await new Promise((r) => setTimeout(r, 250));
     }
-    assert.equal(sample.doors >= 3 && sample.chipCount >= 6, true, `${width} did not render home chrome`);
+    assert.equal(sample.doors >= 4 && sample.chipCount >= 6, true, `${width} did not render home chrome`);
 
     await send('Runtime.evaluate', {
       expression: `(() => {
         const titles = [...document.querySelectorAll('.door-photo b')];
-        if (titles[1]) titles[1].textContent = 'Representative Very Long Politician Name';
-        if (titles[2]) titles[2].textContent = ${JSON.stringify(LONG)};
+        if (titles[2]) titles[2].textContent = 'Representative Very Long Politician Name';
+        if (titles[3]) titles[3].textContent = ${JSON.stringify(LONG)};
         document.body.classList.remove('has-story-hero');
       })()`,
     });
@@ -193,7 +193,7 @@ test('home has no document overflow at phone widths', { timeout: 60000 }, async 
     assert.ok(hero.scroll <= hero.client, `${width} story hero scroll ${hero.scroll} client ${hero.client}`);
     const wideTitle = hero.titles.at(-1);
     assert.ok(wideTitle.cw <= hero.client, `${width} door title box is wider than the viewport`);
-    assert.ok(wideTitle.sw > wideTitle.cw, `${width} long door title was not clipped`);
+    assert.ok(wideTitle.sw > wideTitle.cw, `${width} long door title was not clipped (scroll ${wideTitle.sw}, client ${wideTitle.cw})`);
     ws.close();
     await fetch(`http://127.0.0.1:${debugPort}/json/close/${target.id}`);
   }
