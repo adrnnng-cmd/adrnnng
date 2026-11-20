@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-Hant-HK">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>港股異動與板塊熱力圖 · News Chart</title>
+  <meta name="description" content="恒指成分股與港股全市場的升跌幅榜、10 至 12 大類板塊熱力圖，並附每隻異動股的最新相關新聞預覽。News Chart by ADRRR。">
+  <link rel="canonical" href="https://news-chart.com/hk-movers/">
+  <meta name="theme-color" content="#000000">
+  <meta property="og:site_name" content="News Chart">
+  <meta property="og:title" content="港股異動與板塊熱力圖 · News Chart">
+  <meta property="og:description" content="恒指成分股與港股全市場的升跌幅榜、10 至 12 大類板塊熱力圖，並附每隻異動股的最新相關新聞預覽。News Chart by ADRRR。">
+  <meta property="og:url" content="https://news-chart.com/hk-movers/">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="https://news-chart.com/assets/brand/og-image.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="港股異動與板塊熱力圖 · News Chart">
+  <meta name="twitter:description" content="恒指成分股與港股全市場的升跌幅榜、10 至 12 大類板塊熱力圖，並附每隻異動股的最新相關新聞預覽。News Chart by ADRRR。">
+  <meta name="twitter:image" content="https://news-chart.com/assets/brand/og-image.png">
+  <link rel="icon" href="/assets/brand/favicon.svg?v=nc-2026-11-13" type="image/svg+xml">
+  <link rel="icon" href="/assets/brand/favicon.ico?v=nc-2026-11-13" sizes="any">
+  <link rel="apple-touch-icon" href="/assets/brand/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;700&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap">
+  <link rel="stylesheet" href="/assets/css/theme.css">
+  <link rel="stylesheet" href="/hk-movers/hk-movers.css">
+  <link rel="stylesheet" href="/assets/css/newsletter.css">
+<meta property="og:locale" content="zh_HK">
+<meta name="twitter:site" content="@adrnnng">
+<script type="application/ld+json" id="adrnnng-breadcrumb">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://news-chart.com/"},{"@type":"ListItem","position":2,"name":"港股異動與板塊熱力圖","item":"https://news-chart.com/hk-movers/"}]}</script>
+<script type="application/ld+json" id="adrnnng-site">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://news-chart.com/#organization","name":"News Chart","url":"https://news-chart.com/","logo":{"@type":"ImageObject","url":"https://news-chart.com/assets/brand/apple-touch-icon.png","width":180,"height":180}},{"@type":"WebSite","@id":"https://news-chart.com/#website","name":"News Chart","url":"https://news-chart.com/","inLanguage":"zh-Hant-HK","publisher":{"@id":"https://news-chart.com/#organization"},"author":{"@type":"Organization","name":"ADRRR"}}]}</script>
+</head>
+<body class="hkm-page">
+  <header class="mast" data-site-header>
+    <div class="wrap mast-in"><a class="logo" href="/" aria-label="News Chart home"><img class="mark" src="/assets/brand/news-chart-white.svg" alt="News Chart" height="17"></a></div>
+  </header>
+
+  <main class="wrap hkm">
+    <section class="page-head">
+      <p class="kicker">市場工具 <span class="sep">/</span> 港股</p>
+      <h1>港股異動與板塊熱力圖</h1>
+      <p class="lede">一頁看清恒生指數成分股與港股全市場的強弱分佈：板塊熱力圖、升幅榜與跌幅榜，每隻異動股附最新相關新聞。</p>
+      <p class="byline"><span>作者：ADRRR</span><span id="hkm-updated">資料載入中…</span></p>
+    </section>
+
+    <div id="hkm-notice" class="hkm-notices" aria-live="polite"></div>
+
+    <div class="hkm-switch" role="tablist" aria-label="市場視圖">
+      <button type="button" role="tab" id="tab-hsi" data-view="hsi" aria-selected="true" aria-controls="hkm-body"><b>HSI 恒生指數</b><small>約 95 隻成分股</small></button>
+      <button type="button" role="tab" id="tab-hk" data-view="hk" aria-selected="false" aria-controls="hkm-body"><b>HK 港股全市場</b><small>成交額與市值篩選</small></button>
+    </div>
+
+    <div id="hkm-body" role="tabpanel">
+      <p class="hkm-loading">資料載入中…</p>
+    </div>
+
+    <section class="hkm-method" aria-labelledby="hkm-method-h">
+      <h2 id="hkm-method-h">資料與計算說明</h2>
+      <ul>
+        <li><b>近似影響度（漲跌幅 × 總市值）</b>：以個股漲跌幅乘以總市值，估算當日市值變動，用作排序與板塊權重的近似指標。這不是恒生指數官方公佈的貢獻點數，亦不計入指數的流通調整與封頂因子。</li>
+        <li><b>港股全市場篩選</b>：只計成交額不少於 HK$1,000 萬、總市值高於 HK$10 億的股票，避免低流動性小型股佔據榜單。</li>
+        <li><b>板塊分類</b>：市場約 113 個細分行業，彙整為 12 個大類板塊，對照表由專案維護。板塊漲跌幅按市值加權。</li>
+        <li><b>顏色</b>：綠色代表上升，紅色代表下跌，與本站其他頁面一致；顏色深淺代表升跌幅度，數字與箭頭同時標示。</li>
+        <li><b>新聞預覽</b>：每隻股票顯示一則最新相關新聞，連結會在新分頁開啟原文。找不到相關新聞時會顯示空狀態。</li>
+      </ul>
+      <p class="hkm-disc">本頁資料僅供參考，不構成投資建議。報價可能有延遲，請以交易所及券商資料為準。</p>
+    </section>
+    <noscript><p class="hkm-noscript">此頁需要啟用 JavaScript 才能顯示熱力圖與榜單。</p></noscript>
+  </main>
+
+  <footer data-site-footer></footer>
+  <script type="module" src="/assets/js/site.js"></script>
+  <script type="module" src="/hk-movers/app.js"></script>
+</body>
+</html>

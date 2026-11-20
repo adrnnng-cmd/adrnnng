@@ -14,6 +14,9 @@ export const PUBLIC_DETACH = [
   '/politician-tracker',
   '/politician-tracker/',
   '/politician-tracker/*',
+  '/hk-movers',
+  '/hk-movers/',
+  '/hk-movers/*',
   '/hsi-lab',
   '/hsi-lab/',
   '/hsi-lab/*',
@@ -33,6 +36,8 @@ export const JSON_NOINDEX = [
   '/politician-tracker/data.json',
   '/news/latest.json',
   '/assets/tools.json',
+  '/hk-movers/data/latest',
+  '/hk-movers/data/sample.json',
 ];
 
 const INDEXABLE_SAMPLES = [
@@ -43,6 +48,8 @@ const INDEXABLE_SAMPLES = [
   '/politician-tracker/',
   '/politician-tracker/index.html',
   '/politician-tracker/members/P000197/',
+  '/hk-movers/',
+  '/hk-movers/index.html',
   '/hsi-lab/',
   '/news/',
   '/news/index.html',

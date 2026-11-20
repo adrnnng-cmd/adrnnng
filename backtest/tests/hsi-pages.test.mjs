@@ -93,10 +93,10 @@ test('onRequest reads the HSI_BARS binding', async () => {
   assert.equal(kv.calls[0].key, 'v1/1m/2026.bin');
 });
 
-test('routes invoke a function only for the hsi bar paths', () => {
+test('routes invoke a function only for the hsi bar paths and the hk-movers snapshot', () => {
   const routes = JSON.parse(readFileSync(join(root, '_routes.json'), 'utf8'));
   assert.equal(routes.version, 1);
-  assert.deepEqual(routes.include, ['/backtest/data/hsi/*']);
+  assert.deepEqual(routes.include, ['/backtest/data/hsi/*', '/hk-movers/data/latest']);
   assert.deepEqual(routes.exclude, []);
 });
 

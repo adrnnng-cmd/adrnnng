@@ -24,6 +24,7 @@ export const BRAND_MARK = '';
 const ICONS = {
   backtest: '<path d="M3 20h18M5 16l4-5 4 3 6-8" /><circle cx="19" cy="6" r="1.6" fill="currentColor"/>',
   capitol: '<path d="M4 20h16M6 17h12M7 17v-6M10.5 17v-6M13.5 17v-6M17 17v-6M5 11h14M12 4c-3.3 0-6 2.4-6 5.5V11h12V9.5C18 6.4 15.3 4 12 4ZM12 2v2"/>',
+  heatmap: '<rect x="3" y="4" width="11" height="10" rx="1"/><rect x="16" y="4" width="5" height="5" rx="1"/><rect x="16" y="11" width="5" height="9" rx="1"/><rect x="3" y="16" width="11" height="4" rx="1"/>',
   news: '<rect x="3" y="4" width="15" height="16" rx="2"/><path d="M18 8h2a1 1 0 0 1 1 1v9a2 2 0 0 1-4 0M7 8h7M7 12h7M7 16h4"/>',
   scanner: '<path d="M4 7V5a1 1 0 0 1 1-1h2M17 4h2a1 1 0 0 1 1 1v2M20 17v2a1 1 0 0 1-1 1h-2M7 20H5a1 1 0 0 1-1-1v-2M8 15v-3M12 15V9M16 15v-5"/>',
   greeks: '<path d="M4 18c3 0 4-12 8-12s5 12 8 12"/><path d="M4 21h16" opacity=".5"/>',
