@@ -168,16 +168,16 @@ test('home has no document overflow at phone widths', { timeout: 60000 }, async 
     for (let i = 0; i < 40; i++) {
       const result = await send('Runtime.evaluate', { expression: PROBE, returnByValue: true });
       sample = result.result.value;
-      if (sample && sample.doors >= 3 && sample.chipCount >= 6 && sample.tape) break;
+      if (sample && sample.doors >= 4 && sample.chipCount >= 6 && sample.tape) break;
       await new Promise((r) => setTimeout(r, 250));
     }
-    assert.equal(sample.doors >= 3 && sample.chipCount >= 6, true, `${width} did not render home chrome`);
+    assert.equal(sample.doors >= 4 && sample.chipCount >= 6, true, `${width} did not render home chrome`);
 
     await send('Runtime.evaluate', {
       expression: `(() => {
         const titles = [...document.querySelectorAll('.door-photo b')];
-        if (titles[1]) titles[1].textContent = 'Representative Very Long Politician Name';
-        if (titles[2]) titles[2].textContent = ${JSON.stringify(LONG)};
+        if (titles[2]) titles[2].textContent = 'Representative Very Long Politician Name';
+        if (titles[3]) titles[3].textContent = ${JSON.stringify(LONG)};
         document.body.classList.remove('has-story-hero');
       })()`,
     });

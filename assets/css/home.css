@@ -114,7 +114,7 @@ body.has-story-hero .dek a:hover { text-decoration: underline; text-underline-of
 
 .doors {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: stretch;
   margin: 56px auto 12px;
   border-top: 3px solid #000;
@@ -124,8 +124,8 @@ body.has-story-hero .dek a:hover { text-decoration: underline; text-underline-of
   padding: 22px 28px 28px 0; text-decoration: none;
   border-right: 1px solid var(--line);
 }
-.door:last-child { border-right: 0; padding-right: 0; }
-.door + .door { padding-left: 28px; }
+.door:nth-child(even) { border-right: 0; padding-right: 0; padding-left: 28px; }
+.door:nth-child(n + 3) { border-top: 1px solid var(--line); }
 .door .ey { font-size: 10.5px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
 .door h2 { font-size: clamp(26px, 2.4vw, 34px); letter-spacing: -0.015em; }
 .door h2 .zh { display: block; margin-top: 4px; font-size: 15px; font-weight: 600; color: var(--muted); letter-spacing: 0.04em; }
@@ -159,8 +159,8 @@ body.has-story-hero .dek a:hover { text-decoration: underline; text-underline-of
   .cover-rail { border-left: 0; padding-left: 0; border-top: 1px solid var(--line); padding-top: 24px; }
   .doors { grid-template-columns: minmax(0, 1fr); }
   .door { min-width: 0; }
-  .door, .door + .door { border-right: 0; padding: 20px 0; border-bottom: 1px solid var(--line); }
-  .door:last-child { border-bottom-color: transparent; }
+  .doors .door { border-right: 0; border-top: 0; padding: 20px 0; border-bottom: 1px solid var(--line); }
+  .doors .door:last-child { border-bottom-color: transparent; }
 }
 @media (max-width: 600px) {
   .tape-in { padding: 0 16px; }

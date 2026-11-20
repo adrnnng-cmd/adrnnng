@@ -12,7 +12,7 @@ static JSON/CSV.
 | `/` | Landing page (`index.html`, `assets/js/home.js`) | this repo |
 | `/backtest/` | Backtest tool | this repo; prices refreshed by `backtest-prices.yml` |
 | `/politician-tracker/` | Politician Tracker | this repo; page rebuilt by `politician-tracker.yml` |
-| `/hk-movers/` | 港股異動與板塊熱力圖 (HK Movers) | this repo; data from the local collector `scripts/hk_movers_sync.py` via KV |
+| `/hk-movers/` | Movers 港股異動與板塊熱力圖 | this repo; data from the local collector `scripts/hk_movers_sync.py` via KV |
 | `/news/` | Morning Report | **News Analyst agent** (direct Wrangler upload, ~08:15 HKT). Not in this repo. |
 
 ## Layout

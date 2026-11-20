@@ -128,7 +128,7 @@ function doorPhoto({ webp, jpg, src, img: imgHtml, title, sub, subClass = '' }) 
 
 async function renderDoors() {
   const reg = await loadRegistry();
-  const tools = ['backtest', 'politician-tracker', 'news'].map((id) => reg.tools.find((t) => t.id === id)).filter(Boolean);
+  const tools = ['backtest', 'hk-movers', 'politician-tracker', 'news'].map((id) => reg.tools.find((t) => t.id === id)).filter(Boolean);
   let filing = null;
   const latestRaw = await loadLatestRaw();
   try {
@@ -147,6 +147,12 @@ async function renderDoors() {
           title: 'TD Sequential 9 / 13',
           sub: 'Sharpe · CAGR · Max DD',
         });
+      } else if (t.id === 'hk-movers') {
+        body = doorPhoto({
+          src: '/assets/img/doors/movers.svg',
+          title: 'HSI · 升跌榜 · 板塊熱力圖',
+          sub: '約 5–6 分鐘更新快照',
+        });
       } else if (t.id === 'politician-tracker' && filing) {
         body = doorPhoto({
           img: memberPhotoImg(filing.bioguide),
@@ -162,9 +168,10 @@ async function renderDoors() {
           sub: newsCap.sub,
         });
       }
+      const zh = t.id === 'hk-movers' ? '港股異動' : t.zh;
       return `<a class="door" href="${esc(t.href)}">
         <span class="ey">${esc(t.category || '')}</span>
-        <h2>${esc(t.title)}${t.zh ? `<span class="zh">${esc(t.zh)}</span>` : ''}</h2>
+        <h2>${esc(t.title)}${zh ? `<span class="zh">${esc(zh)}</span>` : ''}</h2>
         ${body}
         <span class="go">Open →</span>
       </a>`;
