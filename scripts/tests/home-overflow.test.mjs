@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
-const LONG = '輝達董事會罷免黃仁勳；股價收跌，盤中一度重挫約百分之十四並更換臨時執行長人選';
+const LONG = '輝達董事會罷免黃仁勳；股價收跌，盤中一度重挫約百分之十四並更換臨時執行長人選'.repeat(2);
 
 const types = {
   '.html': 'text/html; charset=utf-8',
@@ -193,7 +193,7 @@ test('home has no document overflow at phone widths', { timeout: 60000 }, async 
     assert.ok(hero.scroll <= hero.client, `${width} story hero scroll ${hero.scroll} client ${hero.client}`);
     const wideTitle = hero.titles.at(-1);
     assert.ok(wideTitle.cw <= hero.client, `${width} door title box is wider than the viewport`);
-    assert.ok(wideTitle.sw > wideTitle.cw, `${width} long door title was not clipped`);
+    assert.ok(wideTitle.sw > wideTitle.cw, `${width} long door title was not clipped (scroll ${wideTitle.sw}, client ${wideTitle.cw})`);
     ws.close();
     await fetch(`http://127.0.0.1:${debugPort}/json/close/${target.id}`);
   }
