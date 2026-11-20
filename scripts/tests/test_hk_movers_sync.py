@@ -6,7 +6,7 @@ import tempfile
 import types
 import unittest
 import zipfile
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
 from pathlib import Path
 from unittest import mock
@@ -668,6 +668,25 @@ RSS = """<?xml version="1.0" encoding="UTF-8"?>
 </channel></rss>""".encode("utf-8")
 
 
+HKT = news_mod.HKT
+NOW = datetime(2026, 11, 20, 16, 0, tzinfo=HKT)
+
+
+def rss_item(title, when_hkt, source="香港經濟日報", link=None):
+    """One RSS item published at an HKT wall-clock time (string "YYYY-MM-DD HH:MM[:SS]" or datetime)."""
+    from email.utils import format_datetime
+    from datetime import timezone as tz
+    dt = when_hkt if isinstance(when_hkt, datetime) else datetime.strptime(when_hkt, "%Y-%m-%d %H:%M").replace(tzinfo=HKT)
+    link = link or f"https://news.example.com/{abs(hash(title)) % 10**8}"
+    return (f"<item><title>{title} - {source}</title><link>{link}</link>"
+            f"<pubDate>{format_datetime(dt.astimezone(tz.utc), usegmt=True)}</pubDate>"
+            f'<source url="https://x.example">{source}</source></item>')
+
+
+def rss_doc(*items):
+    return ('<?xml version="1.0"?><rss><channel>' + "".join(items) + "</channel></rss>").encode("utf-8")
+
+
 class GoogleNews(unittest.TestCase):
     def test_query_url_is_hong_kong_traditional_chinese(self):
         url = news_mod.rss_url("HK.00700", "騰訊控股")
@@ -676,6 +695,11 @@ class GoogleNews(unittest.TestCase):
         self.assertIn("hl=zh-HK", url)
         self.assertIn("gl=HK", url)
         self.assertIn("ceid=HK:zh-Hant", url)
+
+    def test_query_carries_the_recency_window(self):
+        self.assertIn("when%3A3d", news_mod.rss_url("HK.00700", "騰訊控股"))
+        self.assertIn("when%3A1d", news_mod.rss_url("HK.00700", "騰訊控股", "1d"))
+        self.assertEqual(news_mod.WINDOWS, ("1d", "3d"))
 
     def test_outlet_suffix_and_time(self):
         self.assertEqual(news_mod.strip_outlet("標題一二三 - 香港經濟日報", "香港經濟日報"), "標題一二三")
@@ -686,44 +710,169 @@ class GoogleNews(unittest.TestCase):
         self.assertEqual(news_mod.to_hkt_stamp("garbage"), ("", 0.0))
 
     def test_vendor_english_unsafe_links_are_skipped_and_newest_named_item_wins(self):
-        item = news_mod.pick_item(news_mod.parse_items(RSS), "騰訊控股")
+        item = news_mod.pick_item(news_mod.parse_items(RSS), "騰訊控股", NOW)
         self.assertEqual(item, {
             "title": "騰訊控股回購股份 市場看好", "source": "香港經濟日報",
             "published_at_hkt": "2026-11-20 10:15", "url": "https://news.example.com/hket",
         })
 
     def test_without_a_named_item_the_newest_usable_one_is_used(self):
-        item = news_mod.pick_item(news_mod.parse_items(RSS), "不存在的公司")
+        item = news_mod.pick_item(news_mod.parse_items(RSS), "不存在的公司", NOW)
         self.assertEqual(item["title"], "中國互聯網板塊全面反彈")
 
     def test_banned_wording_is_filtered_everywhere(self):
         for it in news_mod.parse_items(RSS):
-            picked = news_mod.pick_item([it], "")
+            picked = news_mod.pick_item([it], "", NOW)
             if picked:
                 blob = json.dumps(picked, ensure_ascii=False)
                 self.assertNotRegex(blob, r"(?i)futu|富途|moomoo|yahoo|雅虎")
         only_banned = [i for i in news_mod.parse_items(RSS) if re.search(r"(?i)futu|富途|moomoo|yahoo", i["raw_title"] + i["source"] + i["source_url"])]
         self.assertEqual(len(only_banned), 3)
-        self.assertIsNone(news_mod.pick_item(only_banned, ""))
+        self.assertIsNone(news_mod.pick_item(only_banned, "", NOW))
 
     def test_fetch_news_survives_errors_and_empty_feeds(self):
         def boom(url):
             raise OSError("offline")
 
-        self.assertIsNone(news_mod.fetch_news("00700", "騰訊控股", fetch=boom))
-        self.assertIsNone(news_mod.fetch_news("00700", "騰訊控股", fetch=lambda u: b"not xml"))
+        self.assertIsNone(news_mod.fetch_news("00700", "騰訊控股", fetch=boom, now=NOW))
+        self.assertIsNone(news_mod.fetch_news("00700", "騰訊控股", fetch=lambda u: b"not xml", now=NOW))
         empty = b'<?xml version="1.0"?><rss><channel></channel></rss>'
-        self.assertIsNone(news_mod.fetch_news("00700", "騰訊控股", fetch=lambda u: empty))
-        self.assertEqual(news_mod.fetch_news("00700", "騰訊控股", fetch=lambda u: RSS)["source"], "香港經濟日報")
+        self.assertIsNone(news_mod.fetch_news("00700", "騰訊控股", fetch=lambda u: empty, now=NOW))
+        self.assertEqual(news_mod.fetch_news("00700", "騰訊控股", fetch=lambda u: RSS, now=NOW)["source"], "香港經濟日報")
 
     def test_gateway_news_is_only_a_vendor_free_chinese_backup(self):
-        good = {"title": "騰訊業績理想", "url": "https://example.com/a", "source": "某媒體"}
-        self.assertEqual(news_mod.usable_backup(good), good)
-        self.assertIsNone(news_mod.usable_backup({"title": "Tencent beats", "url": "https://example.com/a", "source": "x"}))
-        self.assertIsNone(news_mod.usable_backup({"title": "騰訊業績理想", "url": "https://news.futunn.com/en/x", "source": "x"}))
-        self.assertIsNone(news_mod.usable_backup({"title": "富途解讀騰訊", "url": "https://example.com/a", "source": "x"}))
-        self.assertIsNone(news_mod.usable_backup({"title": "騰訊業績理想", "url": "javascript:1", "source": "x"}))
-        self.assertIsNone(news_mod.usable_backup(None))
+        stamp = "2026-11-20 10:30"
+        good = {"title": "騰訊業績理想", "url": "https://example.com/a", "source": "某媒體", "published_at_hkt": stamp}
+        self.assertEqual(news_mod.usable_backup(good, NOW), good)
+        bad = [
+            {"title": "Tencent beats", "url": "https://example.com/a", "source": "x"},
+            {"title": "騰訊業績理想", "url": "https://news.futunn.com/en/x", "source": "x"},
+            {"title": "富途解讀騰訊", "url": "https://example.com/a", "source": "x"},
+            {"title": "騰訊業績理想", "url": "javascript:1", "source": "x"},
+        ]
+        for item in bad:
+            self.assertIsNone(news_mod.usable_backup({**item, "published_at_hkt": stamp}, NOW), item)
+        self.assertIsNone(news_mod.usable_backup(None, NOW))
+
+    def test_gateway_news_is_age_gated_too(self):
+        base = {"title": "騰訊業績理想", "url": "https://example.com/a", "source": "某媒體"}
+        for stamp, ok in (("2026-11-20 15:59", True), ("2026-11-17 16:00", True), ("2026-11-17 15:59", False),
+                          ("", False), ("昨天", False), ("2026-02-31 10:00", False), ("2026-11-20 16:01", False)):
+            got = news_mod.usable_backup({**base, "published_at_hkt": stamp}, NOW)
+            self.assertEqual(got is not None, ok, stamp)
+        self.assertIsNone(news_mod.usable_backup(dict(base), NOW), "a missing timestamp is rejected")
+
+
+class NewsFreshness(unittest.TestCase):
+    """Strict parsed-timestamp gate: 0 <= age <= 72 hours at the injected now (HKT)."""
+
+    def at(self, **delta):
+        return (NOW - timedelta(**delta)).timestamp()
+
+    def test_boundaries(self):
+        cases = [
+            (dict(seconds=0), True, "published right now"),
+            (dict(hours=1), True, "today"),
+            (dict(hours=71, minutes=59, seconds=59), True, "just inside 72h"),
+            (dict(hours=72), True, "exactly 72h is still accepted"),
+            (dict(hours=72, seconds=1), False, "one second over"),
+            (dict(days=7), False, "weeks-old"),
+            (dict(days=30), False, "weeks-old"),
+            (dict(seconds=-1), False, "one second in the future"),
+            (dict(hours=-5), False, "future"),
+        ]
+        for delta, ok, why in cases:
+            self.assertEqual(news_mod.is_fresh(self.at(**delta), NOW), ok, why)
+        self.assertFalse(news_mod.is_fresh(0.0, NOW), "missing")
+        self.assertFalse(news_mod.is_fresh(-5.0, NOW), "invalid")
+        self.assertFalse(news_mod.is_fresh(float("nan"), NOW), "nan")
+
+    def test_stamp_parser_is_strict(self):
+        self.assertEqual(news_mod.parse_hkt_stamp("2026-11-20 11:00"), datetime(2026, 11, 20, 11, 0, tzinfo=HKT).timestamp())
+        self.assertEqual(news_mod.parse_hkt_stamp("2026-11-20T11:00:30"), datetime(2026, 11, 20, 11, 0, 30, tzinfo=HKT).timestamp())
+        for bad in ("", None, "2026-11-20", "11:00", "2026/11/20 11:00", "2026-13-01 10:00", "2026-02-30 10:00", "2026-11-20 25:00", "x"):
+            self.assertEqual(news_mod.parse_hkt_stamp(bad), 0.0, repr(bad))
+
+    def test_same_day_uses_the_hkt_calendar_day(self):
+        self.assertTrue(news_mod.is_same_day(datetime(2026, 11, 20, 0, 5, tzinfo=HKT).timestamp(), NOW))
+        self.assertFalse(news_mod.is_same_day(datetime(2026, 11, 19, 23, 55, tzinfo=HKT).timestamp(), NOW))
+        utc_evening = datetime(2026, 11, 19, 17, 0, tzinfo=timezone.utc).timestamp()
+        self.assertTrue(news_mod.is_same_day(utc_evening, NOW), "01:00 HKT on the 20th is the same HKT day")
+
+    def test_old_missing_and_future_items_never_win(self):
+        feed = rss_doc(
+            rss_item("騰訊控股半年前舊聞", "2026-05-01 10:00"),
+            rss_item("騰訊控股三星期前消息", "2026-10-30 10:00"),
+            rss_item("騰訊控股來自未來的消息", "2026-11-21 10:00"),
+            "<item><title>騰訊控股沒有時間 - 某報</title><link>https://news.example.com/nodate</link><source url='https://x'>某報</source></item>",
+            "<item><title>騰訊控股時間壞掉 - 某報</title><link>https://news.example.com/baddate</link><pubDate>not a date</pubDate><source url='https://x'>某報</source></item>",
+        )
+        self.assertIsNone(news_mod.pick_item(news_mod.parse_items(feed), "騰訊控股", NOW))
+        self.assertIsNone(news_mod.fetch_news("00700", "騰訊控股", fetch=lambda u: feed, now=NOW), "no weeks-old fallback")
+
+    def test_same_day_beats_newer_looking_older_and_named_older(self):
+        feed = rss_doc(
+            rss_item("騰訊控股昨日公告", "2026-11-19 20:00"),
+            rss_item("某板塊今日走勢", "2026-11-20 09:30"),
+            rss_item("騰訊控股前日消息", "2026-11-18 18:00"),
+        )
+        item = news_mod.pick_item(news_mod.parse_items(feed), "騰訊控股", NOW)
+        self.assertEqual(item["title"], "某板塊今日走勢", "same-day preferred even when unnamed")
+
+    def test_without_same_day_the_named_then_newest_within_72h_wins(self):
+        feed = rss_doc(
+            rss_item("騰訊控股前日消息", "2026-11-18 18:00"),
+            rss_item("騰訊控股昨日公告", "2026-11-19 20:00"),
+            rss_item("某板塊昨日走勢", "2026-11-19 22:00"),
+        )
+        self.assertEqual(news_mod.pick_item(news_mod.parse_items(feed), "騰訊控股", NOW)["title"], "騰訊控股昨日公告")
+
+    def test_fetch_searches_same_day_first_then_the_three_day_window(self):
+        urls = []
+        day1 = rss_doc(rss_item("騰訊控股今日公告", "2026-11-20 10:00"))
+        day3 = rss_doc(rss_item("騰訊控股前日消息", "2026-11-18 18:00"), rss_item("騰訊控股昨日公告", "2026-11-19 20:00"))
+
+        def fetch(url):
+            urls.append(url)
+            return day1 if "when%3A1d" in url else day3
+
+        self.assertEqual(news_mod.fetch_news("00700", "騰訊控股", fetch=fetch, now=NOW)["title"], "騰訊控股今日公告")
+        self.assertEqual(len(urls), 1, "a same-day hit stops the search")
+
+        urls.clear()
+
+        def only_old(url):
+            urls.append(url)
+            return rss_doc() if "when%3A1d" in url else day3
+
+        self.assertEqual(news_mod.fetch_news("00700", "騰訊控股", fetch=only_old, now=NOW)["title"], "騰訊控股昨日公告")
+        self.assertEqual(len(urls), 2)
+        self.assertIn("when%3A1d", urls[0])
+        self.assertIn("when%3A3d", urls[1])
+
+    def test_keep_fresh_drops_cached_old_news(self):
+        news = {
+            "00700": {"title": "今日", "published_at_hkt": "2026-11-20 10:00"},
+            "00005": {"title": "邊界", "published_at_hkt": "2026-11-17 16:00"},
+            "09988": {"title": "過期一秒", "published_at_hkt": "2026-11-17 15:59"},
+            "01211": {"title": "舊聞", "published_at_hkt": "2026-10-01 10:00"},
+            "00001": {"title": "沒有時間", "published_at_hkt": ""},
+            "00002": {"title": "未來", "published_at_hkt": "2026-11-21 10:00"},
+        }
+        self.assertEqual(set(news_mod.keep_fresh(news, NOW)), {"00700", "00005"})
+
+    def test_collect_live_drops_old_headlines_from_the_published_document(self):
+        old = {"title": "騰訊控股舊聞", "source": "某報", "published_at_hkt": "2026-11-01 10:00", "url": "https://example.com/old"}
+        fresh_stamp = datetime.now(HKT).strftime("%Y-%m-%d %H:%M")
+        fresh = {"title": "新鮮消息", "source": "某報", "published_at_hkt": fresh_stamp, "url": "https://example.com/new"}
+        fake, _ = CollectLive().make_sdk()
+        args = sync.parse_args(["--out", "x.json", "--news-delay", "0", "--names-cache", "/nonexistent/names.json"])
+        with mock.patch.dict(sys.modules, {"futu": fake}), \
+                mock.patch.object(names_mod, "load_names", return_value=CollectLive.NAMES), \
+                mock.patch.object(news_mod, "fetch_news", side_effect=lambda code, name, **kw: old if code == "00700" else fresh):
+            doc = sync.collect_live(args)
+        self.assertNotIn("00700", doc["news"], "a stale headline is dropped even if a lookup returned it")
+        self.assertIn("09988", doc["news"])
 
 
 class Wrangler(unittest.TestCase):
@@ -856,7 +1005,8 @@ class CollectLive(unittest.TestCase):
 
         def fake_news(code, name, **kw):
             fetched.append((code, name))
-            return {"title": f"{name}最新消息", "source": "香港經濟日報", "published_at_hkt": "2026-11-20 10:00", "url": "https://example.com/n"}
+            stamp = datetime.now(HKT).strftime("%Y-%m-%d %H:%M")
+            return {"title": f"{name}最新消息", "source": "香港經濟日報", "published_at_hkt": stamp, "url": "https://example.com/n"}
 
         args = sync.parse_args(["--out", "x.json", "--news-delay", "0", "--names-cache", "/nonexistent/names.json"])
         with mock.patch.dict(sys.modules, {"futu": fake}), \

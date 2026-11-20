@@ -655,6 +655,7 @@ def collect_live(args) -> dict:
             if item:
                 news[code] = item
             time.sleep(args.news_delay)
+        news = news_mod.keep_fresh(news)
 
         index = {}
         if index_snap:

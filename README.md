@@ -296,12 +296,27 @@ applies all of them.
 
 `/hk-movers/` is a Traditional Chinese page with two views: **HSI 恒生指數** (about 95 constituents) and
 **HK 港股全市場** (turnover at least HK$10 million and market cap above HK$1 billion). Each view has a
-heat map, a Top 10 gainers table and a Top 10 losers table, and every ranked stock carries one related
+heat map, a gainers table and a losers table (at most 10 each), and every ranked stock carries one related
 news preview. No quote vendor is named anywhere on the public page.
+
+- **Breadth bar.** Advance / flat / decline counts are a stacked bar in the morning report's market-breadth style
+  (`#008259` up, grey flat, `#A50034` down), with actual counts, a legend with shares, an `aria-label`, and a
+  safe empty state.
+- **Honest lists.** The gainers list holds only stocks that really rose and the losers list only those that fell,
+  never padded with the other side. Under 10 the heading reads 實際 N 隻 · 最多 10 隻 and a note says why.
+- **News freshness.** A headline is used only if its time parses, is not in the future and is at most 72 hours old
+  (same HKT day preferred). The collector queries Google News with `when:1d` then `when:3d` and post-filters;
+  the page applies the same gate against the current time, so older cached headlines show 暫無近3日相關新聞.
+- **Refresh.** `updated_at_hkt` is when the collector run started (a run takes about a minute and the next starts
+  300 s after it finishes), not a quote time, so the page calls it a snapshot, not a stream. It re-checks every
+  60 s in trading hours (5 min otherwise), on focus, tab visibility and reconnect, never with two requests at once.
+  A failed or invalid response keeps the last good snapshot and shows 更新失敗; in trading hours a snapshot older
+  than 10 minutes (30 during lunch) is flagged 快照過時. View, sector, stock, sort and weight choices persist.
 
 ```
 hk-movers/index.html, app.js, hk-movers.css   page, shared chrome (theme.css + site.js)
-hk-movers/lib.js                              pure helpers: formatting, ranking, validation, treemap layout
+hk-movers/lib.js                              pure helpers: formatting, ranking, freshness gates, validation, treemap layout
+hk-movers/poll.js                             background refresh controller (no overlap, backoff, recovery)
 hk-movers/data/sample.json                    labelled demo document (data_source "demo"), also the offline fallback
 functions/hk-movers/data/latest.js            Pages Function for GET /hk-movers/data/latest
 scripts/hk_movers_sync.py                     collector for a machine with a local OpenD

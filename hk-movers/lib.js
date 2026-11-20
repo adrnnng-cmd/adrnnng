@@ -137,21 +137,195 @@ export function weightedChange(rows) {
   return rows.reduce((s, r) => s + r.change_pct * r.market_cap_hkd, 0) / cap;
 }
 
-/** Minutes since updated_at_hkt (a Hong Kong wall-clock string). */
-export function ageMinutes(updatedAtHkt, now = new Date()) {
-  const m = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})(?::(\d{2}))?/.exec(updatedAtHkt || '');
+const HKT_OFFSET_MS = 8 * 3600 * 1000;
+const STAMP_FULL = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?$/;
+
+/** Strict "YYYY-MM-DD HH:MM[:SS]" (Hong Kong wall clock) -> epoch ms, or null when missing or not a real date. */
+export function parseHktStamp(text) {
+  const m = STAMP_FULL.exec(String(text ?? '').trim());
   if (!m) return null;
-  const t = Date.parse(`${m[1]}T${m[2]}:${m[3] || '00'}+08:00`);
-  return Number.isNaN(t) ? null : (now.getTime() - t) / 60000;
+  const [y, mo, d, h, mi, sec] = m.slice(1).map((v) => Number(v ?? 0));
+  const utc = Date.UTC(y, mo - 1, d, h, mi, sec);
+  const back = new Date(utc);
+  if (back.getUTCFullYear() !== y || back.getUTCMonth() !== mo - 1 || back.getUTCDate() !== d
+    || back.getUTCHours() !== h || back.getUTCMinutes() !== mi || back.getUTCSeconds() !== sec) return null;
+  return utc - HKT_OFFSET_MS;
 }
 
-/** True when a live document should be flagged as late. */
+/** "YYYY-MM-DD" of an instant on the Hong Kong calendar. */
+export const hktDay = (ms) => new Date(ms + HKT_OFFSET_MS).toISOString().slice(0, 10);
+
+const toMs = (now) => (now instanceof Date ? now.getTime() : Number(now));
+
+/** Minutes since updated_at_hkt (a Hong Kong wall-clock string). */
+export function ageMinutes(updatedAtHkt, now = new Date()) {
+  const t = parseHktStamp(updatedAtHkt);
+  return t == null ? null : (toMs(now) - t) / 60000;
+}
+
+/** Hong Kong trading session at an instant. Weekday schedule only; public holidays are not modelled. */
+export function sessionAt(now = new Date()) {
+  const hk = new Date(toMs(now) + HKT_OFFSET_MS);
+  const day = hk.getUTCDay();
+  if (day === 0 || day === 6) return 'closed';
+  const minutes = hk.getUTCHours() * 60 + hk.getUTCMinutes();
+  if (minutes >= 9 * 60 && minutes < 9 * 60 + 30) return 'pre_open';
+  if (minutes >= 9 * 60 + 30 && minutes < 12 * 60) return 'morning';
+  if (minutes >= 12 * 60 && minutes < 13 * 60) return 'lunch';
+  if (minutes >= 13 * 60 && minutes < 16 * 60) return 'afternoon';
+  if (minutes >= 16 * 60 && minutes < 16 * 60 + 10) return 'closing_auction';
+  return 'closed';
+}
+
+export const isTradingNow = (now = new Date()) => OPEN_SESSIONS.has(sessionAt(now));
+
+/** Minutes a snapshot may age before it is called stale. The collector writes about every 6 minutes. */
+export const STALE_AFTER_MIN = { trading: 10, lunch: 30 };
+export const STALE_AFTER_CLOSED_MIN = 4 * 24 * 60;
+
+/**
+ * True when a live document is late for the clock at `now`. The session is read from the clock, not from the
+ * document, so a Friday snapshot on Monday 09:40 is stale even though it says "closed".
+ * updated_at_hkt is when the collector run started, not an exchange quote time.
+ */
 export function isStale(data, now = new Date()) {
   if (!data || data.data_source === 'demo') return false;
   const age = ageMinutes(data.updated_at_hkt, now);
   if (age == null) return false;
-  if (OPEN_SESSIONS.has(data.market_session)) return age > 30;
-  return age > 4 * 24 * 60;
+  const session = sessionAt(now);
+  if (OPEN_SESSIONS.has(session)) return age > STALE_AFTER_MIN.trading;
+  if (session === 'lunch') return age > STALE_AFTER_MIN.lunch;
+  return age > STALE_AFTER_CLOSED_MIN;
+}
+
+/** "5 分鐘" / "2 小時 5 分鐘" / "1 日 3 小時" for an age in minutes. */
+export function fmtAge(minutes) {
+  if (!isNum(minutes) || minutes < 0) return '—';
+  const m = Math.floor(minutes);
+  if (m < 1) return '不足 1 分鐘';
+  if (m < 60) return `${m} 分鐘`;
+  if (m < 1440) return `${Math.floor(m / 60)} 小時${m % 60 ? ` ${m % 60} 分鐘` : ''}`;
+  return `${Math.floor(m / 1440)} 日${Math.floor((m % 1440) / 60) ? ` ${Math.floor((m % 1440) / 60)} 小時` : ''}`;
+}
+
+// -------------------------------------------------------------------- polling
+
+export const POLL_MS = { trading: 60_000, idle: 300_000, retryBase: 30_000, retryMax: 300_000, minGap: 10_000 };
+
+/** Delay before the next background fetch. Failures back off 30 s, 60 s, 120 s ... up to 5 minutes. */
+export function pollDelayMs({ now = new Date(), fails = 0 } = {}) {
+  if (fails > 0) return Math.min(POLL_MS.retryBase * 2 ** (fails - 1), POLL_MS.retryMax);
+  const session = sessionAt(now);
+  return OPEN_SESSIONS.has(session) || session === 'lunch' ? POLL_MS.trading : POLL_MS.idle;
+}
+
+/**
+ * Decide what to do with a freshly fetched document. Never replaces good live data with demo data
+ * or with an older snapshot.
+ *   {accept:false, kind:'error'}  the server answered, but not with usable live data
+ *   {accept:false, kind:'older'}  an edge cache served an older snapshot: ignore it quietly
+ *   {accept:true, changed:false}  same snapshot as before: no re-render needed
+ */
+export function acceptRefresh(prev, next) {
+  if (!prev) return { accept: true, changed: true };
+  if (prev.data_source === 'live' && next.data_source !== 'live') return { accept: false, kind: 'error', reason: 'demo_downgrade' };
+  const a = parseHktStamp(prev.updated_at_hkt);
+  const b = parseHktStamp(next.updated_at_hkt);
+  if (a != null && b != null && b < a && prev.data_source === next.data_source) return { accept: false, kind: 'older', reason: 'older_snapshot' };
+  const changed = next.updated_at_hkt !== prev.updated_at_hkt || next.data_source !== prev.data_source;
+  return { accept: true, changed };
+}
+
+/** After new data arrives, keep the sector and stock the user picked only if they still exist. */
+export function reconcileSelection({ sector = null, selected = null } = {}, data) {
+  const sectorOk = sector && data.macro_sectors?.some((s) => s.id === sector);
+  const stockOk = selected && data.hsi?.constituents?.some((r) => r.code === selected);
+  return { sector: sectorOk ? sector : null, selected: stockOk ? selected : null };
+}
+
+// ----------------------------------------------------------------------- news
+
+export const NEWS_MAX_AGE_HOURS = 72;
+export const NEWS_EMPTY_TEXT = '暫無近3日相關新聞';
+
+/** The instant a document's headlines are judged against: the clock for live data, the snapshot time for the demo. */
+export function newsReference(data, now = new Date()) {
+  if (data?.data_source === 'demo') return parseHktStamp(data.updated_at_hkt) ?? toMs(now);
+  return toMs(now);
+}
+
+/**
+ * Strict freshness gate. A headline passes only when its time parses, is not in the future,
+ * and is at most 72 hours old at `now`. There is no fallback to older headlines.
+ */
+export function newsFreshness(item, now = new Date()) {
+  const t = parseHktStamp(item?.published_at_hkt);
+  if (t == null) return { ok: false, reason: 'invalid_time' };
+  const age = toMs(now) - t;
+  if (age < 0) return { ok: false, reason: 'future' };
+  if (age > NEWS_MAX_AGE_HOURS * 3600 * 1000) return { ok: false, reason: 'too_old' };
+  return { ok: true, sameDay: hktDay(t) === hktDay(toMs(now)), ageHours: age / 3600000 };
+}
+
+/** The headline to show for a stock, or null. Also needs a title and a safe link. */
+export function usableNews(item, now = new Date()) {
+  if (!item || !item.title || !safeUrl(item.url)) return null;
+  const fresh = newsFreshness(item, now);
+  return fresh.ok ? { ...item, sameDay: fresh.sameDay } : null;
+}
+
+// --------------------------------------------------------------- breadth + lists
+
+export const BREADTH_COLORS = { up: '#008259', flat: '#6b6b6b', down: '#A50034' };
+
+/** Segments for the advance / flat / decline bar. Safe for an empty or malformed breadth. */
+export function breadthSegments(b) {
+  const count = (k) => (isNum(b?.[k]) && b[k] > 0 ? Math.floor(b[k]) : 0);
+  const parts = [
+    { key: 'up', label: '上升', count: count('up') },
+    { key: 'flat', label: '平盤', count: count('flat') },
+    { key: 'down', label: '下跌', count: count('down') },
+  ];
+  const total = parts.reduce((t, p) => t + p.count, 0);
+  const segments = parts.map((p) => ({ ...p, pct: total ? (p.count / total) * 100 : 0 }));
+  const aria = total
+    ? `${segments.map((p) => `${p.label} ${p.count} 隻（${p.pct.toFixed(1)}%）`).join('，')}，共 ${total} 隻`
+    : '暫無升跌家數資料';
+  return { total, segments, aria };
+}
+
+/**
+ * Honest heading for one ranked list. `shown` is what the table will hold: only stocks that really moved
+ * in that direction, at most `limit`, never padded with the other side.
+ */
+export function rankSummary(rows, { dir = 'up', sector = null, sectorLabel = '', universeLabel = '股票', limit = 10 } = {}) {
+  const scope = rows.filter((r) => !sector || r.sector === sector);
+  const counts = { up: 0, down: 0, flat: 0 };
+  for (const r of scope) counts[tone(r.change_pct)]++;
+  const want = dir === 'up' ? 'up' : 'down';
+  const other = dir === 'up' ? 'down' : 'up';
+  const word = dir === 'up' ? '上升' : '下跌';
+  const otherWord = dir === 'up' ? '下跌' : '上升';
+  const matching = counts[want];
+  const shown = Math.min(matching, limit);
+  const where = sector ? `「${sectorLabel || sector}」板塊的${universeLabel}` : universeLabel;
+  let reason = '';
+  if (!scope.length) {
+    reason = `${where}目前沒有資料。`;
+  } else if (matching === 0) {
+    reason = `${where}共 ${scope.length} 隻，沒有${word}的股票，所以此榜為空；榜單不會以${otherWord}股補位。`;
+  } else if (matching < limit) {
+    const rest = [`${counts[other]} 隻${otherWord}`, counts.flat ? `${counts.flat} 隻持平` : ''].filter(Boolean).join('、');
+    reason = `${where}共 ${scope.length} 隻，只有 ${matching} 隻${word}（${rest}），不足 ${limit} 隻；榜單只列出實際${word}的股票，不以${otherWord}股補位。`;
+  } else if (matching > limit) {
+    reason = `${where}共 ${matching} 隻${word}，只列出前 ${limit} 隻。`;
+  }
+  const name = dir === 'up' ? '升幅榜' : '跌幅榜';
+  return {
+    dir, shown, matching, limit, scopeTotal: scope.length, counts, reason, short: matching < limit,
+    title: matching >= limit ? `${name} Top ${limit}` : name,
+    countLabel: matching >= limit ? '' : `實際 ${shown} 隻 · 最多 ${limit} 隻`,
+  };
 }
 
 export const fmtUpdated = (s) => (s ? String(s).slice(0, 16).replace('T', ' ') : '—');

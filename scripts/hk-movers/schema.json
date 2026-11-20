@@ -9,7 +9,7 @@
     "schema_version": { "const": 1 },
     "data_source": { "enum": ["live", "demo"], "description": "demo marks synthetic data; the page shows a banner." },
     "notice": { "type": "string", "description": "Optional extra line for the demo banner." },
-    "updated_at_hkt": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}[ T]\\d{2}:\\d{2}(:\\d{2})?$", "description": "Hong Kong wall-clock time of the snapshot." },
+    "updated_at_hkt": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}[ T]\\d{2}:\\d{2}(:\\d{2})?$", "description": "Hong Kong wall-clock time the collector run started. It is the snapshot time, not an exchange quote time. The page calls this a snapshot (快照), not a live stream." },
     "market_session": { "enum": ["pre_open", "morning", "lunch", "afternoon", "closing_auction", "closed"] },
     "hsi": {
       "type": "object",
@@ -98,7 +98,7 @@
     },
     "news": {
       "type": "object",
-      "description": "One latest Traditional Chinese headline per stock code (5 digits, no market prefix). A missing code shows the empty state.",
+      "description": "At most one Traditional Chinese headline per stock code (5 digits, no market prefix), published within the last 72 hours of the snapshot (same HKT day preferred). published_at_hkt must parse; the collector drops missing, future and older items and the page applies the same gate against the current time. A missing code shows 暫無近3日相關新聞.",
       "additionalProperties": {
         "type": "object",
         "required": ["title", "source", "published_at_hkt", "url"],
