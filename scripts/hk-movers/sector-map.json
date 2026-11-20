@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "note": "Maps market-data industry names (about 113 on the Hong Kong heat map) to 12 macro sectors. Unlisted names fall through `keywords` (first hit wins), then to `other`. hk_movers_sync.py logs every unmapped name so this table can be extended.",
+  "fallback": "other",
+  "sectors": [
+    {
+      "id": "tech",
+      "name": "科技及互聯網",
+      "industries": ["軟件服務", "互聯網", "互聯網服務及基礎設施", "電子商貿", "半導體", "電子元件", "電子設備及儀器", "電腦及周邊設備", "資訊科技服務", "遊戲", "消費電子", "光電及顯示", "數據中心"]
+    },
+    {
+      "id": "finance",
+      "name": "金融及保險",
+      "industries": ["銀行", "保險", "人壽及健康保險", "財產及意外保險", "證券及經紀", "資產管理", "多元金融", "消費金融", "融資租賃", "金融交易所及數據"]
+    },
+    {
+      "id": "property",
+      "name": "地產及物業",
+      "industries": ["地產發展商", "房地產投資信託基金", "物業管理", "地產代理及服務", "商業地產"]
+    },
+    {
+      "id": "consumer",
+      "name": "消費及零售",
+      "industries": ["食品", "飲料", "乳製品", "酒精飲品", "煙草", "服裝", "鞋履及配飾", "紡織製造", "珠寶及奢侈品", "專門零售", "百貨", "超市及便利店", "餐飲", "酒店及度假村", "博彩", "旅遊及休閒", "個人護理", "家居用品", "家用電器", "玩具及文具", "教育", "農業及畜牧", "美容及化妝品", "運動用品"]
+    },
+    {
+      "id": "health",
+      "name": "醫藥及生科",
+      "industries": ["西藥", "中藥", "生物科技", "醫療器械", "醫療服務", "醫藥研發及外包服務", "醫藥分銷及零售"]
+    },
+    {
+      "id": "auto",
+      "name": "汽車及新能源",
+      "industries": ["汽車製造", "新能源車", "汽車零部件", "汽車經銷", "電池及儲能", "光伏設備", "風電設備", "新能源材料"]
+    },
+    {
+      "id": "industrial",
+      "name": "工業及製造",
+      "industries": ["機械設備", "電氣設備", "建築及工程", "建築材料", "航空航天及國防", "綜合工業", "環保及廢物處理", "包裝及容器", "造紙及印刷", "商業及專業服務"]
+    },
+    {
+      "id": "energy",
+      "name": "能源及公用事業",
+      "industries": ["石油及天然氣", "油氣設備及服務", "煤炭", "電力", "燃氣", "水務", "可再生能源發電", "核電"]
+    },
+    {
+      "id": "telecom",
+      "name": "電訊及傳媒",
+      "industries": ["電訊服務", "通訊設備", "影視及娛樂", "廣告及公關", "出版", "數碼媒體"]
+    },
+    {
+      "id": "materials",
+      "name": "原材料及資源",
+      "industries": ["黃金", "有色金屬", "鋼鐵", "鋁業", "銅業", "稀土及小金屬", "基礎化工", "化肥及農藥", "特種化工", "非金屬礦及建材原料"]
+    },
+    {
+      "id": "transport",
+      "name": "交通及物流",
+      "industries": ["航運", "航空公司", "鐵路運輸", "公路及橋樑", "機場及港口", "物流及快遞", "貨運代理", "海運設備"]
+    },
+    {
+      "id": "other",
+      "name": "綜合及其他",
+      "industries": ["綜合企業", "投資控股", "其他"]
+    }
+  ],
+  "keywords": [
+    ["保險", "finance"],
+    ["銀行", "finance"],
+    ["證券", "finance"],
+    ["金融", "finance"],
+    ["信託", "finance"],
+    ["地產", "property"],
+    ["物業", "property"],
+    ["半導體", "tech"],
+    ["軟件", "tech"],
+    ["互聯網", "tech"],
+    ["電子", "tech"],
+    ["電腦", "tech"],
+    ["資訊", "tech"],
+    ["醫", "health"],
+    ["藥", "health"],
+    ["生物", "health"],
+    ["汽車", "auto"],
+    ["電池", "auto"],
+    ["光伏", "auto"],
+    ["風電", "auto"],
+    ["發電", "energy"],
+    ["電力", "energy"],
+    ["燃氣", "energy"],
+    ["石油", "energy"],
+    ["天然氣", "energy"],
+    ["煤", "energy"],
+    ["水務", "energy"],
+    ["電訊", "telecom"],
+    ["通訊", "telecom"],
+    ["傳媒", "telecom"],
+    ["媒體", "telecom"],
+    ["影視", "telecom"],
+    ["廣告", "telecom"],
+    ["金屬", "materials"],
+    ["黃金", "materials"],
+    ["鋼", "materials"],
+    ["化工", "materials"],
+    ["礦", "materials"],
+    ["航運", "transport"],
+    ["航空", "transport"],
+    ["物流", "transport"],
+    ["運輸", "transport"],
+    ["港口", "transport"],
+    ["機械", "industrial"],
+    ["建築", "industrial"],
+    ["工程", "industrial"],
+    ["工業", "industrial"],
+    ["製造", "industrial"],
+    ["食品", "consumer"],
+    ["飲", "consumer"],
+    ["零售", "consumer"],
+    ["服飾", "consumer"],
+    ["餐", "consumer"],
+    ["娛樂", "consumer"],
+    ["旅遊", "consumer"],
+    ["教育", "consumer"]
+  ]
+}

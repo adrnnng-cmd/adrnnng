@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://news-chart.com/hk-movers/schema.json",
+  "title": "HK Movers snapshot",
+  "description": "One JSON document. The collector (scripts/hk_movers_sync.py) writes it to the KV key hk-movers:latest.json; /hk-movers/data/latest serves it; /hk-movers/data/sample.json is the labelled demo copy. Money is HK$ in plain numbers. Percentages are percent points (1.5 means +1.5%).",
+  "type": "object",
+  "required": ["schema_version", "data_source", "updated_at_hkt", "market_session", "hsi", "hk_market", "macro_sectors", "movers"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "data_source": { "enum": ["live", "demo"], "description": "demo marks synthetic data; the page shows a banner." },
+    "notice": { "type": "string", "description": "Optional extra line for the demo banner." },
+    "updated_at_hkt": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}[ T]\\d{2}:\\d{2}(:\\d{2})?$", "description": "Hong Kong wall-clock time of the snapshot." },
+    "market_session": { "enum": ["pre_open", "morning", "lunch", "afternoon", "closing_auction", "closed"] },
+    "hsi": {
+      "type": "object",
+      "required": ["index", "breadth", "turnover_hkd", "constituents"],
+      "properties": {
+        "index": {
+          "type": "object",
+          "required": ["last", "prev_close", "change", "change_pct"],
+          "properties": {
+            "name": { "type": "string" },
+            "last": { "type": "number" },
+            "prev_close": { "type": "number" },
+            "change": { "type": "number" },
+            "change_pct": { "type": "number" }
+          }
+        },
+        "breadth": { "$ref": "#/$defs/breadth" },
+        "turnover_hkd": { "type": "number", "minimum": 0 },
+        "constituents": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/stock" }, "description": "About 95 Hang Seng Index members. No liquidity filter." }
+      }
+    },
+    "hk_market": {
+      "type": "object",
+      "required": ["filters", "universe_count", "qualified_count", "breadth", "turnover_hkd", "stocks"],
+      "properties": {
+        "filters": {
+          "type": "object",
+          "required": ["min_turnover_hkd", "min_market_cap_hkd"],
+          "properties": {
+            "min_turnover_hkd": { "const": 10000000, "description": "turnover >= HK$10 million" },
+            "min_market_cap_hkd": { "const": 1000000000, "description": "market cap > HK$1 billion" }
+          }
+        },
+        "universe_count": { "type": "integer", "minimum": 0 },
+        "qualified_count": { "type": "integer", "minimum": 0 },
+        "breadth": { "$ref": "#/$defs/breadth" },
+        "turnover_hkd": { "type": "number", "minimum": 0 },
+        "stocks": { "type": "array", "items": { "$ref": "#/$defs/stock" }, "description": "Only stocks that pass the filters." }
+      }
+    },
+    "macro_sectors": {
+      "type": "array",
+      "minItems": 10,
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "change_pct", "turnover_hkd", "market_cap_hkd", "up", "down", "flat", "industries"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string", "description": "Traditional Chinese display name." },
+          "change_pct": { "type": "number", "description": "Market-cap weighted." },
+          "turnover_hkd": { "type": "number" },
+          "market_cap_hkd": { "type": "number" },
+          "up": { "type": "integer" },
+          "down": { "type": "integer" },
+          "flat": { "type": "integer" },
+          "leader": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/leader" }] },
+          "industries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["name", "change_pct", "turnover_hkd", "market_cap_hkd", "up", "down", "flat"],
+              "properties": {
+                "name": { "type": "string" },
+                "change_pct": { "type": "number" },
+                "turnover_hkd": { "type": "number" },
+                "market_cap_hkd": { "type": "number" },
+                "up": { "type": "integer" },
+                "down": { "type": "integer" },
+                "flat": { "type": "integer" },
+                "leaders": { "type": "array", "items": { "$ref": "#/$defs/leader" } }
+              }
+            }
+          }
+        }
+      }
+    },
+    "movers": {
+      "type": "object",
+      "required": ["hsi", "hk"],
+      "description": "Published Top 10 lists. The page recomputes rankings from hsi.constituents and hk_market.stocks, so these must match the default ranking by change_pct.",
+      "properties": {
+        "hsi": { "$ref": "#/$defs/moverPair" },
+        "hk": { "$ref": "#/$defs/moverPair" }
+      }
+    },
+    "news": {
+      "type": "object",
+      "description": "One latest Traditional Chinese headline per stock code (5 digits, no market prefix). A missing code shows the empty state.",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["title", "source", "published_at_hkt", "url"],
+        "properties": {
+          "title": { "type": "string" },
+          "source": { "type": "string" },
+          "published_at_hkt": { "type": "string" },
+          "url": { "type": "string", "pattern": "^https?://" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "breadth": {
+      "type": "object",
+      "required": ["up", "down", "flat"],
+      "properties": { "up": { "type": "integer" }, "down": { "type": "integer" }, "flat": { "type": "integer" } }
+    },
+    "leader": {
+      "type": "object",
+      "required": ["code", "name", "change_pct"],
+      "properties": { "code": { "type": "string" }, "name": { "type": "string" }, "change_pct": { "type": "number" } }
+    },
+    "stock": {
+      "type": "object",
+      "required": ["code", "name", "sector", "industry", "last", "change_pct", "turnover_hkd", "market_cap_hkd"],
+      "properties": {
+        "code": { "type": "string", "pattern": "^\\d{5}$" },
+        "name": { "type": "string" },
+        "sector": { "type": "string", "description": "macro_sectors[].id" },
+        "industry": { "type": "string" },
+        "last": { "type": "number" },
+        "prev_close": { "type": "number" },
+        "change_pct": { "type": "number", "description": "(last / prev_close - 1) * 100" },
+        "turnover_hkd": { "type": "number", "minimum": 0 },
+        "market_cap_hkd": { "type": "number", "minimum": 0 },
+        "impact_hkd": { "type": "number", "description": "Approximate impact: change_pct / 100 * market_cap_hkd. Not official index points." },
+        "amplitude_pct": { "type": "number", "description": "(high - low) / prev_close * 100, from the snapshot." }
+      }
+    },
+    "moverPair": {
+      "type": "object",
+      "required": ["gainers", "losers"],
+      "properties": {
+        "gainers": { "type": "array", "maxItems": 10, "items": { "$ref": "#/$defs/stock" } },
+        "losers": { "type": "array", "maxItems": 10, "items": { "$ref": "#/$defs/stock" } }
+      }
+    }
+  }
+}
