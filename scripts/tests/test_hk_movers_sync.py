@@ -443,6 +443,108 @@ class SdkShapes(unittest.TestCase):
         self.assertEqual(sync.fetch_owner_industries(Ctx(), ["HK.00700", "HK.00005"]),
                          {"HK.00700": "Interactive media and services", "HK.00005": "Banks"})
 
+    def test_owner_industries_match_other_typed_plates_by_known_name(self):
+        rows = [
+            {"code": "HK.00700", "plate_name": "Hang Seng Index", "plate_type": "OTHER"},
+            {"code": "HK.00700", "plate_name": "Digital Solution Services", "plate_type": "OTHER"},
+            {"code": "HK.00700", "plate_name": "Some Concept", "plate_type": "CONCEPT"},
+            {"code": "HK.00005", "plate_name": "HK Dividend", "plate_type": "OTHER"},
+            {"code": "HK.00005", "plate_name": "Banks", "plate_type": "OTHER"},
+            {"code": "HK.01299", "plate_name": "Unknown Plate", "plate_type": "OTHER"},
+        ]
+
+        class Ctx:
+            def get_owner_plate(self, codes):
+                return 0, rows
+
+        m = mapper()
+        heat = {"digital solution services"}
+        got = sync.fetch_owner_industries(
+            Ctx(), ["HK.00700", "HK.00005", "HK.01299"], known=lambda n: n.casefold() in heat or m.knows(n))
+        self.assertEqual(got, {"HK.00700": "Digital Solution Services", "HK.00005": "Banks"})
+
+    def test_owner_industries_known_name_beats_an_industry_typed_row(self):
+        class Ctx:
+            def get_owner_plate(self, codes):
+                return 0, [{"code": "HK.00005", "plate_name": "Odd Plate", "plate_type": "INDUSTRY"},
+                           {"code": "HK.00005", "plate_name": "Banks", "plate_type": "OTHER"}]
+
+        self.assertEqual(sync.fetch_owner_industries(Ctx(), ["HK.00005"], known=mapper().knows), {"HK.00005": "Banks"})
+
+    def test_owner_plate_batch_error_is_bisected_to_skip_the_bad_code(self):
+        calls = []
+
+        class Ctx:
+            def get_owner_plate(self, codes):
+                calls.append(list(codes))
+                if "HK.00823" in codes:
+                    return -1, "Get Stock's Sector interface does not support ETFs type."
+                return 0, [{"code": c, "plate_name": "Banks", "plate_type": "OTHER"} for c in codes]
+
+        codes = ["HK.00005", "HK.00011", "HK.00823", "HK.01299", "HK.02388"]
+        got = sync.fetch_owner_industries(Ctx(), codes, known=mapper().knows)
+        self.assertEqual(set(got), {"HK.00005", "HK.00011", "HK.01299", "HK.02388"})
+        self.assertLess(len(calls), 12)
+        self.assertEqual(calls[0], codes, "a healthy batch is one call")
+
+    def test_owner_plate_all_bad_codes_return_nothing(self):
+        class Ctx:
+            def get_owner_plate(self, codes):
+                return -1, "no"
+
+        self.assertEqual(sync.fetch_owner_industries(Ctx(), ["HK.00823", "HK.02800"], known=mapper().knows), {})
+
+    def test_is_reit_uses_the_exchange_category(self):
+        names = {"00823": {"name": "領展房產基金", "category": "房地產投資信託基金"}, "00700": {"name": "騰訊控股", "category": "股本"}}
+        self.assertTrue(sync.is_reit("HK.00823", names))
+        self.assertFalse(sync.is_reit("HK.00700", names))
+        self.assertFalse(sync.is_reit("HK.09999", names))
+
+
+class NanSafety(unittest.TestCase):
+    NAN = float("nan")
+
+    def test_num_turns_bad_values_into_zero(self):
+        for bad in (None, self.NAN, float("inf"), float("-inf"), "n/a", "N/A", ""):
+            self.assertEqual(sync._num(bad), 0.0, repr(bad))
+        self.assertEqual(sync._num("12.5"), 12.5)
+        self.assertEqual(sync._num(3), 3.0)
+        self.assertEqual(sync._num(None, 7.0), 7.0)
+
+    def test_qualifies_does_not_raise_on_nan_or_none(self):
+        self.assertFalse(sync.qualifies(self.NAN, 5e9))
+        self.assertFalse(sync.qualifies(5e7, self.NAN))
+        self.assertFalse(sync.qualifies(None, None))
+        self.assertTrue(sync.qualifies(1e7, 1.1e9))
+
+    def test_build_stock_with_nan_fields(self):
+        row = raw("00700", 10.0, 9.0)
+        row.update(turnover=self.NAN, total_market_val=self.NAN, high_price=self.NAN, low_price=self.NAN)
+        stock = sync.build_stock(row, mapper())
+        self.assertEqual(stock["turnover_hkd"], 0)
+        self.assertEqual(stock["market_cap_hkd"], 0)
+        self.assertEqual(stock["impact_hkd"], 0)
+        self.assertNotIn("amplitude_pct", stock)
+        self.assertFalse(sync.qualifies(stock["turnover_hkd"], stock["market_cap_hkd"]))
+        self.assertIsNone(sync.build_stock(raw("00001", self.NAN, 9.0), mapper()))
+        self.assertIsNone(sync.build_stock(raw("00001", 10.0, self.NAN), mapper()))
+
+    def test_rank_and_breadth_tolerate_missing_numbers(self):
+        rows = [
+            {"code": "00001", "change_pct": 3.0, "turnover_hkd": None},
+            {"code": "00002", "change_pct": 3.0, "turnover_hkd": self.NAN},
+            {"code": "00003", "change_pct": self.NAN, "turnover_hkd": 5e7},
+            {"code": "00004", "change_pct": None, "turnover_hkd": 5e7},
+            {"code": "00005", "change_pct": -2.0, "turnover_hkd": 9e7},
+        ]
+        self.assertEqual([r["code"] for r in sync.rank(rows, "up")], ["00001", "00002"])
+        self.assertEqual([r["code"] for r in sync.rank(rows, "down")], ["00005"])
+        self.assertEqual(sync.breadth(rows), {"up": 2, "down": 1, "flat": 2})
+
+    def test_heatmap_row_with_nan_values(self):
+        row = sync.normalize_heatmap_row({"plate_name": "Banks", "change_rate": self.NAN, "turnover": None, "total_market_val": self.NAN})
+        self.assertEqual((row["change_pct"], row["turnover_hkd"], row["market_cap_hkd"]), (0.0, 0.0, 0.0))
+
 
 def make_xlsx(rows):
     """A minimal workbook: shared strings plus one sheet, like the exchange's list."""
@@ -627,27 +729,43 @@ class GoogleNews(unittest.TestCase):
 class Wrangler(unittest.TestCase):
     def run_push(self, **kw):
         calls = []
-        with mock.patch.object(sync.subprocess, "run", side_effect=lambda cmd, check: calls.append(cmd)):
+        with mock.patch.object(sync.subprocess, "run", side_effect=lambda cmd, **k: calls.append((cmd, k))):
             sync.push_kv({"schema_version": 1}, "ns123", **kw)
         return calls[0]
 
     def test_default_is_npx_wrangler(self):
         with mock.patch.dict(os.environ, {}, clear=False):
             os.environ.pop("HK_MOVERS_WRANGLER_BIN", None)
-            cmd = self.run_push()
+            cmd, kwargs = self.run_push()
         self.assertEqual(cmd[:6], ["npx", "wrangler", "kv", "key", "put", "hk-movers:latest.json"])
         self.assertIn("--namespace-id", cmd)
         self.assertEqual(cmd[cmd.index("--namespace-id") + 1], "ns123")
         self.assertIn("--remote", cmd)
+        self.assertTrue(kwargs["check"])
+        self.assertIsNone(kwargs["cwd"], "no node_modules path: stay in the current directory")
 
     def test_flag_and_environment_choose_the_binary(self):
-        cmd = self.run_push(wrangler_bin="/workspace/digest/tools/cfwrangler")
+        cmd, _ = self.run_push(wrangler_bin="/workspace/digest/tools/cfwrangler")
         self.assertEqual(cmd[0], "/workspace/digest/tools/cfwrangler")
         self.assertEqual(cmd[1:3], ["kv", "key"])
         with mock.patch.dict(os.environ, {"HK_MOVERS_WRANGLER_BIN": "/opt/wr"}):
-            self.assertEqual(self.run_push()[0], "/opt/wr")
-            self.assertEqual(self.run_push(wrangler_bin="/flag/wr")[0], "/flag/wr", "the flag wins")
+            self.assertEqual(self.run_push()[0][0], "/opt/wr")
+            self.assertEqual(self.run_push(wrangler_bin="/flag/wr")[0][0], "/flag/wr", "the flag wins")
         self.assertEqual(sync.wrangler_command("node /opt/wrangler.js")[:2], ["node", "/opt/wrangler.js"])
+
+    def test_cwd_is_the_directory_above_node_modules(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tool = Path(tmp) / "tools" / "cfwrangler"
+            (tool / "node_modules" / ".bin").mkdir(parents=True)
+            binary = str(tool / "node_modules" / ".bin" / "wrangler")
+            cmd, kwargs = self.run_push(wrangler_bin=binary)
+            self.assertEqual(cmd[0], binary)
+            self.assertEqual(kwargs["cwd"], str(tool))
+            with mock.patch.dict(os.environ, {"HK_MOVERS_WRANGLER_BIN": binary}):
+                self.assertEqual(self.run_push()[1]["cwd"], str(tool))
+            self.assertEqual(sync.wrangler_cwd(f"node {binary}"), str(tool))
+            self.assertIsNone(sync.wrangler_cwd(str(Path(tmp) / "bin" / "wrangler")))
+            self.assertIsNone(sync.wrangler_cwd("/nonexistent/x/node_modules/.bin/wrangler"), "a missing directory is not used")
 
     def test_cli_exposes_the_flags(self):
         args = sync.parse_args(["--out", "x.json", "--wrangler-bin", "/w", "--names-cache", "/tmp/n.json"])
@@ -657,25 +775,33 @@ class Wrangler(unittest.TestCase):
 class CollectLive(unittest.TestCase):
     """End to end with a fake SDK that answers in the shapes measured on a real OpenD."""
 
-    def make_sdk(self):
+    LISTED = ("HK.00700", "HK.00005", "HK.09988", "HK.01211", "HK.80700", "HK.07200", "HK.02020", "HK.00999", "HK.00998")
+
+    def make_sdk(self, listed=LISTED):
+        nan = float("nan")
         snap = {
             "HK.00700": dict(code="HK.00700", name="TENCENT", last_price=520.0, prev_close_price=500.0, turnover=2e9, total_market_val=4.8e12, high_price=525.0, low_price=498.0),
             "HK.00005": dict(code="HK.00005", name="HSBC HOLDINGS", last_price=95.0, prev_close_price=100.0, turnover=1e9, total_market_val=1.7e12, high_price=100.0, low_price=94.0),
+            "HK.00823": dict(code="HK.00823", name="LINK REIT", last_price=40.0, prev_close_price=39.0, turnover=3e8, total_market_val=8e10, high_price=40.5, low_price=39.0),
             "HK.09988": dict(code="HK.09988", name="BABA-W", last_price=130.0, prev_close_price=100.0, turnover=3e9, total_market_val=2.2e12, high_price=131.0, low_price=100.0),
             "HK.01211": dict(code="HK.01211", name="BYD COMPANY", last_price=80.0, prev_close_price=100.0, turnover=2e9, total_market_val=1.0e12, high_price=100.0, low_price=79.0),
+            "HK.02020": dict(code="HK.02020", name="MID MOVER", last_price=50.5, prev_close_price=50.0, turnover=5e8, total_market_val=3e10, high_price=51.0, low_price=50.0),
+            "HK.00999": dict(code="HK.00999", name="THIN", last_price=11.0, prev_close_price=10.0, turnover=1e6, total_market_val=5e9, high_price=11.0, low_price=10.0),
+            "HK.00998": dict(code="HK.00998", name="NAN ROW", last_price=11.0, prev_close_price=10.0, turnover=nan, total_market_val=nan, high_price=nan, low_price=nan),
             "HK.80700": dict(code="HK.80700", name="TENCENT-R", last_price=500.0, prev_close_price=400.0, turnover=1e9, total_market_val=4e12, high_price=500.0, low_price=400.0),
             "HK.07200": dict(code="HK.07200", name="FL2 HSI", last_price=9.0, prev_close_price=5.0, turnover=9e8, total_market_val=5e9, high_price=9.0, low_price=5.0),
-            "HK.800000": dict(code="HK.800000", name="HSI", last_price=23200.0, prev_close_price=23000.0, turnover=2.5e11, total_market_val=0, high_price=23300.0, low_price=22900.0),
+            "HK.800000": dict(code="HK.800000", name="HSI", last_price=23200.0, prev_close_price=23000.0, turnover=2.5e11, total_market_val=nan, high_price=23300.0, low_price=22900.0),
         }
-        plates = {"HK.00700": "Interactive media and services", "HK.00005": "Banks", "HK.09988": "Online Retailers", "HK.01211": "Automobiles"}
-        calls = {"top": [], "heat": [], "snap": []}
+        plates = {"HK.00700": "Interactive media and services", "HK.00005": "Banks", "HK.09988": "Online Retailers",
+                  "HK.01211": "Automobiles", "HK.02020": "Textiles and Apparel"}
+        calls = {"top": [], "heat": [], "snap": [], "owner": []}
 
         class Ctx:
             def __init__(self, host, port):
                 self.closed = False
 
             def get_plate_stock(self, plate):
-                return 0, [{"code": "HK.00700"}, {"code": "HK.00005"}]
+                return 0, [{"code": "HK.00700"}, {"code": "HK.00005"}, {"code": "HK.00823"}]
 
             def get_market_snapshot(self, codes):
                 calls["snap"].append(list(codes))
@@ -690,7 +816,7 @@ class CollectLive(unittest.TestCase):
                 return 0, rows, None, len(rows)
 
             def get_stock_basicinfo(self, market, sec_type):
-                return 0, [{"code": c} for c in ("HK.00700", "HK.00005", "HK.09988", "HK.01211", "HK.80700")]
+                return 0, [{"code": c} for c in listed]
 
             def get_top_movers_rank(self, market, sort_dir=None, count=10, offset=None, filter_list=None):
                 calls["top"].append(sort_dir)
@@ -698,7 +824,12 @@ class CollectLive(unittest.TestCase):
                 return 0, (len(rows), rows)
 
             def get_owner_plate(self, codes):
-                return 0, [{"code": c, "plate_name": plates[c], "plate_type": "INDUSTRY"} for c in codes if c in plates]
+                calls["owner"].append(list(codes))
+                if "HK.00823" in codes:
+                    return -1, "Get Stock's Sector interface does not support ETFs type."
+                rows = [{"code": c, "plate_name": plates[c], "plate_type": "OTHER"} for c in codes if c in plates]
+                rows += [{"code": c, "plate_name": "Hang Seng Index", "plate_type": "OTHER"} for c in codes]
+                return 0, rows
 
             def get_search_news(self, query):
                 return 0, [{"title": "Tencent beats", "url": "https://news.futunn.com/en/1", "source": "futu"}]
@@ -713,11 +844,14 @@ class CollectLive(unittest.TestCase):
         fake.RankSortDir = types.SimpleNamespace(DESCENDING="DESC", ASCENDING="ASC")
         return fake, calls
 
-    def test_collect_live_end_to_end(self):
-        fake, calls = self.make_sdk()
-        names = {"00700": {"name": "騰訊控股", "category": "股本"}, "00005": {"name": "滙豐控股", "category": "股本"},
-                 "09988": {"name": "阿里巴巴-W", "category": "股本"}, "01211": {"name": "比亞迪股份", "category": "股本"},
-                 "07200": {"name": "二南方恒指", "category": "交易所買賣產品"}}
+    NAMES = {"00700": {"name": "騰訊控股", "category": "股本"}, "00005": {"name": "滙豐控股", "category": "股本"},
+             "09988": {"name": "阿里巴巴-W", "category": "股本"}, "01211": {"name": "比亞迪股份", "category": "股本"},
+             "02020": {"name": "安踏體育", "category": "股本"}, "00999": {"name": "薄成交", "category": "股本"},
+             "00998": {"name": "空值行", "category": "股本"}, "00823": {"name": "領展房產基金", "category": "房地產投資信託基金"},
+             "07200": {"name": "二南方恒指", "category": "交易所買賣產品"}}
+
+    def run_collect(self, listed=LISTED):
+        fake, calls = self.make_sdk(listed)
         fetched = []
 
         def fake_news(code, name, **kw):
@@ -726,27 +860,44 @@ class CollectLive(unittest.TestCase):
 
         args = sync.parse_args(["--out", "x.json", "--news-delay", "0", "--names-cache", "/nonexistent/names.json"])
         with mock.patch.dict(sys.modules, {"futu": fake}), \
-                mock.patch.object(names_mod, "load_names", return_value=names), \
+                mock.patch.object(names_mod, "load_names", return_value=self.NAMES), \
                 mock.patch.object(news_mod, "fetch_news", side_effect=fake_news):
             doc = sync.collect_live(args)
+        return doc, calls, fetched
+
+    def test_collect_live_end_to_end(self):
+        doc, calls, fetched = self.run_collect()
 
         self.assertEqual(calls["heat"], [200])
-        self.assertEqual(calls["top"], ["DESC", "ASC"])
+        self.assertEqual(calls["top"], [], "the share list replaces the rank endpoint")
         snapped = {c for chunk in calls["snap"] for c in chunk}
         self.assertNotIn("HK.80700", snapped, "RMB counter never reaches the snapshot call")
         self.assertNotIn("HK.07200", snapped, "ETF never reaches the snapshot call")
+        self.assertIn("HK.02020", snapped, "a mid-change share outside any rank list is still read")
+        self.assertIn("HK.00823", snapped, "HSI constituents are always read")
+
+        owner_asked = {c for chunk in calls["owner"] for c in chunk}
+        self.assertEqual(owner_asked, {"HK.00700", "HK.00005", "HK.09988", "HK.01211", "HK.02020"},
+                         "owner plate only for HSI or qualifying shares in the share list; never the REIT, thin or NaN rows")
 
         hsi = {r["code"]: r for r in doc["hsi"]["constituents"]}
-        self.assertEqual(set(hsi), {"00700", "00005"})
+        self.assertEqual(set(hsi), {"00700", "00005", "00823"})
         self.assertEqual(hsi["00700"]["name"], "騰訊控股")
         self.assertEqual(hsi["00700"]["industry"], "互動媒體及服務")
         self.assertEqual(hsi["00700"]["sector"], "tech")
+        self.assertEqual(hsi["00823"]["industry"], "房地產投資信託基金")
+        self.assertEqual(hsi["00823"]["sector"], "property")
         self.assertEqual(doc["hsi"]["index"]["last"], 23200.0)
-        self.assertEqual(doc["hk_market"]["universe_count"], 5)
+        self.assertEqual(doc["hk_market"]["universe_count"], len(self.LISTED))
+
         hk_codes = [r["code"] for r in doc["hk_market"]["stocks"]]
-        self.assertEqual(sorted(hk_codes), ["00005", "00700", "01211", "09988"])
+        self.assertEqual(sorted(hk_codes), ["00005", "00700", "00823", "01211", "02020", "09988"],
+                         "thin (00999) and NaN (00998) rows fail the liquidity filter")
         self.assertEqual([r["code"] for r in doc["movers"]["hk"]["gainers"]][:2], ["09988", "00700"])
         self.assertEqual(doc["movers"]["hk"]["losers"][0]["code"], "01211")
+        self.assertNotIn("00999", [r["code"] for r in doc["movers"]["hk"]["gainers"]], "below the liquidity filter")
+        self.assertNotIn("00998", [r["code"] for r in doc["movers"]["hk"]["gainers"]], "NaN turnover is filtered, not a crash")
+        self.assertIn("02020", [r["code"] for r in doc["movers"]["hk"]["gainers"]])
         sectors = {s["id"]: s for s in doc["macro_sectors"]}
         self.assertEqual(sectors["finance"]["industries"][0]["name"], "銀行")
         self.assertEqual(sectors["consumer"]["industries"][0]["name"], "線上零售")
@@ -754,6 +905,30 @@ class CollectLive(unittest.TestCase):
         self.assertIn(("09988", "阿里巴巴-W"), fetched, "news is searched by the Chinese name")
         text = json.dumps(doc, ensure_ascii=False)
         self.assertNotRegex(text, r"(?i)\bfutu|富途|moomoo|yahoo|TENCENT|HSBC|Banks")
+        self.assertNotIn("NaN", text)
+        json.loads(text)
+
+    def test_snapshot_calls_are_chunked_over_the_whole_share_list(self):
+        many = [f"HK.{i:05d}" for i in range(1, 1201)]
+        fake, calls = self.make_sdk(many)
+        args = sync.parse_args(["--out", "x.json", "--news-delay", "0"])
+        with mock.patch.dict(sys.modules, {"futu": fake}), \
+                mock.patch.object(names_mod, "load_names", return_value={}), \
+                mock.patch.object(news_mod, "fetch_news", return_value=None):
+            sync.collect_live(args)
+        sizes = [len(c) for c in calls["snap"]]
+        self.assertEqual(sizes[0], 1, "index snapshot")
+        self.assertEqual(sum(sizes[1:]), 1200, "every share once; HSI codes already in the list are not repeated")
+        self.assertTrue(all(n <= sync.SNAPSHOT_CHUNK for n in sizes))
+
+    def test_empty_share_list_falls_back_to_the_top_movers_rank(self):
+        doc, calls, _ = self.run_collect(listed=())
+        self.assertEqual(calls["top"], ["DESC", "ASC"])
+        snapped = {c for chunk in calls["snap"] for c in chunk}
+        self.assertNotIn("HK.80700", snapped)
+        self.assertNotIn("HK.07200", snapped)
+        self.assertNotIn("HK.02020", snapped, "only rank candidates and HSI codes are read in the fallback")
+        self.assertEqual(sorted(r["code"] for r in doc["hk_market"]["stocks"]), ["00005", "00700", "00823", "01211", "09988"])
 
     def test_backup_news_never_returns_a_vendor_headline(self):
         fake, _ = self.make_sdk()

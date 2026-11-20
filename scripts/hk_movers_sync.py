@@ -14,11 +14,22 @@ Design notes (verified against a LV1 OpenD at 127.0.0.1:11111, futu-api 10.12.72
   * get_plate_stock('HK.800000') returns about 95 Hang Seng Index constituents.
   * get_market_snapshot takes at most 400 codes per call and has no change_rate
     column. change % = (last_price / prev_close_price - 1) * 100.
-  * get_stock_filter has no CHANGE_RATE / VOLUME filter. Market-wide movers come
-    from get_top_movers_rank, then every candidate is re-read with
-    get_market_snapshot and filtered by turnover and market cap. The rank
-    call's `amplitude` is 10x the snapshot scale, so amplitude is recomputed
-    from the snapshot (high - low) / prev_close.
+  * get_stock_filter has no CHANGE_RATE / VOLUME filter, and the top 100 of
+    get_top_movers_rank misses most mid-change, high-turnover shares. The main
+    flow therefore snapshots every share from get_stock_basicinfo(SecurityType.STOCK)
+    (about 2,800 codes, 8 calls, a few seconds) plus the HSI constituents and
+    filters by turnover and market cap locally. get_top_movers_rank is only the
+    fallback when that share list is empty. The rank call's `amplitude` is 10x
+    the snapshot scale, so amplitude is recomputed from the snapshot
+    (high - low) / prev_close.
+  * get_owner_plate is called only for HSI constituents and qualifying shares
+    that are in the SecurityType.STOCK list. It rejects REITs and ETFs ("does
+    not support ETFs type"), so REITs (exchange 分類 = 房地產投資信託基金) are
+    labelled "REITs" without a call, and a failing batch is bisected to skip
+    the offending code. Its rows carry plate_type "OTHER" for the 113 industry
+    plates, so industry rows are matched by plate_type INDUSTRY or by a plate
+    name that get_heat_map_data / the sector map knows.
+  * Snapshot DataFrames hold NaN; every numeric read goes through _num().
   * get_heat_map_data(Market.HK, count=200) returns a 4-tuple
     (ret, df, None, total_count) with about 113 industry plates.
   * get_top_movers_rank(market, sort_dir, count, offset, filter_list) takes
@@ -114,6 +125,11 @@ class SectorMapper:
             self.unmapped.add(name)
         return self.fallback
 
+    def knows(self, industry: str | None) -> bool:
+        """True for a plate name the map recognises exactly (English plate, Chinese name or Chinese plate)."""
+        name = (industry or "").strip()
+        return bool(name) and (name.casefold() in self.english or name in self.exact)
+
     def industry_zh(self, industry: str | None) -> str:
         """Traditional Chinese industry name. Unknown English names show as 其他 and are recorded."""
         name = (industry or "").strip()
@@ -136,26 +152,28 @@ def normalize_code(code: str) -> str:
 
 
 def change_pct(last: float, prev_close: float) -> float | None:
-    if not prev_close or prev_close <= 0 or last is None:
+    last, prev_close = _num(last, math.nan), _num(prev_close, math.nan)
+    if math.isnan(last) or math.isnan(prev_close) or prev_close <= 0:
         return None
     return (last / prev_close - 1.0) * 100.0
 
 
 def amplitude_pct(high: float, low: float, prev_close: float) -> float | None:
-    if not prev_close or prev_close <= 0 or high is None or low is None:
+    high, low, prev_close = _num(high, math.nan), _num(low, math.nan), _num(prev_close, math.nan)
+    if math.isnan(high) or math.isnan(low) or math.isnan(prev_close) or prev_close <= 0:
         return None
     return (high - low) / prev_close * 100.0
 
 
 def impact_hkd(pct: float, market_cap: float) -> float:
     """Approximate impact: change % x total market cap, as an HK$ market-cap change."""
-    return pct / 100.0 * market_cap
+    return _num(pct) / 100.0 * _num(market_cap)
 
 
 def qualifies(turnover: float, market_cap: float,
               min_turnover: float = MIN_TURNOVER_HKD,
               min_market_cap: float = MIN_MARKET_CAP_HKD) -> bool:
-    return turnover >= min_turnover and market_cap > min_market_cap
+    return _num(turnover) >= min_turnover and _num(market_cap) > min_market_cap
 
 
 def market_session(now: datetime) -> str:
@@ -177,6 +195,15 @@ def market_session(now: datetime) -> str:
     return "closed"
 
 
+def _num(value, default: float = 0.0) -> float:
+    """Finite float, or `default` for None, NaN, +/-Inf and anything non-numeric (pandas NaN is truthy)."""
+    try:
+        out = float(value)
+    except (TypeError, ValueError):
+        return default
+    return out if math.isfinite(out) else default
+
+
 def _r(value: float | None, digits: int):
     if value is None or (isinstance(value, float) and (math.isnan(value) or math.isinf(value))):
         return None
@@ -185,14 +212,14 @@ def _r(value: float | None, digits: int):
 
 def build_stock(raw: dict, mapper: SectorMapper) -> dict | None:
     """Normalise one snapshot row. Returns None when the row cannot be priced."""
-    prev = float(raw.get("prev_close_price") or 0)
-    last = float(raw.get("last_price") or 0)
+    prev = _num(raw.get("prev_close_price"))
+    last = _num(raw.get("last_price"))
     pct = change_pct(last, prev)
     if pct is None or last <= 0:
         return None
-    mcap = float(raw.get("total_market_val") or 0)
-    turnover = float(raw.get("turnover") or 0)
-    plate = (raw.get("industry") or "").strip()
+    mcap = _num(raw.get("total_market_val"))
+    turnover = _num(raw.get("turnover"))
+    plate = str(raw.get("industry") or "").strip()
     row = {
         "code": normalize_code(raw["code"]),
         "name": str(raw.get("name_tc") or raw.get("name") or raw.get("stock_name") or "").strip(),
@@ -212,22 +239,28 @@ def build_stock(raw: dict, mapper: SectorMapper) -> dict | None:
 
 
 def is_flat(pct: float) -> bool:
-    return round(pct, 2) == 0
+    return round(_num(pct), 2) == 0
 
 
 def breadth(rows: list[dict]) -> dict:
-    up = sum(1 for r in rows if not is_flat(r["change_pct"]) and r["change_pct"] > 0)
-    down = sum(1 for r in rows if not is_flat(r["change_pct"]) and r["change_pct"] < 0)
+    up = sum(1 for r in rows if not is_flat(r.get("change_pct")) and _num(r.get("change_pct")) > 0)
+    down = sum(1 for r in rows if not is_flat(r.get("change_pct")) and _num(r.get("change_pct")) < 0)
     return {"up": up, "down": down, "flat": len(rows) - up - down}
 
 
 def rank(rows: list[dict], direction: str, limit: int = TOP_N) -> list[dict]:
+    def pct(r):
+        return _num(r.get("change_pct"))
+
+    def turnover(r):
+        return _num(r.get("turnover_hkd"))
+
     if direction == "up":
-        pool = [r for r in rows if not is_flat(r["change_pct"]) and r["change_pct"] > 0]
-        pool.sort(key=lambda r: (-r["change_pct"], -r["turnover_hkd"], r["code"]))
+        pool = [r for r in rows if not is_flat(pct(r)) and pct(r) > 0]
+        pool.sort(key=lambda r: (-pct(r), -turnover(r), r["code"]))
     else:
-        pool = [r for r in rows if not is_flat(r["change_pct"]) and r["change_pct"] < 0]
-        pool.sort(key=lambda r: (r["change_pct"], -r["turnover_hkd"], r["code"]))
+        pool = [r for r in rows if not is_flat(pct(r)) and pct(r) < 0]
+        pool.sort(key=lambda r: (pct(r), -turnover(r), r["code"]))
     return pool[:limit]
 
 
@@ -245,9 +278,9 @@ def normalize_heatmap_row(row: dict) -> dict | None:
         return None
     return {
         "name": str(name).strip(),
-        "change_pct": float(pick("change_rate", "change_pct", "pct", default=0) or 0),
-        "turnover_hkd": float(pick("turnover", "amount", default=0) or 0),
-        "market_cap_hkd": float(pick("total_market_val", "market_val", "market_cap", default=0) or 0),
+        "change_pct": _num(pick("change_rate", "change_pct", "pct", default=0)),
+        "turnover_hkd": _num(pick("turnover", "amount", default=0)),
+        "market_cap_hkd": _num(pick("total_market_val", "market_val", "market_cap", default=0)),
         "up": pick("up_count", "rise_count", "up"),
         "down": pick("down_count", "fall_count", "down"),
         "flat": pick("flat_count", "equal_count", "flat"),
@@ -489,15 +522,50 @@ def fetch_top_movers(ctx, market, limit: int, sort_dirs) -> list[str]:
     return list(dict.fromkeys(codes))
 
 
-def fetch_owner_industries(ctx, codes: list[str]) -> dict[str, str]:
-    """code -> industry plate name (English). get_owner_plate is rate limited, so batch."""
-    out: dict[str, str] = {}
-    for i in range(0, len(codes), 200):
-        data = _ok(ctx.get_owner_plate(codes[i:i + 200]), "get_owner_plate")
-        for row in _records(data):
-            if str(row.get("plate_type", "")).upper().endswith("INDUSTRY"):
-                out.setdefault(row["code"], row["plate_name"])
-    return out
+REIT_PLATE = "REITs"
+REIT_CATEGORY = "房地產投資信託基金"
+OWNER_PLATE_CHUNK = 200
+
+
+def is_reit(code: str, names: dict[str, dict]) -> bool:
+    entry = names.get(names_mod.short_code(code))
+    return bool(entry) and entry.get("category") == REIT_CATEGORY
+
+
+def _owner_plate_rows(ctx, codes: list[str]) -> list[dict]:
+    """get_owner_plate for one batch. A failing batch is halved until the offending code is isolated and skipped."""
+    if not codes:
+        return []
+    try:
+        return _records(_ok(ctx.get_owner_plate(codes), "get_owner_plate"))
+    except RuntimeError:
+        if len(codes) == 1:
+            return []
+        mid = len(codes) // 2
+        return _owner_plate_rows(ctx, codes[:mid]) + _owner_plate_rows(ctx, codes[mid:])
+
+
+def fetch_owner_industries(ctx, codes: list[str], known=None) -> dict[str, str]:
+    """code -> industry plate name (English). get_owner_plate is rate limited, so batch.
+
+    The 113 industry plates arrive with plate_type "OTHER", so a row counts as an industry when its
+    plate_type ends with INDUSTRY or when `known(plate_name)` accepts the name. A known name wins over
+    a row that is only typed INDUSTRY.
+    """
+    known = known or (lambda name: False)
+    by_name: dict[str, str] = {}
+    by_type: dict[str, str] = {}
+    unique = list(dict.fromkeys(codes))
+    for i in range(0, len(unique), OWNER_PLATE_CHUNK):
+        for row in _owner_plate_rows(ctx, unique[i:i + OWNER_PLATE_CHUNK]):
+            code, name = row.get("code"), str(row.get("plate_name") or "").strip()
+            if not code or not name:
+                continue
+            if known(name):
+                by_name.setdefault(code, name)
+            elif str(row.get("plate_type", "")).upper().endswith("INDUSTRY"):
+                by_type.setdefault(code, name)
+    return {**by_type, **by_name}
 
 
 def fetch_news_backup(ctx, code: str, name: str) -> dict | None:
@@ -553,15 +621,26 @@ def collect_live(args) -> dict:
         index_snap = fetch_snapshots(ctx, [HSI_PLATE])
         industries = fetch_heatmap(ctx, Market.HK)
         listed = fetch_hk_stock_codes(ctx, Market.HK, SecurityType.STOCK)
-        candidates = keep_candidates(
-            fetch_top_movers(ctx, Market.HK, args.candidates, (RankSortDir.DESCENDING, RankSortDir.ASCENDING)), listed, names)
-        snap_rows = fetch_snapshots(ctx, list(dict.fromkeys(hsi_codes + candidates)))
-        industry_of = fetch_owner_industries(ctx, [r["code"] for r in snap_rows])
-        for raw in snap_rows:
-            raw["industry"] = industry_of.get(raw["code"], "")
-        apply_tc_names(snap_rows, names)
+        if listed:
+            universe = keep_candidates([f"HK.{c}" for c in sorted(listed)], listed, names)
+        else:
+            print("warning: empty share list; falling back to the top movers rank", file=sys.stderr)
+            universe = keep_candidates(
+                fetch_top_movers(ctx, Market.HK, args.candidates, (RankSortDir.DESCENDING, RankSortDir.ASCENDING)), listed, names)
+        snap_rows = fetch_snapshots(ctx, list(dict.fromkeys(hsi_codes + universe)))
 
         hsi_set = set(hsi_codes)
+        needed = [r["code"] for r in snap_rows
+                  if r["code"] in hsi_set or qualifies(r.get("turnover"), r.get("total_market_val"))]
+        reits = {c for c in needed if is_reit(c, names)}
+        owner_codes = [c for c in needed if c not in reits and (not listed or names_mod.short_code(c) in listed)]
+        known = {r["name"].casefold() for r in industries}
+        industry_of = fetch_owner_industries(
+            ctx, owner_codes, known=lambda name: name.casefold() in known or mapper.knows(name))
+        for raw in snap_rows:
+            raw["industry"] = REIT_PLATE if raw["code"] in reits else industry_of.get(raw["code"], "")
+        apply_tc_names(snap_rows, names)
+
         hsi_rows = [s for s in (build_stock(r, mapper) for r in snap_rows if r["code"] in hsi_set) if s]
         stocks = [s for s in (build_stock(r, mapper) for r in snap_rows) if s]
 
@@ -581,9 +660,9 @@ def collect_live(args) -> dict:
         if index_snap:
             raw = index_snap[0]
             index = {
-                "last": float(raw.get("last_price") or 0) or None,
-                "prev_close": float(raw.get("prev_close_price") or 0) or None,
-                "turnover_hkd": float(raw.get("turnover") or 0) or None,
+                "last": _num(raw.get("last_price")) or None,
+                "prev_close": _num(raw.get("prev_close_price")) or None,
+                "turnover_hkd": _num(raw.get("turnover")) or None,
             }
         doc = build_snapshot(now=now, hsi_index=index, hsi_rows=hsi_rows, stocks=stocks,
                              industries=industries, news=news, mapper=mapper,
@@ -611,6 +690,25 @@ def wrangler_command(wrangler_bin: str | None) -> list[str]:
     return shlex.split(value) if value else ["npx", "wrangler"]
 
 
+def wrangler_cwd(wrangler_bin: str | None) -> str | None:
+    """Directory that holds the node_modules of a `.../node_modules/.bin/wrangler` path.
+
+    wrangler writes its `.cache` next to the project it is started in, so starting it at `/` fails with
+    EACCES. Returns None (keep the current directory) when the path is not inside a node_modules folder.
+    """
+    command = wrangler_command(wrangler_bin)
+    for token in command[:2]:
+        if "/" not in token:
+            continue
+        parts = Path(os.path.abspath(token)).parts
+        if "node_modules" in parts:
+            at = len(parts) - 1 - parts[::-1].index("node_modules")
+            root = Path(*parts[:at]) if at else None
+            if root and root.is_dir():
+                return str(root)
+    return None
+
+
 def push_kv(doc: dict, namespace_id: str, wrangler_bin: str | None = None) -> None:
     """Write the document with wrangler. Authentication comes from the wrangler login or CLOUDFLARE_API_TOKEN."""
     with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8") as fh:
@@ -621,6 +719,7 @@ def push_kv(doc: dict, namespace_id: str, wrangler_bin: str | None = None) -> No
             [*wrangler_command(wrangler_bin), "kv", "key", "put", KV_KEY, "--path", tmp,
              "--namespace-id", namespace_id, "--remote"],
             check=True,
+            cwd=wrangler_cwd(wrangler_bin),
         )
     finally:
         os.unlink(tmp)
@@ -636,7 +735,7 @@ def parse_args(argv=None):
     p.add_argument("--wrangler-bin", default=None, help="wrangler executable (default: env HK_MOVERS_WRANGLER_BIN, else `npx wrangler`)")
     p.add_argument("--names-cache", default=os.environ.get("HK_MOVERS_NAMES_CACHE", str(names_mod.CACHE_PATH)),
                    help="cache file for the Traditional Chinese name list (refreshed every 7 days)")
-    p.add_argument("--candidates", type=int, default=100, help="candidates per direction from the rank endpoint")
+    p.add_argument("--candidates", type=int, default=100, help="fallback only: candidates per direction from the rank endpoint when the share list is empty")
     p.add_argument("--news-top", type=int, default=30, help="stocks per direction and universe that get a news lookup")
     p.add_argument("--news-delay", type=float, default=0.3, help="seconds between news requests")
     return p.parse_args(argv)

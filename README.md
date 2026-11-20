@@ -336,7 +336,10 @@ python3 scripts/hk_movers_demo.py --out hk-movers/data/sample.json              
 What the collector handles, as measured on a real OpenD:
 
 - SDK replies are `(ret, data)` or longer (`get_heat_map_data` returns `(ret, df, None, total)`); `get_top_movers_rank(market, sort_dir, count, ...)` takes `RankSortDir.DESCENDING/ASCENDING`, returns `(0, (all_count, df))`, and names the code column `security`.
-- Rank candidates are limited to HK$ shares: codes `00001`-`09999`, the exchange list's 分類, and `get_stock_basicinfo(Market.HK, SecurityType.STOCK)`. RMB counters, ETFs and leveraged products cannot crowd the lists.
+- The main flow snapshots every share from `get_stock_basicinfo(Market.HK, SecurityType.STOCK)` (codes `00001`-`09999`, the exchange list's 分類; about 2,800 codes in 8 `get_market_snapshot` calls) plus the HSI constituents, then applies the turnover and market cap filter locally. `get_top_movers_rank` is only the fallback when that share list is empty.
+- `get_owner_plate` is called only for HSI constituents and qualifying shares in the share list, in batches of 200. A failing batch is halved until the bad code is skipped. REITs (分類 房地產投資信託基金) are labelled `REITs` without a call. The 113 industry plates come back with `plate_type` `OTHER`, so rows match by `INDUSTRY` type or by a plate name from the heat map or `sector-map.json`.
+- Numeric snapshot fields go through `_num()`, so pandas `NaN`/`Inf`/`None` read as 0 and never break `qualifies()` or `rank()`.
+- With `--wrangler-bin .../node_modules/.bin/wrangler`, wrangler runs in the directory above `node_modules` so its `.cache` write does not fail with `EACCES`.
 - Plate names from the heat map and `get_owner_plate` are English. `sector-map.json` lists all 113 with a Traditional Chinese display name and sector; names it does not know show as 其他 and are printed so the table can be extended.
 - Stock names come from the exchange's Traditional Chinese securities list (standard library only, cached 7 days in `/tmp/hkex_names_tc.json`, override with `--names-cache`).
 - News comes from Google News Hong Kong RSS (`zh-HK`). Titles drop the trailing outlet, times are HKT, and any headline or source that names a quote vendor is skipped. The gateway's own news search is a backup only when its result is Chinese and vendor-free.
