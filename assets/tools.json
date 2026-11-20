@@ -27,6 +27,25 @@
       "chrome": "shared"
     },
     {
+      "id": "hk-movers",
+      "title": "港股異動",
+      "zh": "港股異動與板塊熱力圖",
+      "href": "/hk-movers/",
+      "status": "new",
+      "category": "Markets",
+      "icon": "heatmap",
+      "accent": "#ef4444",
+      "summary": "恒指成分股與港股全市場的升跌幅榜、12 大類板塊熱力圖，每隻異動股附最新相關新聞預覽。",
+      "highlights": [
+        "恒指與全市場雙視圖",
+        "12 大類板塊熱力圖",
+        "每隻異動股附新聞"
+      ],
+      "nav": true,
+      "owner": "repo",
+      "chrome": "shared"
+    },
+    {
       "id": "politician-tracker",
       "title": "Politician Tracker",
       "zh": "政治人物持股動向",

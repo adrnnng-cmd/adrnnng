@@ -46,6 +46,15 @@
 /politician-tracker/*
   ! X-Robots-Tag
 
+/hk-movers
+  ! X-Robots-Tag
+
+/hk-movers/
+  ! X-Robots-Tag
+
+/hk-movers/*
+  ! X-Robots-Tag
+
 /hsi-lab
   ! X-Robots-Tag
 
@@ -107,6 +116,17 @@
 /news/latest.json
   ! X-Robots-Tag
   X-Robots-Tag: noindex, nofollow
+
+# HK Movers browser JSON. /hk-movers/data/latest is a Pages Function; Pages does not
+# apply this file to Function responses, so the Function sets the same noindex itself.
+/hk-movers/data/latest
+  ! X-Robots-Tag
+  X-Robots-Tag: noindex, nofollow
+
+/hk-movers/data/sample.json
+  ! X-Robots-Tag
+  X-Robots-Tag: noindex, nofollow
+  Cache-Control: public, max-age=300
 
 # Subscribe confirmation. Same noindex as /api. `!` then set so a prepended
 # `/*` noindex does not join into a second value, and no later detach matches.
