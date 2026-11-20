@@ -304,9 +304,11 @@ hk-movers/index.html, app.js, hk-movers.css   page, shared chrome (theme.css + s
 hk-movers/lib.js                              pure helpers: formatting, ranking, validation, treemap layout
 hk-movers/data/sample.json                    labelled demo document (data_source "demo"), also the offline fallback
 functions/hk-movers/data/latest.js            Pages Function for GET /hk-movers/data/latest
-scripts/hk_movers_sync.py                     reference collector for a machine with a local OpenD
+scripts/hk_movers_sync.py                     collector for a machine with a local OpenD
+scripts/hk_movers_names.py                    Traditional Chinese stock names from the exchange list (7-day cache)
+scripts/hk_movers_news.py                     one Traditional Chinese headline per stock (Google News HK RSS)
 scripts/hk_movers_demo.py                     regenerates sample.json (seeded, synthetic)
-scripts/hk-movers/sector-map.json             industry name -> 12 macro sectors (edit this to re-group)
+scripts/hk-movers/sector-map.json             113 English plate names + Chinese aliases -> 12 macro sectors (edit to re-group)
 scripts/hk-movers/schema.json                 JSON Schema of the document
 ```
 
@@ -322,18 +324,24 @@ Top-level keys: `schema_version`, `data_source`, `updated_at_hkt`, `market_sessi
 `macro_sectors`, `movers`, `news` (see `scripts/hk-movers/schema.json`). Impact is
 `change % x market cap`, shown as 近似影響度 and never as official index points.
 
-Collector, run next to OpenD (`127.0.0.1:11111`, LV1). Credentials are never in the repo:
+Collector, run next to OpenD (`127.0.0.1:11111`, LV1; checked against futu-api 10.12.7208). Credentials are never in the repo:
 
 ```bash
 python3 scripts/hk_movers_sync.py --out /tmp/hk-movers-latest.json
 HK_MOVERS_KV_NAMESPACE_ID=<namespace id> python3 scripts/hk_movers_sync.py --push-kv   # wrangler login or CLOUDFLARE_API_TOKEN
+python3 scripts/hk_movers_sync.py --push-kv --wrangler-bin /path/to/wrangler            # or env HK_MOVERS_WRANGLER_BIN; default `npx wrangler`
 python3 scripts/hk_movers_demo.py --out hk-movers/data/sample.json                    # refresh the demo file
 ```
 
-The pure pipeline (change %, filters, ranking, sector roll-up) is unit tested. The OpenD adapters at
-the bottom of `hk_movers_sync.py` (heat map, rank endpoint, owner plate, news) are thin and need a check
-against the installed SDK before the first live run. Unmapped industry names are printed so
-`sector-map.json` can be extended. The site has no dark theme, so this page has none either.
+What the collector handles, as measured on a real OpenD:
+
+- SDK replies are `(ret, data)` or longer (`get_heat_map_data` returns `(ret, df, None, total)`); `get_top_movers_rank(market, sort_dir, count, ...)` takes `RankSortDir.DESCENDING/ASCENDING`, returns `(0, (all_count, df))`, and names the code column `security`.
+- Rank candidates are limited to HK$ shares: codes `00001`-`09999`, the exchange list's 分類, and `get_stock_basicinfo(Market.HK, SecurityType.STOCK)`. RMB counters, ETFs and leveraged products cannot crowd the lists.
+- Plate names from the heat map and `get_owner_plate` are English. `sector-map.json` lists all 113 with a Traditional Chinese display name and sector; names it does not know show as 其他 and are printed so the table can be extended.
+- Stock names come from the exchange's Traditional Chinese securities list (standard library only, cached 7 days in `/tmp/hkex_names_tc.json`, override with `--names-cache`).
+- News comes from Google News Hong Kong RSS (`zh-HK`). Titles drop the trailing outlet, times are HKT, and any headline or source that names a quote vendor is skipped. The gateway's own news search is a backup only when its result is Chinese and vendor-free.
+
+The pure pipeline and every adapter are unit tested with fake SDK replies in the measured shapes. The site has no dark theme, so this page has none either.
 
 ## Host migration to news-chart.com
 

@@ -1,42 +1,42 @@
 {
-  "version": 1,
-  "note": "Maps market-data industry names (about 113 on the Hong Kong heat map) to 12 macro sectors. Unlisted names fall through `keywords` (first hit wins), then to `other`. hk_movers_sync.py logs every unmapped name so this table can be extended.",
+  "version": 2,
+  "note": "Maps market-data industry names to 12 macro sectors. `english` holds the 113 English plate names the market-data gateway returns, each with its Traditional Chinese display name and sector; the Chinese names in `sectors[].industries` are kept as aliases. Anything unlisted falls through `keywords` (first hit wins, case-insensitive), then to `fallback`. hk_movers_sync.py prints every unmapped name so this table can be extended.",
   "fallback": "other",
   "sectors": [
     {
       "id": "tech",
       "name": "科技及互聯網",
-      "industries": ["軟件服務", "互聯網", "互聯網服務及基礎設施", "電子商貿", "半導體", "電子元件", "電子設備及儀器", "電腦及周邊設備", "資訊科技服務", "遊戲", "消費電子", "光電及顯示", "數據中心"]
+      "industries": ["軟件服務", "互聯網", "互聯網服務及基礎設施", "電子商貿", "半導體", "電子元件", "電子設備及儀器", "電腦及周邊設備", "資訊科技服務", "遊戲", "消費電子", "光電及顯示", "數據中心", "應用軟件", "消費通訊設備及零件", "數碼解決方案服務", "電氣及電子零件", "互動媒體及服務", "機器人系統及方案", "半導體設備及材料"]
     },
     {
       "id": "finance",
       "name": "金融及保險",
-      "industries": ["銀行", "保險", "人壽及健康保險", "財產及意外保險", "證券及經紀", "資產管理", "多元金融", "消費金融", "融資租賃", "金融交易所及數據"]
+      "industries": ["銀行", "保險", "人壽及健康保險", "財產及意外保險", "證券及經紀", "資產管理", "多元金融", "消費金融", "融資租賃", "金融交易所及數據", "信貸服務", "投資及資產管理", "其他金融服務", "支付服務"]
     },
     {
       "id": "property",
       "name": "地產及物業",
-      "industries": ["地產發展商", "房地產投資信託基金", "物業管理", "地產代理及服務", "商業地產"]
+      "industries": ["地產發展商", "房地產投資信託基金", "物業管理", "地產代理及服務", "商業地產", "地產投資"]
     },
     {
       "id": "consumer",
       "name": "消費及零售",
-      "industries": ["食品", "飲料", "乳製品", "酒精飲品", "煙草", "服裝", "鞋履及配飾", "紡織製造", "珠寶及奢侈品", "專門零售", "百貨", "超市及便利店", "餐飲", "酒店及度假村", "博彩", "旅遊及休閒", "個人護理", "家居用品", "家用電器", "玩具及文具", "教育", "農業及畜牧", "美容及化妝品", "運動用品"]
+      "industries": ["食品", "飲料", "乳製品", "酒精飲品", "煙草", "服裝", "鞋履及配飾", "紡織製造", "珠寶及奢侈品", "專門零售", "百貨", "超市及便利店", "餐飲", "酒店及度假村", "博彩", "旅遊及休閒", "個人護理", "家居用品", "家用電器", "玩具及文具", "教育", "農業及畜牧", "美容及化妝品", "運動用品", "服裝製造", "服裝零售", "綜合零售", "食品添加劑", "家居建材零售", "珠寶及鐘錶", "畜牧飼料", "肉類及家禽", "非酒精飲品", "線上零售", "其他服飾配件", "其他零售", "度假村及賭場", "體育及康樂設施", "紡織及布料", "玩具及休閒用品", "家具", "家居消耗品", "包裝食品"]
     },
     {
       "id": "health",
       "name": "醫藥及生科",
-      "industries": ["西藥", "中藥", "生物科技", "醫療器械", "醫療服務", "醫藥研發及外包服務", "醫藥分銷及零售"]
+      "industries": ["西藥", "中藥", "生物科技", "醫療器械", "醫療服務", "醫藥研發及外包服務", "醫藥分銷及零售", "醫療設備及用品", "膳食補充劑"]
     },
     {
       "id": "auto",
       "name": "汽車及新能源",
-      "industries": ["汽車製造", "新能源車", "汽車零部件", "汽車經銷", "電池及儲能", "光伏設備", "風電設備", "新能源材料"]
+      "industries": ["汽車製造", "新能源車", "汽車零部件", "汽車經銷", "電池及儲能", "光伏設備", "風電設備", "新能源材料", "商用車及卡車", "儲能系統", "摩托車及其他"]
     },
     {
       "id": "industrial",
       "name": "工業及製造",
-      "industries": ["機械設備", "電氣設備", "建築及工程", "建築材料", "航空航天及國防", "綜合工業", "環保及廢物處理", "包裝及容器", "造紙及印刷", "商業及專業服務"]
+      "industries": ["機械設備", "電氣設備", "建築及工程", "建築材料", "航空航天及國防", "綜合工業", "環保及廢物處理", "包裝及容器", "造紙及印刷", "商業及專業服務", "重型基建", "重型機械", "工業零件及設備", "其他支援服務", "紙品及包裝", "印刷及包裝", "採購及供應鏈管理", "軌道及列車設備"]
     },
     {
       "id": "energy",
@@ -46,23 +46,138 @@
     {
       "id": "telecom",
       "name": "電訊及傳媒",
-      "industries": ["電訊服務", "通訊設備", "影視及娛樂", "廣告及公關", "出版", "數碼媒體"]
+      "industries": ["電訊服務", "通訊設備", "影視及娛樂", "廣告及公關", "出版", "數碼媒體", "廣播及電視", "衛星及無線通訊服務", "電訊網絡設備"]
     },
     {
       "id": "materials",
       "name": "原材料及資源",
-      "industries": ["黃金", "有色金屬", "鋼鐵", "鋁業", "銅業", "稀土及小金屬", "基礎化工", "化肥及農藥", "特種化工", "非金屬礦及建材原料"]
+      "industries": ["黃金", "有色金屬", "鋼鐵", "鋁業", "銅業", "稀土及小金屬", "基礎化工", "化肥及農藥", "特種化工", "非金屬礦及建材原料", "林業及木材", "黃金及貴金屬", "其他金屬及礦物"]
     },
     {
       "id": "transport",
       "name": "交通及物流",
-      "industries": ["航運", "航空公司", "鐵路運輸", "公路及橋樑", "機場及港口", "物流及快遞", "貨運代理", "海運設備"]
+      "industries": ["航運", "航空公司", "鐵路運輸", "公路及橋樑", "機場及港口", "物流及快遞", "貨運代理", "海運設備", "航空貨運及物流", "公共交通", "鐵路及公路", "航運及港口"]
     },
     {
       "id": "other",
       "name": "綜合及其他",
       "industries": ["綜合企業", "投資控股", "其他"]
     }
+  ],
+  "english": [
+    {"en": "Advertising Agencies", "zh": "廣告及公關", "sector": "telecom"},
+    {"en": "Aerospace & Defense", "zh": "航空航天及國防", "sector": "industrial"},
+    {"en": "Agricultural Inputs", "zh": "化肥及農藥", "sector": "materials"},
+    {"en": "Agriculture", "zh": "農業及畜牧", "sector": "consumer"},
+    {"en": "Air Cargo & Logistics", "zh": "航空貨運及物流", "sector": "transport"},
+    {"en": "Airlines", "zh": "航空公司", "sector": "transport"},
+    {"en": "Alcoholic Beverages", "zh": "酒精飲品", "sector": "consumer"},
+    {"en": "Alternative/Renewable Energy", "zh": "可再生能源發電", "sector": "energy"},
+    {"en": "Aluminum", "zh": "鋁業", "sector": "materials"},
+    {"en": "Apparel Manufacturing", "zh": "服裝製造", "sector": "consumer"},
+    {"en": "Apparel Retailers", "zh": "服裝零售", "sector": "consumer"},
+    {"en": "Application Software", "zh": "應用軟件", "sector": "tech"},
+    {"en": "Auto Parts", "zh": "汽車零部件", "sector": "auto"},
+    {"en": "Auto Retailers", "zh": "汽車經銷", "sector": "auto"},
+    {"en": "Automobiles", "zh": "汽車製造", "sector": "auto"},
+    {"en": "Banks", "zh": "銀行", "sector": "finance"},
+    {"en": "Biotechnology", "zh": "生物科技", "sector": "health"},
+    {"en": "Broadcasting", "zh": "廣播及電視", "sector": "telecom"},
+    {"en": "Catering", "zh": "餐飲", "sector": "consumer"},
+    {"en": "Coal", "zh": "煤炭", "sector": "energy"},
+    {"en": "Commercial vehicles and trucks", "zh": "商用車及卡車", "sector": "auto"},
+    {"en": "Computers & Equipment", "zh": "電腦及周邊設備", "sector": "tech"},
+    {"en": "Conglomerates", "zh": "綜合企業", "sector": "other"},
+    {"en": "Construction Materials", "zh": "建築材料", "sector": "industrial"},
+    {"en": "Consumer Electronics", "zh": "消費電子", "sector": "tech"},
+    {"en": "Consumer telecommunications equipment and parts", "zh": "消費通訊設備及零件", "sector": "tech"},
+    {"en": "Copper", "zh": "銅業", "sector": "materials"},
+    {"en": "Credit Services", "zh": "信貸服務", "sector": "finance"},
+    {"en": "Dairy", "zh": "乳製品", "sector": "consumer"},
+    {"en": "Digital Solution Services", "zh": "數碼解決方案服務", "sector": "tech"},
+    {"en": "Diversified Retailers", "zh": "綜合零售", "sector": "consumer"},
+    {"en": "Education", "zh": "教育", "sector": "consumer"},
+    {"en": "Electric Utilities", "zh": "電力", "sector": "energy"},
+    {"en": "Electrical and electronic components", "zh": "電氣及電子零件", "sector": "tech"},
+    {"en": "Energy Storage Systems", "zh": "儲能系統", "sector": "auto"},
+    {"en": "Engineering & Construction", "zh": "建築及工程", "sector": "industrial"},
+    {"en": "Entertainment", "zh": "影視及娛樂", "sector": "telecom"},
+    {"en": "Environmental Services", "zh": "環保及廢物處理", "sector": "industrial"},
+    {"en": "Food Additives", "zh": "食品添加劑", "sector": "consumer"},
+    {"en": "Footwear", "zh": "鞋履及配飾", "sector": "consumer"},
+    {"en": "Forestry & Timber", "zh": "林業及木材", "sector": "materials"},
+    {"en": "Gaming", "zh": "博彩", "sector": "consumer"},
+    {"en": "Gas Utilities", "zh": "燃氣", "sector": "energy"},
+    {"en": "Gold & Precious Metals", "zh": "黃金及貴金屬", "sector": "materials"},
+    {"en": "Heavy Infrastructure", "zh": "重型基建", "sector": "industrial"},
+    {"en": "Heavy Machinery", "zh": "重型機械", "sector": "industrial"},
+    {"en": "Home Appliances", "zh": "家用電器", "sector": "consumer"},
+    {"en": "Home Improvement Retail", "zh": "家居建材零售", "sector": "consumer"},
+    {"en": "Hotels & Resorts", "zh": "酒店及度假村", "sector": "consumer"},
+    {"en": "Industrial Parts & Equipment", "zh": "工業零件及設備", "sector": "industrial"},
+    {"en": "Insurance", "zh": "保險", "sector": "finance"},
+    {"en": "Interactive media and services", "zh": "互動媒體及服務", "sector": "tech"},
+    {"en": "Internet services and infrastructure", "zh": "互聯網服務及基礎設施", "sector": "tech"},
+    {"en": "Investment & Asset Management", "zh": "投資及資產管理", "sector": "finance"},
+    {"en": "Jewelry & Watches", "zh": "珠寶及鐘錶", "sector": "consumer"},
+    {"en": "Livestock Feed", "zh": "畜牧飼料", "sector": "consumer"},
+    {"en": "Meat & Poultry", "zh": "肉類及家禽", "sector": "consumer"},
+    {"en": "Medical Equipment & Supplies", "zh": "醫療設備及用品", "sector": "health"},
+    {"en": "Medical Services", "zh": "醫療服務", "sector": "health"},
+    {"en": "Motorcycles and others", "zh": "摩托車及其他", "sector": "auto"},
+    {"en": "New Energy Materials", "zh": "新能源材料", "sector": "auto"},
+    {"en": "Non-Alcoholic Beverages", "zh": "非酒精飲品", "sector": "consumer"},
+    {"en": "Oil & Gas Producers", "zh": "石油及天然氣", "sector": "energy"},
+    {"en": "Oil & Gas Services", "zh": "油氣設備及服務", "sector": "energy"},
+    {"en": "Online Retailers", "zh": "線上零售", "sector": "consumer"},
+    {"en": "Other Clothing Accessories", "zh": "其他服飾配件", "sector": "consumer"},
+    {"en": "Other Financial Services", "zh": "其他金融服務", "sector": "finance"},
+    {"en": "Other Metals & Minerals", "zh": "其他金屬及礦物", "sector": "materials"},
+    {"en": "Other Retailers", "zh": "其他零售", "sector": "consumer"},
+    {"en": "Other Support Services", "zh": "其他支援服務", "sector": "industrial"},
+    {"en": "Paper & Packaging", "zh": "紙品及包裝", "sector": "industrial"},
+    {"en": "Payment services", "zh": "支付服務", "sector": "finance"},
+    {"en": "Personal Care", "zh": "個人護理", "sector": "consumer"},
+    {"en": "Pharmaceutical Distribution", "zh": "醫藥分銷及零售", "sector": "health"},
+    {"en": "Pharmaceutical and Biotechnology Contract Services", "zh": "醫藥研發及外包服務", "sector": "health"},
+    {"en": "Pharmaceuticals", "zh": "西藥", "sector": "health"},
+    {"en": "Printing & Packaging", "zh": "印刷及包裝", "sector": "industrial"},
+    {"en": "Procurement & Supply Chain Management", "zh": "採購及供應鏈管理", "sector": "industrial"},
+    {"en": "Property Services & Management", "zh": "物業管理", "sector": "property"},
+    {"en": "Public Transport", "zh": "公共交通", "sector": "transport"},
+    {"en": "REITs", "zh": "房地產投資信託基金", "sector": "property"},
+    {"en": "Railroads & Highways", "zh": "鐵路及公路", "sector": "transport"},
+    {"en": "Real Estate Developers", "zh": "地產發展商", "sector": "property"},
+    {"en": "Real Estate Investment", "zh": "地產投資", "sector": "property"},
+    {"en": "Real Estate Services", "zh": "地產代理及服務", "sector": "property"},
+    {"en": "Resorts & Casinos", "zh": "度假村及賭場", "sector": "consumer"},
+    {"en": "Robotics Systems and Solutions", "zh": "機器人系統及方案", "sector": "tech"},
+    {"en": "Satellite & Wireless Services", "zh": "衛星及無線通訊服務", "sector": "telecom"},
+    {"en": "Securities & Brokerage", "zh": "證券及經紀", "sector": "finance"},
+    {"en": "Semiconductor Equipment & Materials", "zh": "半導體設備及材料", "sector": "tech"},
+    {"en": "Semiconductors", "zh": "半導體", "sector": "tech"},
+    {"en": "Shipping & Ports", "zh": "航運及港口", "sector": "transport"},
+    {"en": "Skincare and cosmetics", "zh": "美容及化妝品", "sector": "consumer"},
+    {"en": "Speciality Chemicals", "zh": "特種化工", "sector": "materials"},
+    {"en": "Sports & Recreation Facilities", "zh": "體育及康樂設施", "sector": "consumer"},
+    {"en": "Steel", "zh": "鋼鐵", "sector": "materials"},
+    {"en": "Supermarkets & Convenience Stores", "zh": "超市及便利店", "sector": "consumer"},
+    {"en": "Telecom Services", "zh": "電訊服務", "sector": "telecom"},
+    {"en": "Telecommunication network infrastructure", "zh": "電訊網絡設備", "sector": "telecom"},
+    {"en": "Textiles & Fabrics", "zh": "紡織及布料", "sector": "consumer"},
+    {"en": "Tobacco", "zh": "煙草", "sector": "consumer"},
+    {"en": "Toys & Leisure", "zh": "玩具及休閒用品", "sector": "consumer"},
+    {"en": "Track and train equipment", "zh": "軌道及列車設備", "sector": "industrial"},
+    {"en": "Traditional Chinese Medicine", "zh": "中藥", "sector": "health"},
+    {"en": "Transport & Logistics", "zh": "物流及快遞", "sector": "transport"},
+    {"en": "Travel & Sightseeing", "zh": "旅遊及休閒", "sector": "consumer"},
+    {"en": "Water Utilities", "zh": "水務", "sector": "energy"},
+    {"en": "dietary supplements", "zh": "膳食補充劑", "sector": "health"},
+    {"en": "furniture", "zh": "家具", "sector": "consumer"},
+    {"en": "household consumables", "zh": "家居消耗品", "sector": "consumer"},
+    {"en": "nuclear", "zh": "核電", "sector": "energy"},
+    {"en": "packaged food", "zh": "包裝食品", "sector": "consumer"},
+    {"en": "publishing", "zh": "出版", "sector": "telecom"}
   ],
   "keywords": [
     ["保險", "finance"],
@@ -120,6 +235,32 @@
     ["餐", "consumer"],
     ["娛樂", "consumer"],
     ["旅遊", "consumer"],
-    ["教育", "consumer"]
+    ["教育", "consumer"],
+    ["Bank", "finance"],
+    ["Insurance", "finance"],
+    ["Securities", "finance"],
+    ["Real Estate", "property"],
+    ["Semiconductor", "tech"],
+    ["Software", "tech"],
+    ["Internet", "tech"],
+    ["Pharma", "health"],
+    ["Biotech", "health"],
+    ["Medical", "health"],
+    ["Automobile", "auto"],
+    ["Oil", "energy"],
+    ["Utilities", "energy"],
+    ["Telecom", "telecom"],
+    ["Media", "telecom"],
+    ["Metal", "materials"],
+    ["Steel", "materials"],
+    ["Chemical", "materials"],
+    ["Airline", "transport"],
+    ["Shipping", "transport"],
+    ["Logistics", "transport"],
+    ["Machinery", "industrial"],
+    ["Construction", "industrial"],
+    ["Retail", "consumer"],
+    ["Food", "consumer"],
+    ["Beverage", "consumer"]
   ]
 }

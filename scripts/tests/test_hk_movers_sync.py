@@ -1,14 +1,22 @@
 import json
+import os
 import re
 import sys
+import tempfile
+import types
 import unittest
+import zipfile
 from datetime import datetime
+from io import BytesIO
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 import hk_movers_demo as demo  # noqa: E402
+import hk_movers_names as names_mod  # noqa: E402
+import hk_movers_news as news_mod  # noqa: E402
 import hk_movers_sync as sync  # noqa: E402
 
 MAPPER_MAP = sync.load_sector_map()
@@ -243,6 +251,514 @@ class Demo(unittest.TestCase):
     def test_cli_requires_an_action(self):
         self.assertEqual(sync.main([]), 2)
         self.assertEqual(sync.main(["--push-kv", "--namespace-id", ""]), 2)
+
+
+OPEND_PLATES = [
+    'Advertising Agencies', 'Aerospace & Defense', 'Agricultural Inputs', 'Agriculture', 'Air Cargo & Logistics', 'Airlines',
+    'Alcoholic Beverages', 'Alternative/Renewable Energy', 'Aluminum', 'Apparel Manufacturing', 'Apparel Retailers',
+    'Application Software', 'Auto Parts', 'Auto Retailers', 'Automobiles', 'Banks', 'Biotechnology', 'Broadcasting', 'Catering',
+    'Coal', 'Commercial vehicles and trucks', 'Computers & Equipment', 'Conglomerates', 'Construction Materials',
+    'Consumer Electronics', 'Consumer telecommunications equipment and parts', 'Copper', 'Credit Services', 'Dairy',
+    'Digital Solution Services', 'Diversified Retailers', 'Education', 'Electric Utilities',
+    'Electrical and electronic components', 'Energy Storage Systems', 'Engineering & Construction', 'Entertainment',
+    'Environmental Services', 'Food Additives', 'Footwear', 'Forestry & Timber', 'Gaming', 'Gas Utilities',
+    'Gold & Precious Metals', 'Heavy Infrastructure', 'Heavy Machinery', 'Home Appliances', 'Home Improvement Retail',
+    'Hotels & Resorts', 'Industrial Parts & Equipment', 'Insurance', 'Interactive media and services',
+    'Internet services and infrastructure', 'Investment & Asset Management', 'Jewelry & Watches', 'Livestock Feed',
+    'Meat & Poultry', 'Medical Equipment & Supplies', 'Medical Services', 'Motorcycles and others', 'New Energy Materials',
+    'Non-Alcoholic Beverages', 'Oil & Gas Producers', 'Oil & Gas Services', 'Online Retailers', 'Other Clothing Accessories',
+    'Other Financial Services', 'Other Metals & Minerals', 'Other Retailers', 'Other Support Services', 'Paper & Packaging',
+    'Payment services', 'Personal Care', 'Pharmaceutical Distribution',
+    'Pharmaceutical and Biotechnology Contract Services', 'Pharmaceuticals', 'Printing & Packaging',
+    'Procurement & Supply Chain Management', 'Property Services & Management', 'Public Transport', 'REITs',
+    'Railroads & Highways', 'Real Estate Developers', 'Real Estate Investment', 'Real Estate Services', 'Resorts & Casinos',
+    'Robotics Systems and Solutions', 'Satellite & Wireless Services', 'Securities & Brokerage',
+    'Semiconductor Equipment & Materials', 'Semiconductors', 'Shipping & Ports', 'Skincare and cosmetics',
+    'Speciality Chemicals', 'Sports & Recreation Facilities', 'Steel', 'Supermarkets & Convenience Stores', 'Telecom Services',
+    'Telecommunication network infrastructure', 'Textiles & Fabrics', 'Tobacco', 'Toys & Leisure',
+    'Track and train equipment', 'Traditional Chinese Medicine', 'Transport & Logistics', 'Travel & Sightseeing',
+    'Water Utilities', 'dietary supplements', 'furniture', 'household consumables', 'nuclear', 'packaged food', 'publishing',
+]
+
+
+class EnglishPlates(unittest.TestCase):
+    def test_the_measured_plate_list_has_113_names(self):
+        self.assertEqual(len(OPEND_PLATES), 113)
+        self.assertEqual(len(set(OPEND_PLATES)), 113)
+
+    def test_every_measured_plate_is_mapped_translated_and_grouped(self):
+        m = mapper()
+        table = {e["en"]: e for e in MAPPER_MAP["english"]}
+        self.assertEqual(set(table), set(OPEND_PLATES), "the table holds exactly the measured names")
+        for plate in OPEND_PLATES:
+            zh = m.industry_zh(plate)
+            self.assertRegex(zh, r"[\u4e00-\u9fff]", plate)
+            self.assertNotEqual(zh, "其他", plate)
+            self.assertEqual(zh, table[plate]["zh"])
+            self.assertEqual(m.sector_for(plate), table[plate]["sector"], plate)
+            self.assertEqual(m.sector_for(zh), table[plate]["sector"], f"Chinese alias {zh} agrees with {plate}")
+        self.assertEqual(m.unmapped, set(), "nothing falls through to the fallback by accident")
+
+    def test_plates_spread_over_all_twelve_sectors(self):
+        m = mapper()
+        used = {m.sector_for(p) for p in OPEND_PLATES}
+        self.assertEqual(used, {s["id"] for s in MAPPER_MAP["sectors"]})
+
+    def test_known_examples(self):
+        m = mapper()
+        self.assertEqual((m.industry_zh("Online Retailers"), m.sector_for("Online Retailers")), ("線上零售", "consumer"))
+        self.assertEqual((m.industry_zh("Banks"), m.sector_for("Banks")), ("銀行", "finance"))
+        self.assertEqual(m.sector_for("Semiconductors"), "tech")
+        self.assertEqual(m.sector_for("Automobiles"), "auto")
+        self.assertEqual(m.sector_for("Real Estate Developers"), "property")
+        self.assertEqual(m.sector_for("Oil & Gas Producers"), "energy")
+
+    def test_lookup_is_case_insensitive_and_trims(self):
+        m = mapper()
+        self.assertEqual(m.industry_zh("  DIETARY SUPPLEMENTS "), "膳食補充劑")
+        self.assertEqual(m.sector_for("Nuclear"), "energy")
+
+    def test_chinese_aliases_are_unique_across_sectors(self):
+        seen = {}
+        for s in MAPPER_MAP["sectors"]:
+            for name in s["industries"]:
+                self.assertNotIn(name, seen)
+                seen[name] = s["id"]
+        for e in MAPPER_MAP["english"]:
+            self.assertEqual(seen[e["zh"]], e["sector"], e["en"])
+
+    def test_unknown_english_plate_is_recorded_and_shown_as_other(self):
+        m = mapper()
+        self.assertEqual(m.industry_zh("Space Mining"), "其他")
+        self.assertEqual(m.sector_for("Space Mining"), "other")
+        self.assertIn("Space Mining", m.unmapped)
+        self.assertEqual(m.sector_for("Specialty Retail Chains"), "consumer", "English keyword fallback")
+
+    def test_stock_rows_carry_chinese_industry_and_name(self):
+        m = mapper()
+        r = raw("00700", 110, 100, industry="Interactive media and services", name="TENCENT")
+        r["name_tc"] = "騰訊控股"
+        row = sync.build_stock(r, m)
+        self.assertEqual((row["name"], row["industry"], row["sector"]), ("騰訊控股", "互動媒體及服務", "tech"))
+        plain = sync.build_stock(raw("00005", 110, 100, industry="Banks", name="HSBC HOLDINGS"), m)
+        self.assertEqual((plain["name"], plain["industry"], plain["sector"]), ("HSBC HOLDINGS", "銀行", "finance"))
+
+    def test_heat_map_rows_are_translated_and_merged(self):
+        m = mapper()
+        heat = [
+            {"name": "Banks", "change_pct": 2.0, "turnover_hkd": 3e9, "market_cap_hkd": 6e10, "up": 10, "down": 2, "flat": 0},
+            {"name": "Pharmaceuticals", "change_pct": 1.0, "turnover_hkd": 1e9, "market_cap_hkd": 2e10, "up": 4, "down": 1, "flat": 0},
+            {"name": "Traditional Chinese Medicine", "change_pct": -1.0, "turnover_hkd": 5e8, "market_cap_hkd": 2e10, "up": 1, "down": 3, "flat": 0},
+            {"name": "Mystery Plate", "change_pct": 0.5, "turnover_hkd": 1e8, "market_cap_hkd": 1e9, "up": None, "down": None, "flat": None},
+            {"name": "Another Mystery", "change_pct": 1.5, "turnover_hkd": 1e8, "market_cap_hkd": 1e9, "up": 1, "down": 0, "flat": 0},
+        ]
+        out = {i["name"]: i for i in sync.localize_industries(heat, m)}
+        self.assertEqual(set(out), {"銀行", "西藥", "中藥", "其他"})
+        self.assertEqual(out["銀行"]["up"], 10)
+        merged = out["其他"]
+        self.assertEqual(merged["turnover_hkd"], 2e8)
+        self.assertAlmostEqual(merged["change_pct"], 1.0)
+        self.assertIsNone(merged["up"], "counts stay unknown when any merged row lacks them")
+
+    def test_snapshot_from_english_heat_map_lands_in_chinese_sectors(self):
+        m = mapper()
+        stocks = [sync.build_stock(raw("00001", 110, 100, industry="Banks"), m),
+                  sync.build_stock(raw("00002", 95, 100, industry="Online Retailers"), m)]
+        heat = [{"name": "Banks", "change_pct": 1.0, "turnover_hkd": 3e9, "market_cap_hkd": 6e10, "up": 9, "down": 1, "flat": 0},
+                {"name": "Online Retailers", "change_pct": -1.0, "turnover_hkd": 2e9, "market_cap_hkd": 3e10, "up": 2, "down": 5, "flat": 0}]
+        doc = sync.build_snapshot(now=datetime(2026, 11, 20, 11, 0, tzinfo=sync.HKT), hsi_index=None, hsi_rows=stocks,
+                                  stocks=stocks, industries=heat, news=None, mapper=m)
+        by_id = {s["id"]: s for s in doc["macro_sectors"]}
+        self.assertEqual(by_id["finance"]["industries"][0]["name"], "銀行")
+        self.assertEqual(by_id["consumer"]["industries"][0]["name"], "線上零售")
+        self.assertEqual(by_id["finance"]["leader"]["code"], "00001")
+        self.assertNotRegex(json.dumps(doc, ensure_ascii=False), r"Banks|Online Retailers")
+
+
+class SdkShapes(unittest.TestCase):
+    def test_ok_accepts_two_and_longer_tuples(self):
+        self.assertEqual(sync._ok((0, "data"), "x"), "data")
+        self.assertEqual(sync._ok((0, "df", None, 113), "x"), "df")
+        with self.assertRaises(RuntimeError):
+            sync._ok((-1, "boom"), "x")
+        with self.assertRaises(RuntimeError):
+            sync._ok((-1, "boom", None, 0), "x")
+
+    def test_heat_map_four_tuple_and_count(self):
+        calls = []
+
+        class Ctx:
+            def get_heat_map_data(self, market, count=0):
+                calls.append((market, count))
+                return 0, [{"plate_name": "Banks", "change_rate": 1.2, "turnover": 5e9, "total_market_val": 9e10}], None, 113
+
+        rows = sync.fetch_heatmap(Ctx(), "HK")
+        self.assertEqual(calls, [("HK", 200)])
+        self.assertEqual(rows[0]["name"], "Banks")
+        self.assertEqual(rows[0]["change_pct"], 1.2)
+
+    def test_top_movers_signature_tuple_data_and_security_column(self):
+        calls = []
+
+        class Ctx:
+            def get_top_movers_rank(self, market, sort_dir=None, count=10, offset=None, filter_list=None):
+                calls.append((market, sort_dir, count))
+                rows = [{"security": "HK.00700"}, {"security": "HK.09988"}] if sort_dir == "DESC" else [{"code": "HK.00005"}, {"security": "HK.00700"}]
+                return 0, (len(rows), rows)
+
+        codes = sync.fetch_top_movers(Ctx(), "HK", 50, ("DESC", "ASC"))
+        self.assertEqual(calls, [("HK", "DESC", 50), ("HK", "ASC", 50)])
+        self.assertEqual(codes, ["HK.00700", "HK.09988", "HK.00005"], "both column names read, duplicates dropped")
+
+    def test_top_movers_error_is_raised(self):
+        class Ctx:
+            def get_top_movers_rank(self, *a, **k):
+                return -1, "no rights"
+
+        with self.assertRaises(RuntimeError):
+            sync.fetch_top_movers(Ctx(), "HK", 5, ("DESC",))
+
+    def test_stock_basicinfo_codes(self):
+        class Ctx:
+            def get_stock_basicinfo(self, market, sec_type):
+                assert (market, sec_type) == ("HK", "STOCK")
+                return 0, [{"code": "HK.00700"}, {"code": "HK.00005"}]
+
+        self.assertEqual(sync.fetch_hk_stock_codes(Ctx(), "HK", "STOCK"), {"00700", "00005"})
+
+    def test_candidates_keep_only_hk_dollar_shares(self):
+        names = {"07200": {"name": "二南方恒指", "category": "交易所買賣產品"}, "00700": {"name": "騰訊控股", "category": "股本"}}
+        codes = ["HK.00700", "HK.80700", "HK.07200", "HK.00005", "HK.12345", "HK.09988"]
+        listed = {"00700", "00005", "07200", "80700"}
+        self.assertEqual(sync.keep_candidates(codes, listed, names), ["HK.00700", "HK.00005"])
+        self.assertEqual(sync.keep_candidates(codes, set(), names), ["HK.00700", "HK.00005", "HK.09988"])
+
+    def test_owner_industries_read_english_plate_names(self):
+        class Ctx:
+            def get_owner_plate(self, codes):
+                return 0, [{"code": "HK.00700", "plate_name": "Interactive media and services", "plate_type": "INDUSTRY"},
+                           {"code": "HK.00700", "plate_name": "Hang Seng Index", "plate_type": "OTHER"},
+                           {"code": "HK.00005", "plate_name": "Banks", "plate_type": "PlateType.INDUSTRY"}]
+
+        self.assertEqual(sync.fetch_owner_industries(Ctx(), ["HK.00700", "HK.00005"]),
+                         {"HK.00700": "Interactive media and services", "HK.00005": "Banks"})
+
+
+def make_xlsx(rows):
+    """A minimal workbook: shared strings plus one sheet, like the exchange's list."""
+    strings, index = [], {}
+
+    def sid(text):
+        if text not in index:
+            index[text] = len(strings)
+            strings.append(text)
+        return index[text]
+
+    def col(i):
+        return "ABCDEFGHIJ"[i]
+
+    sheet_rows = []
+    for r, row in enumerate(rows, start=1):
+        cells = "".join(f'<c r="{col(c)}{r}" t="s"><v>{sid(v)}</v></c>' for c, v in enumerate(row) if v != "")
+        sheet_rows.append(f'<row r="{r}">{cells}</row>')
+    ns = 'xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"'
+    sheet = f'<?xml version="1.0"?><worksheet {ns}><sheetData>{"".join(sheet_rows)}</sheetData></worksheet>'
+    shared = f'<?xml version="1.0"?><sst {ns}>' + "".join(f"<si><t>{t}</t></si>" for t in strings) + "</sst>"
+    buf = BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("xl/sharedStrings.xml", shared)
+        zf.writestr("xl/worksheets/sheet1.xml", sheet)
+    return buf.getvalue()
+
+
+SECURITIES = make_xlsx([
+    ["上市證券一覽表"],
+    ["更新日期: 20/11/2026"],
+    [],
+    ["股份代號", "股份名稱", "分類", "買賣單位"],
+    ["00700", "騰訊控股", "股本", "100"],
+    ["09988", "阿里巴巴－Ｗ", "股本", "100"],
+    ["07200", "二南方恒指", "交易所買賣產品", "100"],
+    ["00823", "領展房產基金", "房地產投資信託基金", "500"],
+    ["註: 備註行", "", "", ""],
+])
+
+
+class HkexNames(unittest.TestCase):
+    def test_parse_names_with_standard_library_only(self):
+        names = names_mod.parse_names(SECURITIES)
+        self.assertEqual(names["00700"], {"name": "騰訊控股", "category": "股本"})
+        self.assertEqual(names["09988"]["name"], "阿里巴巴-W", "full-width letters and dash are folded")
+        self.assertEqual(names["07200"]["category"], "交易所買賣產品")
+        self.assertNotIn("註: 備註行", names)
+        self.assertEqual(len(names), 4)
+
+    def test_parse_rejects_a_file_without_the_header(self):
+        with self.assertRaises(ValueError):
+            names_mod.parse_names(make_xlsx([["a", "b"], ["1", "2"]]))
+
+    def test_cache_is_used_for_seven_days_then_refreshed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = Path(tmp) / "names.json"
+            fetches = []
+
+            def fetch(url):
+                fetches.append(url)
+                return SECURITIES
+
+            first = names_mod.load_names(cache, now=1_000_000, fetch=fetch)
+            self.assertEqual(first["00700"]["name"], "騰訊控股")
+            self.assertEqual(len(fetches), 1)
+            self.assertTrue(fetches[0].endswith("ListOfSecurities_c.xlsx"))
+            names_mod.load_names(cache, now=1_000_000 + 6 * 24 * 3600, fetch=fetch)
+            self.assertEqual(len(fetches), 1, "fresh cache, no download")
+            names_mod.load_names(cache, now=1_000_000 + 8 * 24 * 3600, fetch=fetch)
+            self.assertEqual(len(fetches), 2, "stale cache, downloaded again")
+
+    def test_failed_refresh_falls_back_to_stale_cache_then_to_empty(self):
+        def boom(url):
+            raise OSError("offline")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = Path(tmp) / "names.json"
+            self.assertEqual(names_mod.load_names(cache, now=5, fetch=boom), {})
+            names_mod.load_names(cache, now=10, fetch=lambda u: SECURITIES)
+            stale = names_mod.load_names(cache, now=10 + 30 * 24 * 3600, fetch=boom)
+            self.assertEqual(stale["00700"]["name"], "騰訊控股")
+
+    def test_equity_filters(self):
+        names = names_mod.parse_names(SECURITIES)
+        self.assertTrue(names_mod.is_hk_equity_code("HK.00700"))
+        self.assertTrue(names_mod.is_hk_equity_code("09999"))
+        self.assertFalse(names_mod.is_hk_equity_code("HK.80700"), "RMB counter")
+        self.assertFalse(names_mod.is_hk_equity_code("HK.12345"))
+        self.assertFalse(names_mod.is_hk_equity_code("00000"))
+        self.assertTrue(names_mod.is_listed_equity("HK.00700", names))
+        self.assertFalse(names_mod.is_listed_equity("HK.07200", names), "ETF by 分類")
+        self.assertTrue(names_mod.is_listed_equity("HK.00823", names), "REIT")
+        self.assertTrue(names_mod.is_listed_equity("HK.00005", names), "not in the list: range check only")
+
+    def test_tc_names_replace_english_snapshot_names(self):
+        rows = [{"code": "HK.00700", "name": "TENCENT"}, {"code": "HK.00005", "name": "HSBC HOLDINGS"}]
+        sync.apply_tc_names(rows, names_mod.parse_names(SECURITIES))
+        self.assertEqual(rows[0]["name_tc"], "騰訊控股")
+        self.assertNotIn("name_tc", rows[1])
+
+
+RSS = """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel><title>q</title>
+<item><title>Tencent shares rise on results - Reuters</title><link>https://news.example.com/en</link>
+ <pubDate>Fri, 20 Nov 2026 03:00:00 GMT</pubDate><source url="https://www.reuters.com">Reuters</source></item>
+<item><title>富途證券下調騰訊目標價 - 富途新聞</title><link>https://news.example.com/futu</link>
+ <pubDate>Fri, 20 Nov 2026 06:30:00 GMT</pubDate><source url="https://news.futunn.com">富途新聞</source></item>
+<item><title>騰訊控股股價異動 - Yahoo奇摩股市</title><link>https://news.example.com/yahoo</link>
+ <pubDate>Fri, 20 Nov 2026 06:20:00 GMT</pubDate><source url="https://hk.finance.yahoo.com">Yahoo奇摩股市</source></item>
+<item><title>Moomoo 解讀騰訊業績 - 其他</title><link>https://news.example.com/moomoo</link>
+ <pubDate>Fri, 20 Nov 2026 06:10:00 GMT</pubDate><source url="https://www.moomoo.com">其他</source></item>
+<item><title>中國互聯網板塊全面反彈 - 信報財經新聞</title><link>https://news.example.com/sector</link>
+ <pubDate>Fri, 20 Nov 2026 05:00:00 GMT</pubDate><source url="https://www.hkej.com">信報財經新聞</source></item>
+<item><title>騰訊控股回購股份 市場看好 - 香港經濟日報</title><link>https://news.example.com/hket</link>
+ <pubDate>Fri, 20 Nov 2026 02:15:00 GMT</pubDate><source url="https://www.hket.com">香港經濟日報</source></item>
+<item><title>騰訊控股公佈第三季業績 - 明報財經</title><link>https://news.example.com/mingpao</link>
+ <pubDate>Thu, 19 Nov 2026 14:00:00 GMT</pubDate><source url="https://www.mingpao.com">明報財經</source></item>
+<item><title>騰訊控股相關 - 壞連結</title><link>javascript:alert(1)</link>
+ <pubDate>Fri, 20 Nov 2026 07:00:00 GMT</pubDate><source url="https://x.example">壞連結</source></item>
+</channel></rss>""".encode("utf-8")
+
+
+class GoogleNews(unittest.TestCase):
+    def test_query_url_is_hong_kong_traditional_chinese(self):
+        url = news_mod.rss_url("HK.00700", "騰訊控股")
+        self.assertTrue(url.startswith("https://news.google.com/rss/search?q=700+"))
+        self.assertIn("%E9%A8%B0%E8%A8%8A", url)
+        self.assertIn("hl=zh-HK", url)
+        self.assertIn("gl=HK", url)
+        self.assertIn("ceid=HK:zh-Hant", url)
+
+    def test_outlet_suffix_and_time(self):
+        self.assertEqual(news_mod.strip_outlet("標題一二三 - 香港經濟日報", "香港經濟日報"), "標題一二三")
+        self.assertEqual(news_mod.strip_outlet("標題 - 副題 - 某報", "某報"), "標題 - 副題")
+        self.assertEqual(news_mod.strip_outlet("沒有媒體名的標題", ""), "沒有媒體名的標題")
+        self.assertEqual(news_mod.to_hkt_stamp("Fri, 20 Nov 2026 03:00:00 GMT")[0], "2026-11-20 11:00")
+        self.assertEqual(news_mod.to_hkt_stamp("Thu, 19 Nov 2026 20:00:00 +0000")[0], "2026-11-20 04:00")
+        self.assertEqual(news_mod.to_hkt_stamp("garbage"), ("", 0.0))
+
+    def test_vendor_english_unsafe_links_are_skipped_and_newest_named_item_wins(self):
+        item = news_mod.pick_item(news_mod.parse_items(RSS), "騰訊控股")
+        self.assertEqual(item, {
+            "title": "騰訊控股回購股份 市場看好", "source": "香港經濟日報",
+            "published_at_hkt": "2026-11-20 10:15", "url": "https://news.example.com/hket",
+        })
+
+    def test_without_a_named_item_the_newest_usable_one_is_used(self):
+        item = news_mod.pick_item(news_mod.parse_items(RSS), "不存在的公司")
+        self.assertEqual(item["title"], "中國互聯網板塊全面反彈")
+
+    def test_banned_wording_is_filtered_everywhere(self):
+        for it in news_mod.parse_items(RSS):
+            picked = news_mod.pick_item([it], "")
+            if picked:
+                blob = json.dumps(picked, ensure_ascii=False)
+                self.assertNotRegex(blob, r"(?i)futu|富途|moomoo|yahoo|雅虎")
+        only_banned = [i for i in news_mod.parse_items(RSS) if re.search(r"(?i)futu|富途|moomoo|yahoo", i["raw_title"] + i["source"] + i["source_url"])]
+        self.assertEqual(len(only_banned), 3)
+        self.assertIsNone(news_mod.pick_item(only_banned, ""))
+
+    def test_fetch_news_survives_errors_and_empty_feeds(self):
+        def boom(url):
+            raise OSError("offline")
+
+        self.assertIsNone(news_mod.fetch_news("00700", "騰訊控股", fetch=boom))
+        self.assertIsNone(news_mod.fetch_news("00700", "騰訊控股", fetch=lambda u: b"not xml"))
+        empty = b'<?xml version="1.0"?><rss><channel></channel></rss>'
+        self.assertIsNone(news_mod.fetch_news("00700", "騰訊控股", fetch=lambda u: empty))
+        self.assertEqual(news_mod.fetch_news("00700", "騰訊控股", fetch=lambda u: RSS)["source"], "香港經濟日報")
+
+    def test_gateway_news_is_only_a_vendor_free_chinese_backup(self):
+        good = {"title": "騰訊業績理想", "url": "https://example.com/a", "source": "某媒體"}
+        self.assertEqual(news_mod.usable_backup(good), good)
+        self.assertIsNone(news_mod.usable_backup({"title": "Tencent beats", "url": "https://example.com/a", "source": "x"}))
+        self.assertIsNone(news_mod.usable_backup({"title": "騰訊業績理想", "url": "https://news.futunn.com/en/x", "source": "x"}))
+        self.assertIsNone(news_mod.usable_backup({"title": "富途解讀騰訊", "url": "https://example.com/a", "source": "x"}))
+        self.assertIsNone(news_mod.usable_backup({"title": "騰訊業績理想", "url": "javascript:1", "source": "x"}))
+        self.assertIsNone(news_mod.usable_backup(None))
+
+
+class Wrangler(unittest.TestCase):
+    def run_push(self, **kw):
+        calls = []
+        with mock.patch.object(sync.subprocess, "run", side_effect=lambda cmd, check: calls.append(cmd)):
+            sync.push_kv({"schema_version": 1}, "ns123", **kw)
+        return calls[0]
+
+    def test_default_is_npx_wrangler(self):
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("HK_MOVERS_WRANGLER_BIN", None)
+            cmd = self.run_push()
+        self.assertEqual(cmd[:6], ["npx", "wrangler", "kv", "key", "put", "hk-movers:latest.json"])
+        self.assertIn("--namespace-id", cmd)
+        self.assertEqual(cmd[cmd.index("--namespace-id") + 1], "ns123")
+        self.assertIn("--remote", cmd)
+
+    def test_flag_and_environment_choose_the_binary(self):
+        cmd = self.run_push(wrangler_bin="/workspace/digest/tools/cfwrangler")
+        self.assertEqual(cmd[0], "/workspace/digest/tools/cfwrangler")
+        self.assertEqual(cmd[1:3], ["kv", "key"])
+        with mock.patch.dict(os.environ, {"HK_MOVERS_WRANGLER_BIN": "/opt/wr"}):
+            self.assertEqual(self.run_push()[0], "/opt/wr")
+            self.assertEqual(self.run_push(wrangler_bin="/flag/wr")[0], "/flag/wr", "the flag wins")
+        self.assertEqual(sync.wrangler_command("node /opt/wrangler.js")[:2], ["node", "/opt/wrangler.js"])
+
+    def test_cli_exposes_the_flags(self):
+        args = sync.parse_args(["--out", "x.json", "--wrangler-bin", "/w", "--names-cache", "/tmp/n.json"])
+        self.assertEqual((args.wrangler_bin, args.names_cache), ("/w", "/tmp/n.json"))
+
+
+class CollectLive(unittest.TestCase):
+    """End to end with a fake SDK that answers in the shapes measured on a real OpenD."""
+
+    def make_sdk(self):
+        snap = {
+            "HK.00700": dict(code="HK.00700", name="TENCENT", last_price=520.0, prev_close_price=500.0, turnover=2e9, total_market_val=4.8e12, high_price=525.0, low_price=498.0),
+            "HK.00005": dict(code="HK.00005", name="HSBC HOLDINGS", last_price=95.0, prev_close_price=100.0, turnover=1e9, total_market_val=1.7e12, high_price=100.0, low_price=94.0),
+            "HK.09988": dict(code="HK.09988", name="BABA-W", last_price=130.0, prev_close_price=100.0, turnover=3e9, total_market_val=2.2e12, high_price=131.0, low_price=100.0),
+            "HK.01211": dict(code="HK.01211", name="BYD COMPANY", last_price=80.0, prev_close_price=100.0, turnover=2e9, total_market_val=1.0e12, high_price=100.0, low_price=79.0),
+            "HK.80700": dict(code="HK.80700", name="TENCENT-R", last_price=500.0, prev_close_price=400.0, turnover=1e9, total_market_val=4e12, high_price=500.0, low_price=400.0),
+            "HK.07200": dict(code="HK.07200", name="FL2 HSI", last_price=9.0, prev_close_price=5.0, turnover=9e8, total_market_val=5e9, high_price=9.0, low_price=5.0),
+            "HK.800000": dict(code="HK.800000", name="HSI", last_price=23200.0, prev_close_price=23000.0, turnover=2.5e11, total_market_val=0, high_price=23300.0, low_price=22900.0),
+        }
+        plates = {"HK.00700": "Interactive media and services", "HK.00005": "Banks", "HK.09988": "Online Retailers", "HK.01211": "Automobiles"}
+        calls = {"top": [], "heat": [], "snap": []}
+
+        class Ctx:
+            def __init__(self, host, port):
+                self.closed = False
+
+            def get_plate_stock(self, plate):
+                return 0, [{"code": "HK.00700"}, {"code": "HK.00005"}]
+
+            def get_market_snapshot(self, codes):
+                calls["snap"].append(list(codes))
+                return 0, [snap[c] for c in codes if c in snap]
+
+            def get_heat_map_data(self, market, count=0):
+                calls["heat"].append(count)
+                rows = [{"plate_name": "Interactive media and services", "change_rate": 4.0, "turnover": 2e9, "total_market_val": 4.8e12},
+                        {"plate_name": "Banks", "change_rate": -5.0, "turnover": 1e9, "total_market_val": 1.7e12},
+                        {"plate_name": "Online Retailers", "change_rate": 30.0, "turnover": 3e9, "total_market_val": 2.2e12},
+                        {"plate_name": "Automobiles", "change_rate": -20.0, "turnover": 2e9, "total_market_val": 1.0e12}]
+                return 0, rows, None, len(rows)
+
+            def get_stock_basicinfo(self, market, sec_type):
+                return 0, [{"code": c} for c in ("HK.00700", "HK.00005", "HK.09988", "HK.01211", "HK.80700")]
+
+            def get_top_movers_rank(self, market, sort_dir=None, count=10, offset=None, filter_list=None):
+                calls["top"].append(sort_dir)
+                rows = [{"security": "HK.09988"}, {"security": "HK.80700"}, {"security": "HK.07200"}] if sort_dir == "DESC" else [{"security": "HK.01211"}]
+                return 0, (len(rows), rows)
+
+            def get_owner_plate(self, codes):
+                return 0, [{"code": c, "plate_name": plates[c], "plate_type": "INDUSTRY"} for c in codes if c in plates]
+
+            def get_search_news(self, query):
+                return 0, [{"title": "Tencent beats", "url": "https://news.futunn.com/en/1", "source": "futu"}]
+
+            def close(self):
+                self.closed = True
+
+        fake = types.ModuleType("futu")
+        fake.OpenQuoteContext = Ctx
+        fake.Market = types.SimpleNamespace(HK="HK")
+        fake.SecurityType = types.SimpleNamespace(STOCK="STOCK")
+        fake.RankSortDir = types.SimpleNamespace(DESCENDING="DESC", ASCENDING="ASC")
+        return fake, calls
+
+    def test_collect_live_end_to_end(self):
+        fake, calls = self.make_sdk()
+        names = {"00700": {"name": "騰訊控股", "category": "股本"}, "00005": {"name": "滙豐控股", "category": "股本"},
+                 "09988": {"name": "阿里巴巴-W", "category": "股本"}, "01211": {"name": "比亞迪股份", "category": "股本"},
+                 "07200": {"name": "二南方恒指", "category": "交易所買賣產品"}}
+        fetched = []
+
+        def fake_news(code, name, **kw):
+            fetched.append((code, name))
+            return {"title": f"{name}最新消息", "source": "香港經濟日報", "published_at_hkt": "2026-11-20 10:00", "url": "https://example.com/n"}
+
+        args = sync.parse_args(["--out", "x.json", "--news-delay", "0", "--names-cache", "/nonexistent/names.json"])
+        with mock.patch.dict(sys.modules, {"futu": fake}), \
+                mock.patch.object(names_mod, "load_names", return_value=names), \
+                mock.patch.object(news_mod, "fetch_news", side_effect=fake_news):
+            doc = sync.collect_live(args)
+
+        self.assertEqual(calls["heat"], [200])
+        self.assertEqual(calls["top"], ["DESC", "ASC"])
+        snapped = {c for chunk in calls["snap"] for c in chunk}
+        self.assertNotIn("HK.80700", snapped, "RMB counter never reaches the snapshot call")
+        self.assertNotIn("HK.07200", snapped, "ETF never reaches the snapshot call")
+
+        hsi = {r["code"]: r for r in doc["hsi"]["constituents"]}
+        self.assertEqual(set(hsi), {"00700", "00005"})
+        self.assertEqual(hsi["00700"]["name"], "騰訊控股")
+        self.assertEqual(hsi["00700"]["industry"], "互動媒體及服務")
+        self.assertEqual(hsi["00700"]["sector"], "tech")
+        self.assertEqual(doc["hsi"]["index"]["last"], 23200.0)
+        self.assertEqual(doc["hk_market"]["universe_count"], 5)
+        hk_codes = [r["code"] for r in doc["hk_market"]["stocks"]]
+        self.assertEqual(sorted(hk_codes), ["00005", "00700", "01211", "09988"])
+        self.assertEqual([r["code"] for r in doc["movers"]["hk"]["gainers"]][:2], ["09988", "00700"])
+        self.assertEqual(doc["movers"]["hk"]["losers"][0]["code"], "01211")
+        sectors = {s["id"]: s for s in doc["macro_sectors"]}
+        self.assertEqual(sectors["finance"]["industries"][0]["name"], "銀行")
+        self.assertEqual(sectors["consumer"]["industries"][0]["name"], "線上零售")
+        self.assertEqual(doc["news"]["09988"]["title"], "阿里巴巴-W最新消息")
+        self.assertIn(("09988", "阿里巴巴-W"), fetched, "news is searched by the Chinese name")
+        text = json.dumps(doc, ensure_ascii=False)
+        self.assertNotRegex(text, r"(?i)\bfutu|富途|moomoo|yahoo|TENCENT|HSBC|Banks")
+
+    def test_backup_news_never_returns_a_vendor_headline(self):
+        fake, _ = self.make_sdk()
+        ctx = fake.OpenQuoteContext("127.0.0.1", 11111)
+        self.assertIsNone(sync.fetch_news_backup(ctx, "HK.00700", "騰訊控股"))
 
 
 if __name__ == "__main__":
