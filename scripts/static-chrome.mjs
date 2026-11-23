@@ -103,6 +103,7 @@ export function staticChromeError(root = ROOT) {
     const footer = FOOTER_RE.exec(html)?.[2];
     if (footer === undefined) continue;
     for (const href of CANONICAL) if (!footer.includes(`href="${href}"`)) missing.push(`${file} footer -> ${href}`);
+    if (!footer.includes('href="/about/"')) missing.push(`${file} footer -> /about/`);
   }
   const home = readFileSync(join(root, 'index.html'), 'utf8');
   const doors = DOORS_RE.exec(home)?.[2] || '';

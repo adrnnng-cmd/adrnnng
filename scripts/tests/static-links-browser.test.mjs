@@ -14,6 +14,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const OLD = join(root, 'scripts/tests/fixtures/pre-static');
 const SHOT_DIR = process.env.STATIC_SHOT_DIR || '';
 const CANONICAL = ['/backtest/', '/movers/', '/politician-tracker/', '/news/'];
+const FOOTER = [...CANONICAL, '/about/'];
 
 const types = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
@@ -215,7 +216,7 @@ test('scripting off: the home page shows and follows real links to all four sect
     assert.equal(await page.evaluate(`typeof window.__x + String(document.querySelector('[data-site-header] .d')?.textContent)`), 'undefined', 'no script ran');
     const s = await page.evaluate(SNAPSHOT);
     assert.deepEqual(s.doors, CANONICAL, name);
-    assert.deepEqual(s.footer, CANONICAL, name);
+    assert.deepEqual(s.footer, FOOTER, name);
     assert.ok(s.header.includes('/news/') && s.header.includes('/'), name);
     assert.equal(s.overflow, 0, `${name}: no horizontal scroll`);
     assert.equal(s.xs, name === 'desktop' ? 2 : 1, `${name}: two columns on desktop, one on phone`);
@@ -253,7 +254,7 @@ test('scripting on: links stay where they are, none is duplicated or removed, la
     await settle(600);
     const s = await page.evaluate(SNAPSHOT);
     assert.deepEqual(s.doors, CANONICAL, name);
-    assert.deepEqual(s.footer, CANONICAL, name);
+    assert.deepEqual(s.footer, FOOTER, name);
     assert.deepEqual(dupes(s.header), [], `${name}: no duplicate header link`);
     assert.equal(s.toggles, 1, 'one Menu button');
     assert.equal(s.boxes, 1, 'one Morning Report box');
@@ -299,6 +300,7 @@ test('shared pages hydrate in place too: header and footer keep their links, the
   const s = await page.evaluate(`({ header: [...document.querySelectorAll('[data-site-header] a')].map((a) => a.getAttribute('href')), footer: [...document.querySelectorAll('[data-site-footer] .row a')].map((a) => a.getAttribute('href')), current: [...document.querySelectorAll('[aria-current="page"]')].map((a) => a.getAttribute('href')), toggles: document.querySelectorAll('.nav-toggle').length })`);
   assert.deepEqual(dupes(s.header), []);
   assert.deepEqual(s.footer, CANONICAL);
+  assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('[data-site-footer] .fine a')].map((a) => a.getAttribute('href'))`), ['/about/']);
   assert.deepEqual(s.current, ['/backtest/']);
   assert.equal(s.toggles, 1);
   assert.deepEqual(await page.evaluate('window.__removed.filter((h) => h !== null)'), [], 'no link removed while hydrating');
@@ -375,7 +377,7 @@ test('reload and Back keep one copy of every link', { timeout: 120000 }, async (
     await settle(500);
     const s = await page.evaluate(SNAPSHOT);
     assert.deepEqual(s.doors, CANONICAL, label);
-    assert.deepEqual(s.footer, CANONICAL, label);
+    assert.deepEqual(s.footer, FOOTER, label);
     assert.deepEqual(dupes(s.header), [], label);
     assert.equal(s.toggles, 1, label);
     assert.equal(s.overflow, 0, label);

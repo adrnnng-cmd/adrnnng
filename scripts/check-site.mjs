@@ -182,6 +182,7 @@ const indexable = [
   ['backtest/index.html', `${SITE_ORIGIN}/backtest/`],
   ['politician-tracker/index.html', `${SITE_ORIGIN}/politician-tracker/`],
   ['movers/index.html', `${SITE_ORIGIN}/movers/`],
+  ['about/index.html', `${SITE_ORIGIN}/about/`],
 ];
 const titles = [];
 for (const [file, canonical] of indexable) {

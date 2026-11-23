@@ -72,6 +72,8 @@ function renderFooter(el, reg) {
   const want = document.createElement('div');
   want.innerHTML = footerInner(reg);
   if (!sameList(hrefsOf(el), hrefsOf(want))) el.innerHTML = footerInner(reg);
+  const aboutLink = '<a href="/about/">About</a>';
+  if (!el.querySelector('.fine')?.innerHTML.includes(aboutLink)) el.querySelector('.fine')?.insertAdjacentHTML('beforeend', ` ${aboutLink}`);
 }
 
 export async function mountChrome() {
