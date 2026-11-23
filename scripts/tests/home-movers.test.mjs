@@ -36,15 +36,10 @@ test('home door order is Backtest, Movers, Politician Tracker, Morning Report an
   assert.match(js, /id === 'movers' \? '港股異動'/);
 });
 
-test('Movers thumbnail is a static, colourless grid with no text or numbers', () => {
-  const svg = read('assets/img/doors/movers.svg');
+test('Movers thumbnail is a static grid with no text or numbers (its colours are checked in home-door-hover.test.mjs)', () => {
+  const src = /src: '(\/assets\/img\/doors\/[^']+\.svg)'/.exec(read('assets/js/home.js'))?.[1];
+  const svg = read(src.slice(1));
   assert.doesNotMatch(svg, /<text|<script|https?:\/\/(?!www\.w3\.org)/);
-  const colours = [...svg.matchAll(/#[0-9a-fA-F]{3,6}\b/g)].map((m) => m[0].toLowerCase());
-  for (const c of colours) {
-    const h = c.length === 4 ? c.slice(1).split('').map((x) => x + x).join('') : c.slice(1);
-    assert.equal(h.slice(0, 2), h.slice(2, 4), c);
-    assert.equal(h.slice(2, 4), h.slice(4, 6), c);
-  }
 });
 
 test('subpage heading is Movers with the 港股異動與板塊熱力圖 subtitle; URL and canonical unchanged', () => {

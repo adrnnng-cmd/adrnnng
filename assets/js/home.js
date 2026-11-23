@@ -170,7 +170,7 @@ async function renderDoors() {
         });
       } else if (t.id === 'movers') {
         body = doorPhoto({
-          src: '/assets/img/doors/movers.svg',
+          src: '/assets/img/doors/movers-heat.svg',
           title: 'HSI · 升跌榜 · 板塊熱力圖',
           sub: '約 5–6 分鐘更新快照',
         });
