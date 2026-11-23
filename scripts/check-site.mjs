@@ -5,7 +5,7 @@
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join, dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { bootStampError } from './home-assets.mjs';
+import { stampError } from './asset-versions.mjs';
 import { indexingHeaderErrors } from './headers.mjs';
 import { findIndexNowKey } from './indexnow.mjs';
 import { SITE_ORIGIN } from './seo-meta.mjs';
@@ -156,7 +156,7 @@ if (!key) err('IndexNow key file missing at the site root (<hex>.txt whose conte
 const headerText = existsSync(join(ROOT, '_headers')) ? readFileSync(join(ROOT, '_headers'), 'utf8') : '';
 for (const problem of indexingHeaderErrors(headerText, { keyFile: key?.file })) err(problem);
 {
-  const problem = bootStampError(ROOT);
+  const problem = stampError(ROOT);
   if (problem) err(problem);
 }
 const llmsPath = join(ROOT, 'llms.txt');

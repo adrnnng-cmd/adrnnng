@@ -14,7 +14,8 @@
 
 # Modules and stylesheets pair with /assets/tools.json (five minutes), so they revalidate on the same horizon
 # instead of Pages' four-hour default. An old module cached before this rule keeps its old max-age; the
-# landing page gets past that with the ?v= boot URL in index.html (scripts/home-assets.mjs).
+# pages get past that with the content-hash ?v= stamps on every script, stylesheet and import
+# (scripts/asset-versions.mjs).
 /assets/js/*
   Cache-Control: public, max-age=300, must-revalidate
 

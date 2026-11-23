@@ -1,7 +1,7 @@
-import { loadRegistry, esc } from './site.js';
-import { newsDoorCaption, parseLatest } from './latest.js';
-import { memberPhotoImg } from './member-photo.js';
-import { tdSequential } from '/backtest/strategies/td-sequential.js';
+import { loadRegistry, esc } from './site.js?v=c486917671';
+import { newsDoorCaption, parseLatest } from './latest.js?v=86aa2415e4';
+import { memberPhotoImg } from './member-photo.js?v=9c2f4ca5f0';
+import { tdSequential } from '/backtest/strategies/td-sequential.js?v=a6aead052c';
 
 const PRICES = '/backtest/data/prices/';
 const TAPE = ['^GSPC', '^NDX', '^HSI', '2800.HK', '0700.HK', 'AAPL', 'NVDA', 'MSFT', 'TSLA', 'GLD', 'BTC-USD'];

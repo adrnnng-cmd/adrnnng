@@ -3,7 +3,7 @@
 //   <script type="module" src="/assets/js/site.js"></script>
 // Header nav and footer links come from /assets/tools.json.
 // Pages with a footer also get the newsletter end card, unless <body data-newsletter="off">.
-import { mountNewsletterCard } from './newsletter.js';
+import { mountNewsletterCard } from './newsletter.js?v=b973a0dd5f';
 
 const REGISTRY_URL = '/assets/tools.json';
 let registryPromise = null;

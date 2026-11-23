@@ -5,8 +5,10 @@ import {
   membersLabels, membersWindow, reconcileSelection, returnRefs, rosterNotes, safeUrl, sectorName, shortRefDate, sortAnnouncement,
   sessionAt, squarify, tone,
   usableNews, validateSnapshot, weightedChange,
-} from './lib.js';
-import { createRefresher } from './poll.js';
+} from './lib.js?v=a02e146830';
+import { createRefresher } from './poll.js?v=91e94d5fc4';
+
+document.documentElement.dataset.hkmBoot = 'ready';
 
 const LIVE_URL = '/movers/data/latest';
 const SAMPLE_URL = '/movers/data/sample.json';
@@ -600,21 +602,26 @@ const refresher = polling
 let starting = false;
 let startFailedAt = 0;
 
+const SLOW_LOAD_MS = 4_000;
+
 async function start() {
   if (starting) return;
   starting = true;
-  if (!state.data) body.innerHTML = '<p class="hkm-loading">資料載入中…</p>';
+  const loading = (text) => { if (!state.data) body.innerHTML = `<p class="hkm-loading" role="status">${text}</p>`; };
+  loading('資料載入中…');
+  const slow = setTimeout(() => loading('資料載入中…網絡較慢，仍在嘗試取得最新快照（最長約 20 秒）。'), SLOW_LOAD_MS);
   try {
     state.load = await loadData();
     state.data = state.load.data;
     startFailedAt = 0;
-    refresher?.seed();
+    refresher?.seed({ failed: state.load.fellBack });
     render();
   } catch (e) {
     startFailedAt = Date.now();
     renderError('請稍後再試，或重新整理此頁。');
     console.warn('movers:', e);
   } finally {
+    clearTimeout(slow);
     starting = false;
   }
 }

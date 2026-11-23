@@ -362,10 +362,23 @@ The two index views also have a full constituents table. No quote vendor is name
   says it follows the weekday schedule and hedges the "no snapshot today" and "earlier than the close" notes for a
   possible holiday or half day. If the collector ever publishes OpenD's own market state, it can replace that guess;
   the collector is not changed here.
+- **Cached modules and first load.** The production zone serves `/assets` and `/movers` JS/CSS with a four-hour
+  browser cache whatever `_headers` says (the Pages origin sends 300 s or 0 s; the zone overrides it), and each file
+  expires on its own clock, so a new `app.js` could meet a cached old `lib.js`, fail to link
+  (`does not provide an export named …`) and leave 資料載入中… on screen through normal reloads. Headers cannot fix
+  that, so every local script, stylesheet and module import carries `?v=<hash>` (`node scripts/asset-versions.mjs`
+  writes it, `--check` and `npm run check` fail when stale). A module's hash covers its source with its imports' hashes
+  already inside, so changing `lib.js` also moves the URLs of `poll.js` and `app.js`. HTML always revalidates, so new
+  HTML names a whole new graph. Keep the committed `?v=` values when the external assemble copies the files. A classic
+  script in `movers/index.html` says 頁面程式未能載入 with a reload button when the module graph fails or nothing has
+  booted after 12 s. The first load shows a slow-network notice after 4 s; if it fell back to the demo, the refresher
+  starts in back-off (`seed({ failed: true })`) and retries instead of waiting for the next quiet interval. Real-Chrome
+  regressions with a zone-like 4 h TTL are in `scripts/tests/movers-cache.test.mjs` and `home-boot-cache.test.mjs`.
 
 ```
 movers/index.html, app.js, movers.css         page, shared chrome (theme.css + site.js)
 movers/lib.js                                 pure helpers: formatting, ranking, sorting, freshness gates, validation, treemap layout
+scripts/asset-versions.mjs                    content-hash ?v= stamps for scripts, stylesheets and imports (--check in npm run check)
 movers/poll.js                                background refresh controller (no overlap, backoff, recovery)
 movers/data/sample.json                       labelled demo document (data_source "demo"), also the offline fallback
 functions/movers/data/latest.js               Pages Function for GET /movers/data/latest (the shared implementation)
