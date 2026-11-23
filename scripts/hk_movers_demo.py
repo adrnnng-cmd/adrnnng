@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Builds hk-movers/data/sample.json, the clearly labelled demo document.
+"""Builds movers/data/sample.json, the clearly labelled demo document.
 
 The numbers are synthetic and seeded, so the file is reproducible:
 
-    python3 scripts/hk_movers_demo.py --out hk-movers/data/sample.json
+    python3 scripts/hk_movers_demo.py --out movers/data/sample.json
 
 Company names are real listings, but prices, market caps, turnover, moves and
 headlines are made up. The page and the API both mark this data as a demo.
@@ -14,16 +14,33 @@ from __future__ import annotations
 import argparse
 import random
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import hk_movers_returns as returns_mod  # noqa: E402
+import hk_movers_rosters as rosters_mod  # noqa: E402
 import hk_movers_sync as sync  # noqa: E402
 
 SEED = 20261120
 DEMO_NOW = datetime(2026, 11, 20, 16, 10, 0, tzinfo=sync.HKT)
 HSI_PREV_CLOSE = 23150.62
+HSTECH_PREV_CLOSE = 5412.37
+# Demo only: one HSTECH member has no quote, so the page shows how an unavailable member looks.
+NO_QUOTE_DEMO = {"01698"}
+# Demo industry for roster members that UNIVERSE does not list, by the announcement's own sector heading.
+GROUP_INDUSTRY = {
+    "Financials": "銀行",
+    "Consumer Discretionary and Consumer Staples": "食品",
+    "Energy, Materials, Industrials and Conglomerates": "有色金屬",
+    "Telecommunications and Utilities": "電力",
+    "Healthcare": "西藥",
+    "Properties & Construction": "地產發展商",
+    "Information Technology": "軟件服務",
+    "Consumer Discretionary": "電子商貿",
+    "Industrials": "電氣設備",
+}
 NEWS_URL = "https://news-chart.com/news/"
 NEWS_SOURCE = "示範資料（非真實新聞）"
 NOTICE = "此為示範數據：價格、成交額、市值與新聞標題均為模擬，並非即時報價或真實報導。"
@@ -252,14 +269,41 @@ def _dedupe(rows):
     return out
 
 
+def _weekdays(start: str, end: str) -> list[str]:
+    day, last, out = datetime.fromisoformat(start), datetime.fromisoformat(end), []
+    while day <= last:
+        if day.weekday() < 5:
+            out.append(day.strftime("%Y-%m-%d"))
+        day += timedelta(days=1)
+    return out
+
+
 def build_demo() -> dict:
     rng = random.Random(SEED)
     mapper = sync.SectorMapper(sync.load_sector_map())
+    rosters = rosters_mod.load_rosters()
+    chosen = {}
+    for key in rosters_mod.INDEX_IDS:
+        version, upcoming = rosters_mod.select_version(rosters["indices"][key], DEMO_NOW.date())
+        chosen[key] = {"members": version["members"], "meta": rosters_mod.roster_meta(version, upcoming, rosters["source"])}
+    hsi_codes = {m["code"] for m in chosen["hsi"]["members"]}
+    hstech_codes = {m["code"] for m in chosen["hstech"]["members"]}
     rows = _dedupe(UNIVERSE)
+    listed = {r[0] for r in rows}
+    for key, wide in (("hsi", 350), ("hstech", 120)):
+        for m in chosen[key]["members"]:
+            if m["code"] in listed:
+                continue
+            listed.add(m["code"])
+            group = next((x["group"] for ix in rosters["indices"][key]["versions"] for x in ix["members"] if x["code"] == m["code"]), None)
+            rows.append((m["code"], m["name"], GROUP_INDUSTRY.get(group, "軟件服務"),
+                         round(rng.uniform(4, 160), 1), max(8.0, round(m["weight_pct"] * wide)), True))
+    rows = [r for r in rows if r[0] not in NO_QUOTE_DEMO]
     shocks = {sid: rng.gauss(0.2, 1.5) for sid in mapper.order}
 
     raw_rows = []
-    for code, name, industry, price, mcap_bn, in_hsi in rows:
+    for code, name, industry, price, mcap_bn, _flag in rows:
+        in_hsi = code in hsi_codes
         sector = mapper.sector_for(industry)
         pct = shocks[sector] * 0.9 + rng.gauss(0, 2.4 if not in_hsi else 1.5)
         pct = max(-13.0, min(15.0, pct))
@@ -279,9 +323,24 @@ def build_demo() -> dict:
             "_hsi": in_hsi,
         })
 
-    built = [(sync.build_stock(r, mapper), r["_hsi"]) for r in raw_rows]
-    stocks = [s for s, _ in built if s]
-    hsi_rows = [s for s, in_hsi in built if s and in_hsi]
+    built = [sync.build_stock(r, mapper) for r in raw_rows]
+    stocks = [s for s in built if s]
+    hsi_rows = [s for s in stocks if s["code"] in hsi_codes]
+    hstech_rows = [s for s in stocks if s["code"] in hstech_codes]
+
+    calendar = _weekdays("2025-12-01", DEMO_NOW.strftime("%Y-%m-%d"))
+    refs = returns_mod.reference_dates(calendar)
+    returns = {}
+    for row in hsi_rows + hstech_rows:
+        returns[row["code"]] = {
+            "ret_5d": round(row["change_pct"] * 0.6 + rng.gauss(0.3, 2.2), 4),
+            "ret_1m": round(rng.gauss(1.0, 6.5), 4),
+            "ret_ytd": round(rng.gauss(9.0, 24.0), 4),
+        }
+    tech_cap = sum(r["market_cap_hkd"] for r in hstech_rows)
+    tech_move = sum(r["change_pct"] * r["market_cap_hkd"] for r in hstech_rows) / tech_cap if tech_cap else 0.0
+    members = {key: sync.build_members(c["members"], rows_, returns)
+               for key, c, rows_ in (("hsi", chosen["hsi"], hsi_rows), ("hstech", chosen["hstech"], hstech_rows))}
 
     news = {}
     for row in stocks:
@@ -297,6 +356,11 @@ def build_demo() -> dict:
         now=DEMO_NOW,
         hsi_index={"prev_close": HSI_PREV_CLOSE},
         hsi_rows=hsi_rows,
+        hstech_index={"prev_close": HSTECH_PREV_CLOSE, "last": round(HSTECH_PREV_CLOSE * (1 + tech_move / 100.0), 2)},
+        hstech_rows=hstech_rows,
+        members=members,
+        roster_meta={k: c["meta"] for k, c in chosen.items()},
+        returns_ref={"basis": "adjusted_close", **refs},
         stocks=stocks,
         industries=sync.industries_from_stocks(stocks),
         news=news,

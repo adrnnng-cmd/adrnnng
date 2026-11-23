@@ -2,9 +2,9 @@
 // document, re-timed to "now" and reshaped so ranking and breadth edge cases are easy to produce.
 
 import { readFileSync } from 'node:fs';
-import { breadth, tone } from '../../hk-movers/lib.js';
+import { breadth, tone } from '../../movers/lib.js';
 
-const sample = JSON.parse(readFileSync(new URL('../../hk-movers/data/sample.json', import.meta.url), 'utf8'));
+const sample = JSON.parse(readFileSync(new URL('../../movers/data/sample.json', import.meta.url), 'utf8'));
 
 export const hktString = (ms, withSeconds = true) => {
   const iso = new Date(ms + 8 * 3600e3).toISOString();
@@ -31,6 +31,15 @@ function reshape(rows, { up, down, flat }) {
   });
 }
 
+/** Keep the full constituents table consistent with the (reshaped) priced rows; unavailable members stay unavailable. */
+function syncMembers(block) {
+  const byCode = new Map(block.constituents.map((r) => [r.code, r]));
+  block.members = block.members.map((m) => {
+    const r = byCode.get(m.code);
+    return r ? { ...m, last: r.last, prev_close: r.prev_close, change_pct: r.change_pct, market_cap_hkd: r.market_cap_hkd } : m;
+  });
+}
+
 function resectors(doc) {
   const stocks = doc.hk_market.stocks;
   for (const s of doc.macro_sectors) {
@@ -51,9 +60,10 @@ function resectors(doc) {
  * @param {number} o.now           epoch ms the snapshot is stamped with
  * @param {object} [o.hsi]         {up, down, flat} for the 95 constituents (default 5 / 89 / 1)
  * @param {object} [o.hk]          {up, down, flat} for the qualified HK stocks (default 7 up, rest down)
+ * @param {object} [o.hstech]      {up, down, flat} for the priced HSTECH constituents (default 21 up, 7 down, 1 flat)
  * @param {string} [o.session]
  */
-export function liveDoc({ now, hsi = { up: 5, down: 89, flat: 1 }, hk = null, session = 'afternoon' }) {
+export function liveDoc({ now, hsi = { up: 5, down: 89, flat: 1 }, hk = null, hstech = { up: 21, down: 7, flat: 1 }, session = 'afternoon' }) {
   const doc = JSON.parse(JSON.stringify(sample));
   doc.data_source = 'live';
   delete doc.notice;
@@ -67,6 +77,14 @@ export function liveDoc({ now, hsi = { up: 5, down: 89, flat: 1 }, hk = null, se
   idx.change = Math.round(idx.prev_close * idx.change_pct) / 100;
   idx.last = Math.round((idx.prev_close + idx.change) * 100) / 100;
 
+  doc.hstech.constituents = reshape(doc.hstech.constituents, hstech);
+  doc.hstech.breadth = breadth(doc.hstech.constituents);
+  const tech = doc.hstech.index;
+  tech.change_pct = 0.84;
+  tech.change = Math.round(tech.prev_close * tech.change_pct) / 100;
+  tech.last = Math.round((tech.prev_close + tech.change) * 100) / 100;
+  for (const key of ['hsi', 'hstech']) syncMembers(doc[key]);
+
   const n = doc.hk_market.stocks.length;
   const shape = hk || { up: 7, down: n - 8, flat: 1 };
   doc.hk_market.stocks = reshape(doc.hk_market.stocks, shape);
@@ -79,9 +97,11 @@ export function liveDoc({ now, hsi = { up: 5, down: 89, flat: 1 }, hk = null, se
   doc.movers = {
     hsi: { gainers: rank(doc.hsi.constituents, 'up'), losers: rank(doc.hsi.constituents, 'down') },
     hk: { gainers: rank(doc.hk_market.stocks, 'up'), losers: rank(doc.hk_market.stocks, 'down') },
+    hstech: { gainers: rank(doc.hstech.constituents, 'up'), losers: rank(doc.hstech.constituents, 'down') },
   };
 
-  const listed = [...doc.movers.hsi.gainers, ...doc.movers.hsi.losers, ...doc.movers.hk.gainers, ...doc.movers.hk.losers];
+  const listed = [...doc.movers.hsi.gainers, ...doc.movers.hsi.losers, ...doc.movers.hk.gainers, ...doc.movers.hk.losers,
+    ...doc.movers.hstech.gainers, ...doc.movers.hstech.losers];
   const news = {};
   listed.forEach((r, i) => {
     const prior = sample.news[r.code];

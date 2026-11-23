@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createRefresher } from '../../hk-movers/poll.js';
-import { POLL_MS, reconcileSelection } from '../../hk-movers/lib.js';
+import { createRefresher } from '../../movers/poll.js';
+import { POLL_MS, reconcileSelection } from '../../movers/lib.js';
 
 const T0 = Date.parse('2026-11-20T10:00:00+08:00');
 const doc = (stamp, extra = {}) => ({ data_source: 'live', updated_at_hkt: stamp, ...extra });
@@ -183,7 +183,7 @@ test('user choices survive a refresh: only a vanished sector or stock is cleared
 
 test('app wiring: one interval, visibility/focus/online recovery, strict refresh loader', async () => {
   const { readFileSync } = await import('node:fs');
-  const app = readFileSync(new URL('../../hk-movers/app.js', import.meta.url), 'utf8');
+  const app = readFileSync(new URL('../../movers/app.js', import.meta.url), 'utf8');
   assert.match(app, /createRefresher\(/);
   assert.match(app, /setInterval\(pageTick, TICK_MS\)/);
   assert.match(app, /addEventListener\('visibilitychange', pageRecover\)/);
@@ -192,6 +192,6 @@ test('app wiring: one interval, visibility/focus/online recovery, strict refresh
   assert.match(app, /loadData\(\{ strict: true \}\)/);
   assert.match(app, /cache: 'no-store'/);
   assert.match(app, /AbortController/);
-  assert.match(app, /reconcileSelection\(state, doc\)/);
+  assert.match(app, /reconcileSelection\(state, doc, state\.view\)/);
   assert.equal((app.match(/setInterval\(/g) || []).length, 1, 'a single timer');
 });

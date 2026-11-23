@@ -1,3 +1,4 @@
+import importlib.util
 import json
 import os
 import re
@@ -230,11 +231,11 @@ class Snapshot(unittest.TestCase):
 
 class Demo(unittest.TestCase):
     def test_committed_sample_is_the_seeded_output(self):
-        committed = json.loads((ROOT / "hk-movers/data/sample.json").read_text(encoding="utf-8"))
+        committed = json.loads((ROOT / "movers/data/sample.json").read_text(encoding="utf-8"))
         self.assertEqual(demo.build_demo(), committed, "run: python3 scripts/hk_movers_demo.py --out hk-movers/data/sample.json")
 
     def test_sample_is_marked_and_vendor_free(self):
-        text = (ROOT / "hk-movers/data/sample.json").read_text(encoding="utf-8")
+        text = (ROOT / "movers/data/sample.json").read_text(encoding="utf-8")
         doc = json.loads(text)
         self.assertEqual(doc["data_source"], "demo")
         self.assertIn("示範", doc["notice"])
@@ -866,7 +867,10 @@ class NewsFreshness(unittest.TestCase):
         fresh_stamp = datetime.now(HKT).strftime("%Y-%m-%d %H:%M")
         fresh = {"title": "新鮮消息", "source": "某報", "published_at_hkt": fresh_stamp, "url": "https://example.com/new"}
         fake, _ = CollectLive().make_sdk()
-        args = sync.parse_args(["--out", "x.json", "--news-delay", "0", "--names-cache", "/nonexistent/names.json"])
+        roster_path = CollectLive.roster_file()
+        self.addCleanup(os.unlink, roster_path)
+        args = sync.parse_args(["--out", "x.json", "--news-delay", "0", "--names-cache", "/nonexistent/names.json",
+                                "--rosters", roster_path, "--history-batch", "0"])
         with mock.patch.dict(sys.modules, {"futu": fake}), \
                 mock.patch.object(names_mod, "load_names", return_value=CollectLive.NAMES), \
                 mock.patch.object(news_mod, "fetch_news", side_effect=lambda code, name, **kw: old if code == "00700" else fresh):
@@ -921,6 +925,18 @@ class Wrangler(unittest.TestCase):
         self.assertEqual((args.wrangler_bin, args.names_cache), ("/w", "/tmp/n.json"))
 
 
+def _weekdays(start, end):
+    day, last, out = datetime.fromisoformat(start), datetime.fromisoformat(end), []
+    while day <= last:
+        if day.weekday() < 5:
+            out.append(day.strftime("%Y-%m-%d"))
+        day += timedelta(days=1)
+    return out
+
+
+HISTORY_DAYS = _weekdays("2025-12-01", "2026-11-23")
+
+
 class CollectLive(unittest.TestCase):
     """End to end with a fake SDK that answers in the shapes measured on a real OpenD."""
 
@@ -940,10 +956,11 @@ class CollectLive(unittest.TestCase):
             "HK.80700": dict(code="HK.80700", name="TENCENT-R", last_price=500.0, prev_close_price=400.0, turnover=1e9, total_market_val=4e12, high_price=500.0, low_price=400.0),
             "HK.07200": dict(code="HK.07200", name="FL2 HSI", last_price=9.0, prev_close_price=5.0, turnover=9e8, total_market_val=5e9, high_price=9.0, low_price=5.0),
             "HK.800000": dict(code="HK.800000", name="HSI", last_price=23200.0, prev_close_price=23000.0, turnover=2.5e11, total_market_val=nan, high_price=23300.0, low_price=22900.0),
+            "HK.800700": dict(code="HK.800700", name="HSTECH", last_price=5100.0, prev_close_price=5000.0, turnover=8e10, total_market_val=nan, high_price=5150.0, low_price=4990.0),
         }
         plates = {"HK.00700": "Interactive media and services", "HK.00005": "Banks", "HK.09988": "Online Retailers",
                   "HK.01211": "Automobiles", "HK.02020": "Textiles and Apparel"}
-        calls = {"top": [], "heat": [], "snap": [], "owner": []}
+        calls = {"top": [], "heat": [], "snap": [], "owner": [], "kline": []}
 
         class Ctx:
             def __init__(self, host, port):
@@ -980,6 +997,14 @@ class CollectLive(unittest.TestCase):
                 rows += [{"code": c, "plate_name": "Hang Seng Index", "plate_type": "OTHER"} for c in codes]
                 return 0, rows
 
+            def request_history_kline(self, code, start=None, end=None, ktype=None, autype=None, max_count=None, page_req_key=None):
+                calls["kline"].append((code, start, end, ktype, autype))
+                if code == "HK.00998":
+                    return -1, "quota exhausted", None
+                days = [d for d in HISTORY_DAYS if start <= d <= end]
+                rows = [{"code": code, "time_key": f"{d} 00:00:00", "close": 100.0 + 0.5 * i} for i, d in enumerate(days)]
+                return 0, rows, None
+
             def get_search_news(self, query):
                 return 0, [{"title": "Tencent beats", "url": "https://news.futunn.com/en/1", "source": "futu"}]
 
@@ -991,6 +1016,8 @@ class CollectLive(unittest.TestCase):
         fake.Market = types.SimpleNamespace(HK="HK")
         fake.SecurityType = types.SimpleNamespace(STOCK="STOCK")
         fake.RankSortDir = types.SimpleNamespace(DESCENDING="DESC", ASCENDING="ASC")
+        fake.KLType = types.SimpleNamespace(K_DAY="K_DAY")
+        fake.AuType = types.SimpleNamespace(QFQ="qfq")
         return fake, calls
 
     NAMES = {"00700": {"name": "騰訊控股", "category": "股本"}, "00005": {"name": "滙豐控股", "category": "股本"},
@@ -999,8 +1026,32 @@ class CollectLive(unittest.TestCase):
              "00998": {"name": "空值行", "category": "股本"}, "00823": {"name": "領展房產基金", "category": "房地產投資信託基金"},
              "07200": {"name": "二南方恒指", "category": "交易所買賣產品"}}
 
-    def run_collect(self, listed=LISTED):
+    @staticmethod
+    def roster_file():
+        member = lambda code, name, w: {"code": code, "name": name, "name_en": name, "weight_pct": w, "faf_pct": 100.0, "group": "x", "page": 4}  # noqa: E731
+        version = lambda status, start, members, **extra: {  # noqa: E731
+            "id": f"{status}", "status": status, "effective_from": start, "weights_column": "Before", "weights_as_of": "2026-11-18",
+            "weights_note": "fixture", "source_pages": "Appendix 1", "count": len(members), "members": members, **extra}
+        doc = {"schema": 1, "source": {"publisher": "Hang Seng Indexes Company", "announced": "2026-11-20", "url": "https://example.test/review.pdf",
+                                       "weights_reference_date": "2026-11-18"},
+               "indices": {
+                   "hsi": {"name": "恒生指數", "versions": [version("current", None, [member("00700", "騰訊控股", 60.0), member("00005", "滙豐控股", 30.0), member("00823", "領展房產基金", 10.0)])]},
+                   "hstech": {"name": "恒生科技指數", "versions": [
+                       version("current", None, [member("00700", "騰訊控股", 50.0), member("09988", "阿里巴巴-W", 30.0), member("01810", "小米集團-W", 20.0)]),
+                       version("announced", "2999-01-01", [member("00700", "騰訊控股", 40.0), member("09988", "阿里巴巴-W", 30.0), member("01810", "小米集團-W", 20.0), member("00999", "薄成交", 10.0)],
+                               added=["00999"], removed=[])]}}}
+        handle = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8")
+        json.dump(doc, handle, ensure_ascii=False)
+        handle.close()
+        return handle.name
+
+    def run_collect(self, listed=LISTED, extra=(), now=None, real_rosters=False):
         fake, calls = self.make_sdk(listed)
+        if real_rosters:
+            roster_path = str(ROOT / "scripts" / "hk-movers" / "index-rosters.json")
+        else:
+            roster_path = self.roster_file()
+            self.addCleanup(os.unlink, roster_path)
         fetched = []
 
         def fake_news(code, name, **kw):
@@ -1008,11 +1059,12 @@ class CollectLive(unittest.TestCase):
             stamp = datetime.now(HKT).strftime("%Y-%m-%d %H:%M")
             return {"title": f"{name}最新消息", "source": "香港經濟日報", "published_at_hkt": stamp, "url": "https://example.com/n"}
 
-        args = sync.parse_args(["--out", "x.json", "--news-delay", "0", "--names-cache", "/nonexistent/names.json"])
+        args = sync.parse_args(["--out", "x.json", "--news-delay", "0", "--names-cache", "/nonexistent/names.json",
+                                "--rosters", roster_path, "--history-batch", "0", *extra])
         with mock.patch.dict(sys.modules, {"futu": fake}), \
                 mock.patch.object(names_mod, "load_names", return_value=self.NAMES), \
                 mock.patch.object(news_mod, "fetch_news", side_effect=fake_news):
-            doc = sync.collect_live(args)
+            doc = sync.collect_live(args, now=now or datetime(2026, 11, 23, 15, 0, tzinfo=HKT))
         return doc, calls, fetched
 
     def test_collect_live_end_to_end(self):
@@ -1061,14 +1113,16 @@ class CollectLive(unittest.TestCase):
     def test_snapshot_calls_are_chunked_over_the_whole_share_list(self):
         many = [f"HK.{i:05d}" for i in range(1, 1201)]
         fake, calls = self.make_sdk(many)
-        args = sync.parse_args(["--out", "x.json", "--news-delay", "0"])
+        roster_path = self.roster_file()
+        self.addCleanup(os.unlink, roster_path)
+        args = sync.parse_args(["--out", "x.json", "--news-delay", "0", "--rosters", roster_path, "--history-batch", "0"])
         with mock.patch.dict(sys.modules, {"futu": fake}), \
                 mock.patch.object(names_mod, "load_names", return_value={}), \
                 mock.patch.object(news_mod, "fetch_news", return_value=None):
-            sync.collect_live(args)
+            sync.collect_live(args, now=datetime(2026, 11, 23, 15, 0, tzinfo=HKT))
         sizes = [len(c) for c in calls["snap"]]
-        self.assertEqual(sizes[0], 1, "index snapshot")
-        self.assertEqual(sum(sizes[1:]), 1200, "every share once; HSI codes already in the list are not repeated")
+        self.assertEqual(sizes[0], 2, "both index quotes in one call")
+        self.assertEqual(sum(sizes[1:]), 1202, "every share once; roster codes already in the list are not repeated (09988 and 01810 are outside it)")
         self.assertTrue(all(n <= sync.SNAPSHOT_CHUNK for n in sizes))
 
     def test_empty_share_list_falls_back_to_the_top_movers_rank(self):
@@ -1079,6 +1133,130 @@ class CollectLive(unittest.TestCase):
         self.assertNotIn("HK.07200", snapped)
         self.assertNotIn("HK.02020", snapped, "only rank candidates and HSI codes are read in the fallback")
         self.assertEqual(sorted(r["code"] for r in doc["hk_market"]["stocks"]), ["00005", "00700", "00823", "01211", "09988"])
+
+    def test_hstech_block_members_roster_and_movers(self):
+        doc, _, _ = self.run_collect()
+        self.assertEqual(doc["schema_version"], 1)
+        tech = doc["hstech"]
+        self.assertEqual(tech["index"]["name"], "恒生科技指數")
+        self.assertEqual(tech["index"]["last"], 5100.0)
+        self.assertEqual(tech["index"]["change_pct"], 2.0)
+        self.assertEqual({r["code"] for r in tech["constituents"]}, {"00700", "09988"}, "priced current members only")
+        self.assertNotIn("00999", {r["code"] for r in tech["constituents"]}, "the announced future member is not in the current universe")
+        self.assertEqual(tech["breadth"], {"up": 2, "down": 0, "flat": 0})
+        self.assertEqual([r["code"] for r in doc["movers"]["hstech"]["gainers"]], ["09988", "00700"])
+        self.assertEqual(doc["movers"]["hstech"]["losers"], [], "no decliner pads the list")
+
+        members = tech["members"]
+        self.assertEqual([m["code"] for m in members], ["00700", "09988", "01810"], "every official member, in official order")
+        self.assertEqual([m["weight_pct"] for m in members], [50.0, 30.0, 20.0], "current weights, not the announced ones")
+        missing = members[2]
+        self.assertFalse(missing["available"])
+        self.assertTrue(all(missing[k] is None for k in ("last", "change_pct", "ret_5d", "ret_1m", "ret_ytd", "market_cap_hkd")))
+        self.assertEqual(missing["name"], "小米集團-W")
+        self.assertTrue(members[0]["available"])
+
+        meta = tech["roster"]
+        self.assertEqual((meta["status"], meta["count"], meta["weights_as_of"]), ("current", 3, "2026-11-18"))
+        self.assertEqual(meta["upcoming"], {"effective_from": "2999-01-01", "count": 4, "added_count": 1, "removed_count": 0, "announced": "2026-11-20"})
+        self.assertEqual(meta["weights_stage"], "pre_review")
+        self.assertNotIn("00999", json.dumps(meta), "the future member's code is not published before it takes effect")
+        self.assertNotIn("members", json.dumps(meta))
+
+        hsi = doc["hsi"]
+        self.assertEqual([m["code"] for m in hsi["members"]], ["00700", "00005", "00823"])
+        self.assertIsNone(hsi["roster"]["upcoming"])
+        self.assertTrue(all(m["available"] for m in hsi["members"]))
+
+    @unittest.skipUnless(importlib.util.find_spec("jsonschema"), "jsonschema is not installed")
+    def test_collector_output_and_sample_validate_against_schema_json(self):
+        import jsonschema
+        schema = json.loads((ROOT / "scripts" / "hk-movers" / "schema.json").read_text(encoding="utf-8"))
+        validator = jsonschema.Draft202012Validator(schema)
+        relaxed = json.loads(json.dumps(schema))
+        relaxed["properties"]["macro_sectors"]["minItems"] = 0  # the fake gateway only knows four sectors
+        relaxed_validator = jsonschema.Draft202012Validator(relaxed)
+        with tempfile.TemporaryDirectory() as tmp:
+            doc, _, _ = self.run_collect(extra=("--history-batch", "50", "--history-cache", str(Path(tmp) / "h.json"), "--history-delay", "0"))
+        relaxed_validator.validate(json.loads(json.dumps(doc)))
+        validator.validate(json.loads((ROOT / "movers" / "data" / "sample.json").read_text(encoding="utf-8")))
+
+    FUTURE_ONLY_HSTECH = ["00148", "00522", "01729", "01888", "02018", "02475", "02476", "02525", "02577", "02706",
+                          "03308", "03317", "03750", "03896", "06082", "06809", "06869", "09678", "09698", "09880"]
+
+    def test_real_rosters_before_the_effective_date_publish_only_the_current_30_and_95(self):
+        for day in (datetime(2026, 11, 23, 15, 0, tzinfo=HKT), datetime(2026, 12, 4, 15, 0, tzinfo=HKT), datetime(2026, 12, 6, 23, 59, tzinfo=HKT)):
+            doc, _, _ = self.run_collect(real_rosters=True, now=day)
+            self.assertEqual((len(doc["hstech"]["members"]), len(doc["hsi"]["members"])), (30, 95), day)
+            self.assertEqual(doc["hstech"]["roster"]["count"], 30)
+            self.assertEqual(doc["hstech"]["roster"]["weights_stage"], "pre_review")
+            self.assertEqual(doc["hstech"]["roster"]["upcoming"], {"effective_from": "2026-12-07", "count": 50, "added_count": 20,
+                                                                    "removed_count": 0, "announced": "2026-11-20"})
+            text = json.dumps(doc["hstech"], ensure_ascii=False)
+            for code in self.FUTURE_ONLY_HSTECH:
+                self.assertNotIn(code, text, f"{code} is an announced HSTECH inclusion and must not appear in the HSTECH block before 2026-12-07 ({day})")
+            self.assertEqual({m["code"] for m in doc["hstech"]["members"]} & set(self.FUTURE_ONLY_HSTECH), set())
+            self.assertEqual({r["code"] for r in doc["hstech"]["constituents"]} & set(self.FUTURE_ONLY_HSTECH), set())
+            self.assertEqual(doc["hsi"]["members"][0]["code"], "00005")
+            self.assertEqual(doc["hsi"]["members"][0]["weight_pct"], 7.37)
+
+    def test_real_rosters_switch_to_the_announced_50_and_re_capped_weights_on_the_effective_date(self):
+        doc, _, _ = self.run_collect(real_rosters=True, now=datetime(2026, 12, 7, 9, 0, tzinfo=HKT))
+        members = doc["hstech"]["members"]
+        self.assertEqual(len(members), 50)
+        self.assertEqual(set(self.FUTURE_ONLY_HSTECH) <= {m["code"] for m in members}, True)
+        self.assertEqual([m["weight_pct"] for m in members][:5], [8.0, 8.0, 8.0, 8.0, 8.0], "five names re-capped to 8%")
+        self.assertAlmostEqual(sum(m["weight_pct"] for m in members), 100, delta=0.6)
+        self.assertEqual([m["weight_pct"] for m in members], sorted((m["weight_pct"] for m in members), reverse=True))
+        self.assertEqual(sum(1 for m in members if m["available"]), len(doc["hstech"]["constituents"]),
+                         "only members the fake gateway prices are available; the rest stay in the table as unavailable")
+        self.assertLess(len(doc["hstech"]["constituents"]), 10)
+        self.assertTrue(all(m["last"] is None for m in members if not m["available"]))
+        meta = doc["hstech"]["roster"]
+        self.assertEqual((meta["status"], meta["count"], meta["effective_from"], meta["weights_stage"]), ("current", 50, "2026-12-07", "post_review_pro_forma"))
+        self.assertIsNone(meta["upcoming"])
+        self.assertEqual(len(doc["hsi"]["members"]), 95)
+        self.assertEqual(doc["hsi"]["members"][0]["weight_pct"], 8.0, "HSI re-capped weights apply from the same day")
+        self.assertEqual(doc["hsi"]["roster"]["weights_stage"], "post_review_pro_forma")
+
+    def test_members_include_every_roster_code_even_when_the_filters_would_drop_them(self):
+        doc, _, _ = self.run_collect()
+        qualified = {r["code"] for r in doc["hk_market"]["stocks"]}
+        thin = [m for m in doc["hsi"]["members"] if m["code"] == "00823"][0]
+        self.assertTrue(thin["available"])
+        self.assertIn("00823", qualified)
+        self.assertEqual(len(doc["hsi"]["members"]), 3)
+
+    def test_returns_come_from_cached_history_and_are_not_refetched_the_same_day(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = str(Path(tmp) / "history.json")
+            doc, calls, _ = self.run_collect(extra=("--history-batch", "50", "--history-cache", cache, "--history-delay", "0"))
+            fetched = {c[0] for c in calls["kline"]}
+            self.assertIn("HK.800000", fetched, "the index calendar is fetched too")
+            self.assertTrue({"HK.00700", "HK.00005", "HK.09988"} <= fetched)
+            self.assertTrue(all(c[3:] == ("K_DAY", "qfq") for c in calls["kline"]), "daily adjusted bars")
+            self.assertTrue(all(c[1] == "2025-12-01" and c[2] == "2026-11-23" for c in calls["kline"]))
+            ref = doc["returns"]
+            self.assertEqual((ref["as_of"], ref["d5"], ref["m1"], ref["ytd"], ref["basis"]), ("2026-11-23", "2026-11-16", "2026-10-23", "2025-12-31", "adjusted_close"))
+            tencent = [m for m in doc["hsi"]["members"] if m["code"] == "00700"][0]
+            closes = {d: 100.0 + 0.5 * i for i, d in enumerate(HISTORY_DAYS)}
+            self.assertAlmostEqual(tencent["ret_5d"], (520.0 / closes["2026-11-16"] - 1) * 100, places=3)
+            self.assertAlmostEqual(tencent["ret_1m"], (520.0 / closes["2026-10-23"] - 1) * 100, places=3)
+            self.assertAlmostEqual(tencent["ret_ytd"], (520.0 / closes["2025-12-31"] - 1) * 100, places=3)
+            self.assertIsNone([m for m in doc["hstech"]["members"] if m["code"] == "01810"][0]["ret_5d"])
+            first = len(calls["kline"])
+
+            doc2, calls2, _ = self.run_collect(extra=("--history-batch", "50", "--history-cache", cache, "--history-delay", "0"))
+            self.assertEqual(len(calls2["kline"]), 0, "same HK day: served from the cache")
+            self.assertEqual(doc2["returns"], ref)
+            self.assertGreater(first, 3)
+
+    def test_history_batch_zero_disables_returns_but_prices_still_show(self):
+        doc, calls, _ = self.run_collect()
+        self.assertEqual(calls["kline"], [])
+        self.assertNotIn("returns", doc)
+        self.assertTrue(all(m["ret_5d"] is None for m in doc["hsi"]["members"]))
+        self.assertTrue(all(m["available"] for m in doc["hsi"]["members"]), "prices still show without returns")
 
     def test_backup_news_never_returns_a_vendor_headline(self):
         fake, _ = self.make_sdk()

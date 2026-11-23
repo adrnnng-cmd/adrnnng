@@ -1,0 +1,2530 @@
+{
+ "schema": 1,
+ "source": {
+  "publisher": "Hang Seng Indexes Company",
+  "title": "Hang Seng Indexes Company Announces Index Review Results",
+  "review_period": "quarter ended 30 September 2026",
+  "announced": "2026-11-20",
+  "url": "https://www.hsi.com.hk/content/dam/wpb/hsil/en_hk/press_releases/content/20261120T174500.pdf",
+  "weights_reference_date": "2026-11-18"
+ },
+ "indices": {
+  "hsi": {
+   "name": "恒生指數",
+   "official_name": "Hang Seng Index",
+   "versions": [
+    {
+     "id": "hsi-current",
+     "status": "current",
+     "effective_from": null,
+     "weights_column": "Before",
+     "weights_as_of": "2026-11-18",
+     "weights_note": "Weighting of the current constituents on the review reference date, before re-capping and before the announced changes.",
+     "source_pages": "Appendix 1, pp.4-5",
+     "count": 95,
+     "members": [
+      {
+       "code": "00005",
+       "name": "匯豐控股",
+       "name_en": "HSBC HOLDINGS",
+       "weight_pct": 7.37,
+       "faf_pct": 100.0,
+       "group": "Financials",
+       "page": 4
+      },
+      {
+       "code": "00700",
+       "name": "騰訊控股",
+       "name_en": "TENCENT",
+       "weight_pct": 7.35,
+       "faf_pct": 70.0,
+       "group": "Information Technology",
+       "page": 5
+      },
+      {
+       "code": "09988",
+       "name": "阿里巴巴-W",
+       "name_en": "BABA - W",
+       "weight_pct": 6.72,
+       "faf_pct": 100.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "00939",
+       "name": "建設銀行",
+       "name_en": "CCB (H)",
+       "weight_pct": 6.46,
+       "faf_pct": 40.0,
+       "group": "Financials",
+       "page": 4
+      },
+      {
+       "code": "01299",
+       "name": "友邦保險",
+       "name_en": "AIA",
+       "weight_pct": 5.09,
+       "faf_pct": 100.0,
+       "group": "Financials",
+       "page": 4
+      },
+      {
+       "code": "01398",
+       "name": "工商銀行",
+       "name_en": "ICBC (H)",
+       "weight_pct": 4.18,
+       "faf_pct": 95.0,
+       "group": "Financials",
+       "page": 4
+      },
+      {
+       "code": "01810",
+       "name": "小米集團-W",
+       "name_en": "XIAOMI - W",
+       "weight_pct": 3.42,
+       "faf_pct": 70.0,
+       "group": "Information Technology",
+       "page": 5
+      },
+      {
+       "code": "00941",
+       "name": "中國移動",
+       "name_en": "CHINA MOBILE",
+       "weight_pct": 3.21,
+       "faf_pct": 30.0,
+       "group": "Telecommunications and Utilities",
+       "page": 5
+      },
+      {
+       "code": "00388",
+       "name": "香港交易所",
+       "name_en": "HKEX",
+       "weight_pct": 2.89,
+       "faf_pct": 95.0,
+       "group": "Financials",
+       "page": 4
+      },
+      {
+       "code": "03988",
+       "name": "中國銀行",
+       "name_en": "BANK OF CHINA (H)",
+       "weight_pct": 2.86,
+       "faf_pct": 85.0,
+       "group": "Financials",
+       "page": 4
+      },
+      {
+       "code": "03690",
+       "name": "美團-W",
+       "name_en": "MEITUAN - W",
+       "weight_pct": 2.49,
+       "faf_pct": 90.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "00883",
+       "name": "中國海洋石油",
+       "name_en": "CNOOC",
+       "weight_pct": 2.22,
+       "faf_pct": 35.0,
+       "group": "Energy, Materials, Industrials and Conglomerates",
+       "page": 5
+      },
+      {
+       "code": "02318",
+       "name": "中國平安",
+       "name_en": "PING AN (H)",
+       "weight_pct": 2.17,
+       "faf_pct": 90.0,
+       "group": "Financials",
+       "page": 4
+      },
+      {
+       "code": "09999",
+       "name": "網易",
+       "name_en": "NTES",
+       "weight_pct": 2.12,
+       "faf_pct": 55.0,
+       "group": "Information Technology",
+       "page": 5
+      },
+      {
+       "code": "06160",
+       "name": "百濟神州",
+       "name_en": "BEONE MEDICINES",
+       "weight_pct": 1.9,
+       "faf_pct": 85.0,
+       "group": "Healthcare",
+       "page": 5
+      },
+      {
+       "code": "01211",
+       "name": "比亞迪股份",
+       "name_en": "BYD COMPANY (H)",
+       "weight_pct": 1.51,
+       "faf_pct": 100.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "00981",
+       "name": "中芯國際",
+       "name_en": "SMIC",
+       "weight_pct": 1.42,
+       "faf_pct": 85.0,
+       "group": "Information Technology",
+       "page": 5
+      },
+      {
+       "code": "00857",
+       "name": "中國石油股份",
+       "name_en": "PETROCHINA (H)",
+       "weight_pct": 1.39,
+       "faf_pct": 100.0,
+       "group": "Energy, Materials, Industrials and Conglomerates",
+       "page": 5
+      },
+      {
+       "code": "03968",
+       "name": "招商銀行",
+       "name_en": "CM BANK (H)",
+       "weight_pct": 1.35,
+       "faf_pct": 85.0,
+       "group": "Financials",
+       "page": 4
+      },
+      {
+       "code": "00669",
+       "name": "創科實業",
+       "name_en": "TECHTRONIC IND",
+       "weight_pct": 1.3,
+       "faf_pct": 80.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "00001",
+       "name": "長和",
+       "name_en": "CKH HOLDINGS",
+       "weight_pct": 1.18,
+       "faf_pct": 70.0,
+       "group": "Energy, Materials, Industrials and Conglomerates",
+       "page": 5
+      },
+      {
+       "code": "02388",
+       "name": "中銀香港",
+       "name_en": "BOC HONG KONG",
+       "weight_pct": 1.15,
+       "faf_pct": 35.0,
+       "group": "Financials",
+       "page": 4
+      },
+      {
+       "code": "02269",
+       "name": "藥明生物",
+       "name_en": "WUXI BIO",
+       "weight_pct": 1.12,
+       "faf_pct": 95.0,
+       "group": "Healthcare",
+       "page": 5
+      },
+      {
+       "code": "02628",
+       "name": "中國人壽",
+       "name_en": "CHINA LIFE (H)",
+       "weight_pct": 1.07,
+       "faf_pct": 100.0,
+       "group": "Financials",
+       "page": 4
+      },
+      {
+       "code": "00016",
+       "name": "新鴻基地產",
+       "name_en": "SHK PPT",
+       "weight_pct": 1.02,
+       "faf_pct": 50.0,
+       "group": "Properties & Construction",
+       "page": 5
+      },
+      {
+       "code": "09618",
+       "name": "京東集團-SW",
+       "name_en": "JD - SW",
+       "weight_pct": 0.97,
+       "faf_pct": 55.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "02899",
+       "name": "紫金礦業",
+       "name_en": "ZIJIN MINING (H)",
+       "weight_pct": 0.93,
+       "faf_pct": 100.0,
+       "group": "Energy, Materials, Industrials and Conglomerates",
+       "page": 5
+      },
+      {
+       "code": "01088",
+       "name": "中國神華",
+       "name_en": "CHINA SHENHUA (H)",
+       "weight_pct": 0.89,
+       "faf_pct": 95.0,
+       "group": "Energy, Materials, Industrials and Conglomerates",
+       "page": 5
+      },
+      {
+       "code": "01801",
+       "name": "信達生物",
+       "name_en": "INNOVENT BIO",
+       "weight_pct": 0.88,
+       "faf_pct": 95.0,
+       "group": "Healthcare",
+       "page": 5
+      },
+      {
+       "code": "00002",
+       "name": "中電控股",
+       "name_en": "CLP HOLDINGS",
+       "weight_pct": 0.86,
+       "faf_pct": 65.0,
+       "group": "Telecommunications and Utilities",
+       "page": 5
+      },
+      {
+       "code": "00992",
+       "name": "聯想集團",
+       "name_en": "LENOVO GROUP",
+       "weight_pct": 0.82,
+       "faf_pct": 60.0,
+       "group": "Information Technology",
+       "page": 5
+      },
+      {
+       "code": "09961",
+       "name": "攜程集團-S",
+       "name_en": "TRIP.COM - S",
+       "weight_pct": 0.76,
+       "faf_pct": 50.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "02020",
+       "name": "安踏體育",
+       "name_en": "ANTA SPORTS",
+       "weight_pct": 0.73,
+       "faf_pct": 50.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "09888",
+       "name": "百度集團-W",
+       "name_en": "BIDU - W",
+       "weight_pct": 0.7,
+       "faf_pct": 80.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "00386",
+       "name": "中國石油化工股份",
+       "name_en": "SINOPEC CORP (H)",
+       "weight_pct": 0.69,
+       "faf_pct": 95.0,
+       "group": "Energy, Materials, Industrials and Conglomerates",
+       "page": 5
+      },
+      {
+       "code": "00823",
+       "name": "領展房產基金",
+       "name_en": "LINK REIT",
+       "weight_pct": 0.68,
+       "faf_pct": 100.0,
+       "group": "Properties & Construction",
+       "page": 5
+      },
+      {
+       "code": "09992",
+       "name": "泡泡瑪特",
+       "name_en": "POP MART",
+       "weight_pct": 0.68,
+       "faf_pct": 55.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "02359",
+       "name": "藥明康德",
+       "name_en": "WUXI APPTEC (H)",
+       "weight_pct": 0.66,
+       "faf_pct": 100.0,
+       "group": "Healthcare",
+       "page": 5
+      },
+      {
+       "code": "01113",
+       "name": "長實集團",
+       "name_en": "CK ASSET",
+       "weight_pct": 0.62,
+       "faf_pct": 55.0,
+       "group": "Properties & Construction",
+       "page": 5
+      },
+      {
+       "code": "01109",
+       "name": "華潤置地",
+       "name_en": "CHINA RES LAND",
+       "weight_pct": 0.61,
+       "faf_pct": 45.0,
+       "group": "Properties & Construction",
+       "page": 5
+      },
+      {
+       "code": "09633",
+       "name": "農夫山泉",
+       "name_en": "NONGFU SPRING (H)",
+       "weight_pct": 0.6,
+       "faf_pct": 40.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "00006",
+       "name": "電能實業",
+       "name_en": "POWER ASSETS",
+       "weight_pct": 0.59,
+       "faf_pct": 65.0,
+       "group": "Telecommunications and Utilities",
+       "page": 5
+      },
+      {
+       "code": "00175",
+       "name": "吉利汽車",
+       "name_en": "GEELY AUTO",
+       "weight_pct": 0.56,
+       "faf_pct": 60.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "00003",
+       "name": "香港中華煤氣",
+       "name_en": "HK & CHINA GAS",
+       "weight_pct": 0.53,
+       "faf_pct": 60.0,
+       "group": "Telecommunications and Utilities",
+       "page": 5
+      },
+      {
+       "code": "03750",
+       "name": "寧德時代",
+       "name_en": "CATL (H)",
+       "weight_pct": 0.49,
+       "faf_pct": 95.0,
+       "group": "Energy, Materials, Industrials and Conglomerates",
+       "page": 5
+      },
+      {
+       "code": "00267",
+       "name": "中信股份",
+       "name_en": "CITIC",
+       "weight_pct": 0.47,
+       "faf_pct": 20.0,
+       "group": "Energy, Materials, Industrials and Conglomerates",
+       "page": 5
+      },
+      {
+       "code": "01024",
+       "name": "快手-W",
+       "name_en": "KUAISHOU - W",
+       "weight_pct": 0.47,
+       "faf_pct": 75.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "02319",
+       "name": "蒙牛乳業",
+       "name_en": "MENGNIU DAIRY",
+       "weight_pct": 0.46,
+       "faf_pct": 80.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "00027",
+       "name": "銀河娛樂",
+       "name_en": "GALAXY ENT",
+       "weight_pct": 0.42,
+       "faf_pct": 50.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "00300",
+       "name": "美的集團",
+       "name_en": "MIDEA GROUP (H)",
+       "weight_pct": 0.41,
+       "faf_pct": 95.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "01093",
+       "name": "石藥集團",
+       "name_en": "CSPC PHARMA",
+       "weight_pct": 0.41,
+       "faf_pct": 70.0,
+       "group": "Healthcare",
+       "page": 5
+      },
+      {
+       "code": "02057",
+       "name": "中通快遞-W",
+       "name_en": "ZTO EXPRESS - W",
+       "weight_pct": 0.41,
+       "faf_pct": 55.0,
+       "group": "Energy, Materials, Industrials and Conglomerates",
+       "page": 5
+      },
+      {
+       "code": "01347",
+       "name": "華虹宏力",
+       "name_en": "HUA HONG GRACE",
+       "weight_pct": 0.4,
+       "faf_pct": 60.0,
+       "group": "Information Technology",
+       "page": 5
+      },
+      {
+       "code": "01378",
+       "name": "中國宏橋",
+       "name_en": "CHINAHONGQIAO",
+       "weight_pct": 0.4,
+       "faf_pct": 35.0,
+       "group": "Energy, Materials, Industrials and Conglomerates",
+       "page": 5
+      },
+      {
+       "code": "02015",
+       "name": "理想汽車-W",
+       "name_en": "LI AUTO - W",
+       "weight_pct": 0.4,
+       "faf_pct": 60.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "00066",
+       "name": "港鐵公司",
+       "name_en": "MTR CORPORATION",
+       "weight_pct": 0.39,
+       "faf_pct": 30.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "01519",
+       "name": "極兔速遞-W",
+       "name_en": "J&T EXPRESS - W",
+       "weight_pct": 0.39,
+       "faf_pct": 70.0,
+       "group": "Energy, Materials, Industrials and Conglomerates",
+       "page": 5
+      },
+      {
+       "code": "00728",
+       "name": "中國電信",
+       "name_en": "CHINA TELECOM (H)",
+       "weight_pct": 0.38,
+       "faf_pct": 95.0,
+       "group": "Telecommunications and Utilities",
+       "page": 5
+      },
+      {
+       "code": "00288",
+       "name": "萬洲國際",
+       "name_en": "WH GROUP",
+       "weight_pct": 0.37,
+       "faf_pct": 65.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "01177",
+       "name": "中國生物製藥",
+       "name_en": "SBP GROUP",
+       "weight_pct": 0.36,
+       "faf_pct": 55.0,
+       "group": "Healthcare",
+       "page": 5
+      },
+      {
+       "code": "01997",
+       "name": "九龍倉置業",
+       "name_en": "WHARF REIC",
+       "weight_pct": 0.34,
+       "faf_pct": 55.0,
+       "group": "Properties & Construction",
+       "page": 5
+      },
+      {
+       "code": "06690",
+       "name": "海爾智家",
+       "name_en": "HAIER SMARTHOME (H)",
+       "weight_pct": 0.34,
+       "faf_pct": 85.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "03692",
+       "name": "翰森製藥",
+       "name_en": "HANSOH PHARMA",
+       "weight_pct": 0.32,
+       "faf_pct": 25.0,
+       "group": "Healthcare",
+       "page": 5
+      },
+      {
+       "code": "00688",
+       "name": "中國海外發展",
+       "name_en": "CHINA OVERSEAS",
+       "weight_pct": 0.29,
+       "faf_pct": 35.0,
+       "group": "Properties & Construction",
+       "page": 5
+      },
+      {
+       "code": "01038",
+       "name": "長江基建集團",
+       "name_en": "CKI HOLDINGS",
+       "weight_pct": 0.29,
+       "faf_pct": 25.0,
+       "group": "Telecommunications and Utilities",
+       "page": 5
+      },
+      {
+       "code": "00012",
+       "name": "恒基地產",
+       "name_en": "HENDERSON LAND",
+       "weight_pct": 0.27,
+       "faf_pct": 30.0,
+       "group": "Properties & Construction",
+       "page": 5
+      },
+      {
+       "code": "00836",
+       "name": "華潤電力",
+       "name_en": "CHINA RES POWER",
+       "weight_pct": 0.27,
+       "faf_pct": 40.0,
+       "group": "Telecommunications and Utilities",
+       "page": 5
+      },
+      {
+       "code": "02338",
+       "name": "濰柴動力",
+       "name_en": "WEICHAI POWER (H)",
+       "weight_pct": 0.27,
+       "faf_pct": 100.0,
+       "group": "Energy, Materials, Industrials and Conglomerates",
+       "page": 5
+      },
+      {
+       "code": "02382",
+       "name": "舜宇光學科技",
+       "name_en": "SUNNY OPTICAL",
+       "weight_pct": 0.27,
+       "faf_pct": 65.0,
+       "group": "Information Technology",
+       "page": 5
+      },
+      {
+       "code": "02688",
+       "name": "新奧能源",
+       "name_en": "ENN ENERGY",
+       "weight_pct": 0.26,
+       "faf_pct": 65.0,
+       "group": "Telecommunications and Utilities",
+       "page": 5
+      },
+      {
+       "code": "03993",
+       "name": "洛陽鉬業",
+       "name_en": "CMOC (H)",
+       "weight_pct": 0.26,
+       "faf_pct": 95.0,
+       "group": "Energy, Materials, Industrials and Conglomerates",
+       "page": 5
+      },
+      {
+       "code": "06618",
+       "name": "京東健康",
+       "name_en": "JD HEALTH",
+       "weight_pct": 0.25,
+       "faf_pct": 35.0,
+       "group": "Healthcare",
+       "page": 5
+      },
+      {
+       "code": "09901",
+       "name": "新東方-S",
+       "name_en": "NEW ORIENTAL - S",
+       "weight_pct": 0.23,
+       "faf_pct": 50.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "00291",
+       "name": "華潤啤酒",
+       "name_en": "CHINA RES BEER",
+       "weight_pct": 0.22,
+       "faf_pct": 50.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "02313",
+       "name": "申洲國際",
+       "name_en": "SHENZHOU INTL",
+       "weight_pct": 0.22,
+       "faf_pct": 55.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "00762",
+       "name": "中國聯通",
+       "name_en": "CHINA UNICOM",
+       "weight_pct": 0.21,
+       "faf_pct": 25.0,
+       "group": "Telecommunications and Utilities",
+       "page": 5
+      },
+      {
+       "code": "02331",
+       "name": "李寧",
+       "name_en": "LI NING",
+       "weight_pct": 0.18,
+       "faf_pct": 85.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "00322",
+       "name": "康師傅控股",
+       "name_en": "TINGYI",
+       "weight_pct": 0.17,
+       "faf_pct": 35.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "01209",
+       "name": "華潤萬象生活",
+       "name_en": "CHINA RES MIXC",
+       "weight_pct": 0.17,
+       "faf_pct": 30.0,
+       "group": "Properties & Construction",
+       "page": 5
+      },
+      {
+       "code": "02618",
+       "name": "京東物流",
+       "name_en": "JD LOGISTICS",
+       "weight_pct": 0.17,
+       "faf_pct": 40.0,
+       "group": "Energy, Materials, Industrials and Conglomerates",
+       "page": 5
+      },
+      {
+       "code": "01928",
+       "name": "金沙中國有限公司",
+       "name_en": "SANDS CHINA LTD",
+       "weight_pct": 0.16,
+       "faf_pct": 25.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "01099",
+       "name": "國藥控股",
+       "name_en": "SINOPHARM (H)",
+       "weight_pct": 0.15,
+       "faf_pct": 95.0,
+       "group": "Healthcare",
+       "page": 5
+      },
+      {
+       "code": "01929",
+       "name": "周大福",
+       "name_en": "CHOW TAI FOOK",
+       "weight_pct": 0.15,
+       "faf_pct": 20.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "02600",
+       "name": "中國鋁業",
+       "name_en": "CHALCO (H)",
+       "weight_pct": 0.15,
+       "faf_pct": 95.0,
+       "group": "Energy, Materials, Industrials and Conglomerates",
+       "page": 5
+      },
+      {
+       "code": "00316",
+       "name": "東方海外國際",
+       "name_en": "OOIL",
+       "weight_pct": 0.13,
+       "faf_pct": 20.0,
+       "group": "Energy, Materials, Industrials and Conglomerates",
+       "page": 5
+      },
+      {
+       "code": "06862",
+       "name": "海底撈",
+       "name_en": "HAIDILAO",
+       "weight_pct": 0.13,
+       "faf_pct": 40.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "06181",
+       "name": "老鋪黃金",
+       "name_en": "LAOPU GOLD (H)",
+       "weight_pct": 0.12,
+       "faf_pct": 45.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "00241",
+       "name": "阿里健康",
+       "name_en": "ALI HEALTH",
+       "weight_pct": 0.11,
+       "faf_pct": 40.0,
+       "group": "Healthcare",
+       "page": 5
+      },
+      {
+       "code": "00868",
+       "name": "信義玻璃",
+       "name_en": "XINYI GLASS",
+       "weight_pct": 0.11,
+       "faf_pct": 40.0,
+       "group": "Energy, Materials, Industrials and Conglomerates",
+       "page": 5
+      },
+      {
+       "code": "00285",
+       "name": "比亞迪電子",
+       "name_en": "BYD ELECTRONIC",
+       "weight_pct": 0.1,
+       "faf_pct": 35.0,
+       "group": "Information Technology",
+       "page": 5
+      },
+      {
+       "code": "01044",
+       "name": "恒安國際",
+       "name_en": "HENGAN INT'L",
+       "weight_pct": 0.09,
+       "faf_pct": 55.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "01876",
+       "name": "百威亞太",
+       "name_en": "BUD APAC",
+       "weight_pct": 0.08,
+       "faf_pct": 15.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "00101",
+       "name": "恒隆地產",
+       "name_en": "HANG LUNG PPT",
+       "weight_pct": 0.07,
+       "faf_pct": 35.0,
+       "group": "Properties & Construction",
+       "page": 5
+      },
+      {
+       "code": "00960",
+       "name": "龍湖集團",
+       "name_en": "LONGFOR GROUP",
+       "weight_pct": 0.06,
+       "faf_pct": 35.0,
+       "group": "Properties & Construction",
+       "page": 5
+      },
+      {
+       "code": "00968",
+       "name": "信義光能",
+       "name_en": "XINYI SOLAR",
+       "weight_pct": 0.05,
+       "faf_pct": 50.0,
+       "group": "Energy, Materials, Industrials and Conglomerates",
+       "page": 5
+      }
+     ]
+    },
+    {
+     "id": "hsi-2026-12-07",
+     "status": "announced",
+     "effective_from": "2026-12-07",
+     "implemented_after_close": "2026-12-04",
+     "weights_column": "After",
+     "weights_as_of": "2026-11-18",
+     "weights_note": "Pro-forma weighting after the announced re-capping and constituent changes. Not in force before the effective date.",
+     "source_pages": "Appendix 1, pp.4-5",
+     "count": 95,
+     "added": [],
+     "removed": [],
+     "members": [
+      {
+       "code": "00005",
+       "name": "匯豐控股",
+       "name_en": "HSBC HOLDINGS",
+       "weight_pct": 8.0,
+       "faf_pct": 100.0,
+       "group": "Financials",
+       "page": 4
+      },
+      {
+       "code": "00700",
+       "name": "騰訊控股",
+       "name_en": "TENCENT",
+       "weight_pct": 8.0,
+       "faf_pct": 70.0,
+       "group": "Information Technology",
+       "page": 5
+      },
+      {
+       "code": "09988",
+       "name": "阿里巴巴-W",
+       "name_en": "BABA - W",
+       "weight_pct": 8.0,
+       "faf_pct": 100.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "00939",
+       "name": "建設銀行",
+       "name_en": "CCB (H)",
+       "weight_pct": 6.21,
+       "faf_pct": 40.0,
+       "group": "Financials",
+       "page": 4
+      },
+      {
+       "code": "01299",
+       "name": "友邦保險",
+       "name_en": "AIA",
+       "weight_pct": 4.88,
+       "faf_pct": 100.0,
+       "group": "Financials",
+       "page": 4
+      },
+      {
+       "code": "01398",
+       "name": "工商銀行",
+       "name_en": "ICBC (H)",
+       "weight_pct": 4.02,
+       "faf_pct": 95.0,
+       "group": "Financials",
+       "page": 4
+      },
+      {
+       "code": "01810",
+       "name": "小米集團-W",
+       "name_en": "XIAOMI - W",
+       "weight_pct": 3.29,
+       "faf_pct": 70.0,
+       "group": "Information Technology",
+       "page": 5
+      },
+      {
+       "code": "00941",
+       "name": "中國移動",
+       "name_en": "CHINA MOBILE",
+       "weight_pct": 3.09,
+       "faf_pct": 30.0,
+       "group": "Telecommunications and Utilities",
+       "page": 5
+      },
+      {
+       "code": "00388",
+       "name": "香港交易所",
+       "name_en": "HKEX",
+       "weight_pct": 2.78,
+       "faf_pct": 95.0,
+       "group": "Financials",
+       "page": 4
+      },
+      {
+       "code": "03988",
+       "name": "中國銀行",
+       "name_en": "BANK OF CHINA (H)",
+       "weight_pct": 2.74,
+       "faf_pct": 85.0,
+       "group": "Financials",
+       "page": 4
+      },
+      {
+       "code": "03690",
+       "name": "美團-W",
+       "name_en": "MEITUAN - W",
+       "weight_pct": 2.4,
+       "faf_pct": 90.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "00883",
+       "name": "中國海洋石油",
+       "name_en": "CNOOC",
+       "weight_pct": 2.13,
+       "faf_pct": 35.0,
+       "group": "Energy, Materials, Industrials and Conglomerates",
+       "page": 5
+      },
+      {
+       "code": "02318",
+       "name": "中國平安",
+       "name_en": "PING AN (H)",
+       "weight_pct": 2.09,
+       "faf_pct": 90.0,
+       "group": "Financials",
+       "page": 4
+      },
+      {
+       "code": "09999",
+       "name": "網易",
+       "name_en": "NTES",
+       "weight_pct": 2.04,
+       "faf_pct": 55.0,
+       "group": "Information Technology",
+       "page": 5
+      },
+      {
+       "code": "06160",
+       "name": "百濟神州",
+       "name_en": "BEONE MEDICINES",
+       "weight_pct": 1.82,
+       "faf_pct": 85.0,
+       "group": "Healthcare",
+       "page": 5
+      },
+      {
+       "code": "00981",
+       "name": "中芯國際",
+       "name_en": "SMIC",
+       "weight_pct": 1.55,
+       "faf_pct": 85.0,
+       "group": "Information Technology",
+       "page": 5
+      },
+      {
+       "code": "01211",
+       "name": "比亞迪股份",
+       "name_en": "BYD COMPANY (H)",
+       "weight_pct": 1.45,
+       "faf_pct": 100.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "00857",
+       "name": "中國石油股份",
+       "name_en": "PETROCHINA (H)",
+       "weight_pct": 1.34,
+       "faf_pct": 100.0,
+       "group": "Energy, Materials, Industrials and Conglomerates",
+       "page": 5
+      },
+      {
+       "code": "03968",
+       "name": "招商銀行",
+       "name_en": "CM BANK (H)",
+       "weight_pct": 1.3,
+       "faf_pct": 85.0,
+       "group": "Financials",
+       "page": 4
+      },
+      {
+       "code": "00669",
+       "name": "創科實業",
+       "name_en": "TECHTRONIC IND",
+       "weight_pct": 1.24,
+       "faf_pct": 80.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "00001",
+       "name": "長和",
+       "name_en": "CKH HOLDINGS",
+       "weight_pct": 1.13,
+       "faf_pct": 70.0,
+       "group": "Energy, Materials, Industrials and Conglomerates",
+       "page": 5
+      },
+      {
+       "code": "02388",
+       "name": "中銀香港",
+       "name_en": "BOC HONG KONG",
+       "weight_pct": 1.1,
+       "faf_pct": 35.0,
+       "group": "Financials",
+       "page": 4
+      },
+      {
+       "code": "02269",
+       "name": "藥明生物",
+       "name_en": "WUXI BIO",
+       "weight_pct": 1.07,
+       "faf_pct": 95.0,
+       "group": "Healthcare",
+       "page": 5
+      },
+      {
+       "code": "02628",
+       "name": "中國人壽",
+       "name_en": "CHINA LIFE (H)",
+       "weight_pct": 1.03,
+       "faf_pct": 100.0,
+       "group": "Financials",
+       "page": 4
+      },
+      {
+       "code": "00016",
+       "name": "新鴻基地產",
+       "name_en": "SHK PPT",
+       "weight_pct": 0.98,
+       "faf_pct": 50.0,
+       "group": "Properties & Construction",
+       "page": 5
+      },
+      {
+       "code": "09888",
+       "name": "百度集團-W",
+       "name_en": "BIDU - W",
+       "weight_pct": 0.95,
+       "faf_pct": 80.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "09618",
+       "name": "京東集團-SW",
+       "name_en": "JD - SW",
+       "weight_pct": 0.93,
+       "faf_pct": 55.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "02899",
+       "name": "紫金礦業",
+       "name_en": "ZIJIN MINING (H)",
+       "weight_pct": 0.89,
+       "faf_pct": 100.0,
+       "group": "Energy, Materials, Industrials and Conglomerates",
+       "page": 5
+      },
+      {
+       "code": "01088",
+       "name": "中國神華",
+       "name_en": "CHINA SHENHUA (H)",
+       "weight_pct": 0.85,
+       "faf_pct": 95.0,
+       "group": "Energy, Materials, Industrials and Conglomerates",
+       "page": 5
+      },
+      {
+       "code": "01801",
+       "name": "信達生物",
+       "name_en": "INNOVENT BIO",
+       "weight_pct": 0.85,
+       "faf_pct": 95.0,
+       "group": "Healthcare",
+       "page": 5
+      },
+      {
+       "code": "00002",
+       "name": "中電控股",
+       "name_en": "CLP HOLDINGS",
+       "weight_pct": 0.83,
+       "faf_pct": 65.0,
+       "group": "Telecommunications and Utilities",
+       "page": 5
+      },
+      {
+       "code": "00992",
+       "name": "聯想集團",
+       "name_en": "LENOVO GROUP",
+       "weight_pct": 0.81,
+       "faf_pct": 60.0,
+       "group": "Information Technology",
+       "page": 5
+      },
+      {
+       "code": "09961",
+       "name": "攜程集團-S",
+       "name_en": "TRIP.COM - S",
+       "weight_pct": 0.73,
+       "faf_pct": 50.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "02020",
+       "name": "安踏體育",
+       "name_en": "ANTA SPORTS",
+       "weight_pct": 0.71,
+       "faf_pct": 50.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "00386",
+       "name": "中國石油化工股份",
+       "name_en": "SINOPEC CORP (H)",
+       "weight_pct": 0.66,
+       "faf_pct": 95.0,
+       "group": "Energy, Materials, Industrials and Conglomerates",
+       "page": 5
+      },
+      {
+       "code": "00823",
+       "name": "領展房產基金",
+       "name_en": "LINK REIT",
+       "weight_pct": 0.65,
+       "faf_pct": 100.0,
+       "group": "Properties & Construction",
+       "page": 5
+      },
+      {
+       "code": "09992",
+       "name": "泡泡瑪特",
+       "name_en": "POP MART",
+       "weight_pct": 0.65,
+       "faf_pct": 55.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "02359",
+       "name": "藥明康德",
+       "name_en": "WUXI APPTEC (H)",
+       "weight_pct": 0.63,
+       "faf_pct": 100.0,
+       "group": "Healthcare",
+       "page": 5
+      },
+      {
+       "code": "01113",
+       "name": "長實集團",
+       "name_en": "CK ASSET",
+       "weight_pct": 0.59,
+       "faf_pct": 55.0,
+       "group": "Properties & Construction",
+       "page": 5
+      },
+      {
+       "code": "01109",
+       "name": "華潤置地",
+       "name_en": "CHINA RES LAND",
+       "weight_pct": 0.58,
+       "faf_pct": 45.0,
+       "group": "Properties & Construction",
+       "page": 5
+      },
+      {
+       "code": "00006",
+       "name": "電能實業",
+       "name_en": "POWER ASSETS",
+       "weight_pct": 0.57,
+       "faf_pct": 65.0,
+       "group": "Telecommunications and Utilities",
+       "page": 5
+      },
+      {
+       "code": "09633",
+       "name": "農夫山泉",
+       "name_en": "NONGFU SPRING (H)",
+       "weight_pct": 0.57,
+       "faf_pct": 40.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "00175",
+       "name": "吉利汽車",
+       "name_en": "GEELY AUTO",
+       "weight_pct": 0.54,
+       "faf_pct": 60.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "00003",
+       "name": "香港中華煤氣",
+       "name_en": "HK & CHINA GAS",
+       "weight_pct": 0.51,
+       "faf_pct": 60.0,
+       "group": "Telecommunications and Utilities",
+       "page": 5
+      },
+      {
+       "code": "01024",
+       "name": "快手-W",
+       "name_en": "KUAISHOU - W",
+       "weight_pct": 0.48,
+       "faf_pct": 75.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "03750",
+       "name": "寧德時代",
+       "name_en": "CATL (H)",
+       "weight_pct": 0.47,
+       "faf_pct": 95.0,
+       "group": "Energy, Materials, Industrials and Conglomerates",
+       "page": 5
+      },
+      {
+       "code": "00027",
+       "name": "銀河娛樂",
+       "name_en": "GALAXY ENT",
+       "weight_pct": 0.45,
+       "faf_pct": 50.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "00267",
+       "name": "中信股份",
+       "name_en": "CITIC",
+       "weight_pct": 0.45,
+       "faf_pct": 20.0,
+       "group": "Energy, Materials, Industrials and Conglomerates",
+       "page": 5
+      },
+      {
+       "code": "02319",
+       "name": "蒙牛乳業",
+       "name_en": "MENGNIU DAIRY",
+       "weight_pct": 0.44,
+       "faf_pct": 80.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "02057",
+       "name": "中通快遞-W",
+       "name_en": "ZTO EXPRESS - W",
+       "weight_pct": 0.43,
+       "faf_pct": 55.0,
+       "group": "Energy, Materials, Industrials and Conglomerates",
+       "page": 5
+      },
+      {
+       "code": "01093",
+       "name": "石藥集團",
+       "name_en": "CSPC PHARMA",
+       "weight_pct": 0.4,
+       "faf_pct": 70.0,
+       "group": "Healthcare",
+       "page": 5
+      },
+      {
+       "code": "00300",
+       "name": "美的集團",
+       "name_en": "MIDEA GROUP (H)",
+       "weight_pct": 0.39,
+       "faf_pct": 95.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "01347",
+       "name": "華虹宏力",
+       "name_en": "HUA HONG GRACE",
+       "weight_pct": 0.38,
+       "faf_pct": 60.0,
+       "group": "Information Technology",
+       "page": 5
+      },
+      {
+       "code": "01378",
+       "name": "中國宏橋",
+       "name_en": "CHINAHONGQIAO",
+       "weight_pct": 0.38,
+       "faf_pct": 35.0,
+       "group": "Energy, Materials, Industrials and Conglomerates",
+       "page": 5
+      },
+      {
+       "code": "00066",
+       "name": "港鐵公司",
+       "name_en": "MTR CORPORATION",
+       "weight_pct": 0.37,
+       "faf_pct": 30.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "01519",
+       "name": "極兔速遞-W",
+       "name_en": "J&T EXPRESS - W",
+       "weight_pct": 0.37,
+       "faf_pct": 70.0,
+       "group": "Energy, Materials, Industrials and Conglomerates",
+       "page": 5
+      },
+      {
+       "code": "00728",
+       "name": "中國電信",
+       "name_en": "CHINA TELECOM (H)",
+       "weight_pct": 0.36,
+       "faf_pct": 95.0,
+       "group": "Telecommunications and Utilities",
+       "page": 5
+      },
+      {
+       "code": "00288",
+       "name": "萬洲國際",
+       "name_en": "WH GROUP",
+       "weight_pct": 0.35,
+       "faf_pct": 65.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "02015",
+       "name": "理想汽車-W",
+       "name_en": "LI AUTO - W",
+       "weight_pct": 0.35,
+       "faf_pct": 60.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "01177",
+       "name": "中國生物製藥",
+       "name_en": "SBP GROUP",
+       "weight_pct": 0.34,
+       "faf_pct": 55.0,
+       "group": "Healthcare",
+       "page": 5
+      },
+      {
+       "code": "01997",
+       "name": "九龍倉置業",
+       "name_en": "WHARF REIC",
+       "weight_pct": 0.33,
+       "faf_pct": 55.0,
+       "group": "Properties & Construction",
+       "page": 5
+      },
+      {
+       "code": "06690",
+       "name": "海爾智家",
+       "name_en": "HAIER SMARTHOME (H)",
+       "weight_pct": 0.33,
+       "faf_pct": 85.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "03692",
+       "name": "翰森製藥",
+       "name_en": "HANSOH PHARMA",
+       "weight_pct": 0.3,
+       "faf_pct": 25.0,
+       "group": "Healthcare",
+       "page": 5
+      },
+      {
+       "code": "00688",
+       "name": "中國海外發展",
+       "name_en": "CHINA OVERSEAS",
+       "weight_pct": 0.28,
+       "faf_pct": 35.0,
+       "group": "Properties & Construction",
+       "page": 5
+      },
+      {
+       "code": "01038",
+       "name": "長江基建集團",
+       "name_en": "CKI HOLDINGS",
+       "weight_pct": 0.28,
+       "faf_pct": 25.0,
+       "group": "Telecommunications and Utilities",
+       "page": 5
+      },
+      {
+       "code": "00012",
+       "name": "恒基地產",
+       "name_en": "HENDERSON LAND",
+       "weight_pct": 0.26,
+       "faf_pct": 30.0,
+       "group": "Properties & Construction",
+       "page": 5
+      },
+      {
+       "code": "00762",
+       "name": "中國聯通",
+       "name_en": "CHINA UNICOM",
+       "weight_pct": 0.26,
+       "faf_pct": 25.0,
+       "group": "Telecommunications and Utilities",
+       "page": 5
+      },
+      {
+       "code": "00836",
+       "name": "華潤電力",
+       "name_en": "CHINA RES POWER",
+       "weight_pct": 0.26,
+       "faf_pct": 40.0,
+       "group": "Telecommunications and Utilities",
+       "page": 5
+      },
+      {
+       "code": "02338",
+       "name": "濰柴動力",
+       "name_en": "WEICHAI POWER (H)",
+       "weight_pct": 0.26,
+       "faf_pct": 100.0,
+       "group": "Energy, Materials, Industrials and Conglomerates",
+       "page": 5
+      },
+      {
+       "code": "02382",
+       "name": "舜宇光學科技",
+       "name_en": "SUNNY OPTICAL",
+       "weight_pct": 0.26,
+       "faf_pct": 65.0,
+       "group": "Information Technology",
+       "page": 5
+      },
+      {
+       "code": "03993",
+       "name": "洛陽鉬業",
+       "name_en": "CMOC (H)",
+       "weight_pct": 0.25,
+       "faf_pct": 95.0,
+       "group": "Energy, Materials, Industrials and Conglomerates",
+       "page": 5
+      },
+      {
+       "code": "06618",
+       "name": "京東健康",
+       "name_en": "JD HEALTH",
+       "weight_pct": 0.24,
+       "faf_pct": 35.0,
+       "group": "Healthcare",
+       "page": 5
+      },
+      {
+       "code": "02688",
+       "name": "新奧能源",
+       "name_en": "ENN ENERGY",
+       "weight_pct": 0.23,
+       "faf_pct": 65.0,
+       "group": "Telecommunications and Utilities",
+       "page": 5
+      },
+      {
+       "code": "02313",
+       "name": "申洲國際",
+       "name_en": "SHENZHOU INTL",
+       "weight_pct": 0.22,
+       "faf_pct": 55.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "09901",
+       "name": "新東方-S",
+       "name_en": "NEW ORIENTAL - S",
+       "weight_pct": 0.22,
+       "faf_pct": 50.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "00291",
+       "name": "華潤啤酒",
+       "name_en": "CHINA RES BEER",
+       "weight_pct": 0.21,
+       "faf_pct": 50.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "00322",
+       "name": "康師傅控股",
+       "name_en": "TINGYI",
+       "weight_pct": 0.17,
+       "faf_pct": 35.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "02331",
+       "name": "李寧",
+       "name_en": "LI NING",
+       "weight_pct": 0.17,
+       "faf_pct": 85.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "01209",
+       "name": "華潤萬象生活",
+       "name_en": "CHINA RES MIXC",
+       "weight_pct": 0.16,
+       "faf_pct": 30.0,
+       "group": "Properties & Construction",
+       "page": 5
+      },
+      {
+       "code": "02618",
+       "name": "京東物流",
+       "name_en": "JD LOGISTICS",
+       "weight_pct": 0.16,
+       "faf_pct": 40.0,
+       "group": "Energy, Materials, Industrials and Conglomerates",
+       "page": 5
+      },
+      {
+       "code": "01929",
+       "name": "周大福",
+       "name_en": "CHOW TAI FOOK",
+       "weight_pct": 0.14,
+       "faf_pct": 20.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "02600",
+       "name": "中國鋁業",
+       "name_en": "CHALCO (H)",
+       "weight_pct": 0.14,
+       "faf_pct": 95.0,
+       "group": "Energy, Materials, Industrials and Conglomerates",
+       "page": 5
+      },
+      {
+       "code": "06862",
+       "name": "海底撈",
+       "name_en": "HAIDILAO",
+       "weight_pct": 0.14,
+       "faf_pct": 40.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "01099",
+       "name": "國藥控股",
+       "name_en": "SINOPHARM (H)",
+       "weight_pct": 0.13,
+       "faf_pct": 95.0,
+       "group": "Healthcare",
+       "page": 5
+      },
+      {
+       "code": "01928",
+       "name": "金沙中國有限公司",
+       "name_en": "SANDS CHINA LTD",
+       "weight_pct": 0.13,
+       "faf_pct": 25.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "00316",
+       "name": "東方海外國際",
+       "name_en": "OOIL",
+       "weight_pct": 0.12,
+       "faf_pct": 20.0,
+       "group": "Energy, Materials, Industrials and Conglomerates",
+       "page": 5
+      },
+      {
+       "code": "00241",
+       "name": "阿里健康",
+       "name_en": "ALI HEALTH",
+       "weight_pct": 0.11,
+       "faf_pct": 40.0,
+       "group": "Healthcare",
+       "page": 5
+      },
+      {
+       "code": "06181",
+       "name": "老鋪黃金",
+       "name_en": "LAOPU GOLD (H)",
+       "weight_pct": 0.11,
+       "faf_pct": 45.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "00285",
+       "name": "比亞迪電子",
+       "name_en": "BYD ELECTRONIC",
+       "weight_pct": 0.09,
+       "faf_pct": 35.0,
+       "group": "Information Technology",
+       "page": 5
+      },
+      {
+       "code": "00868",
+       "name": "信義玻璃",
+       "name_en": "XINYI GLASS",
+       "weight_pct": 0.09,
+       "faf_pct": 40.0,
+       "group": "Energy, Materials, Industrials and Conglomerates",
+       "page": 5
+      },
+      {
+       "code": "01044",
+       "name": "恒安國際",
+       "name_en": "HENGAN INT'L",
+       "weight_pct": 0.09,
+       "faf_pct": 55.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "01876",
+       "name": "百威亞太",
+       "name_en": "BUD APAC",
+       "weight_pct": 0.08,
+       "faf_pct": 15.0,
+       "group": "Consumer Discretionary and Consumer Staples",
+       "page": 4
+      },
+      {
+       "code": "00101",
+       "name": "恒隆地產",
+       "name_en": "HANG LUNG PPT",
+       "weight_pct": 0.07,
+       "faf_pct": 35.0,
+       "group": "Properties & Construction",
+       "page": 5
+      },
+      {
+       "code": "00960",
+       "name": "龍湖集團",
+       "name_en": "LONGFOR GROUP",
+       "weight_pct": 0.05,
+       "faf_pct": 35.0,
+       "group": "Properties & Construction",
+       "page": 5
+      },
+      {
+       "code": "00968",
+       "name": "信義光能",
+       "name_en": "XINYI SOLAR",
+       "weight_pct": 0.05,
+       "faf_pct": 50.0,
+       "group": "Energy, Materials, Industrials and Conglomerates",
+       "page": 5
+      }
+     ]
+    }
+   ]
+  },
+  "hstech": {
+   "name": "恒生科技指數",
+   "official_name": "Hang Seng TECH Index",
+   "versions": [
+    {
+     "id": "hstech-current",
+     "status": "current",
+     "effective_from": null,
+     "weights_column": "Before",
+     "weights_as_of": "2026-11-18",
+     "weights_note": "Weighting of the current constituents on the review reference date, before re-capping and before the announced changes.",
+     "source_pages": "Appendix 3, pp.8-9",
+     "count": 30,
+     "members": [
+      {
+       "code": "01810",
+       "name": "小米集團-W",
+       "name_en": "XIAOMI - W",
+       "weight_pct": 10.36,
+       "faf_pct": 70.0,
+       "group": "Information Technology",
+       "page": 8
+      },
+      {
+       "code": "09999",
+       "name": "網易",
+       "name_en": "NTES",
+       "weight_pct": 9.6,
+       "faf_pct": 55.0,
+       "group": "Information Technology",
+       "page": 8
+      },
+      {
+       "code": "03690",
+       "name": "美團-W",
+       "name_en": "MEITUAN - W",
+       "weight_pct": 8.81,
+       "faf_pct": 90.0,
+       "group": "Consumer Discretionary",
+       "page": 9
+      },
+      {
+       "code": "00700",
+       "name": "騰訊控股",
+       "name_en": "TENCENT",
+       "weight_pct": 8.13,
+       "faf_pct": 70.0,
+       "group": "Information Technology",
+       "page": 8
+      },
+      {
+       "code": "09988",
+       "name": "阿里巴巴-W",
+       "name_en": "BABA - W",
+       "weight_pct": 7.43,
+       "faf_pct": 100.0,
+       "group": "Consumer Discretionary",
+       "page": 9
+      },
+      {
+       "code": "01211",
+       "name": "比亞迪股份",
+       "name_en": "BYD COMPANY (H)",
+       "weight_pct": 6.99,
+       "faf_pct": 100.0,
+       "group": "Consumer Discretionary",
+       "page": 9
+      },
+      {
+       "code": "00981",
+       "name": "中芯國際",
+       "name_en": "SMIC",
+       "weight_pct": 6.88,
+       "faf_pct": 85.0,
+       "group": "Information Technology",
+       "page": 8
+      },
+      {
+       "code": "09618",
+       "name": "京東集團-SW",
+       "name_en": "JD - SW",
+       "weight_pct": 5.26,
+       "faf_pct": 55.0,
+       "group": "Consumer Discretionary",
+       "page": 9
+      },
+      {
+       "code": "00992",
+       "name": "聯想集團",
+       "name_en": "LENOVO GROUP",
+       "weight_pct": 4.45,
+       "faf_pct": 60.0,
+       "group": "Information Technology",
+       "page": 8
+      },
+      {
+       "code": "09961",
+       "name": "攜程集團-S",
+       "name_en": "TRIP.COM - S",
+       "weight_pct": 4.11,
+       "faf_pct": 50.0,
+       "group": "Consumer Discretionary",
+       "page": 9
+      },
+      {
+       "code": "09888",
+       "name": "百度集團-W",
+       "name_en": "BIDU - W",
+       "weight_pct": 3.82,
+       "faf_pct": 80.0,
+       "group": "Consumer Discretionary",
+       "page": 9
+      },
+      {
+       "code": "01024",
+       "name": "快手-W",
+       "name_en": "KUAISHOU - W",
+       "weight_pct": 2.53,
+       "faf_pct": 75.0,
+       "group": "Consumer Discretionary",
+       "page": 9
+      },
+      {
+       "code": "09868",
+       "name": "小鵬集團-W",
+       "name_en": "XPENG - W",
+       "weight_pct": 2.24,
+       "faf_pct": 85.0,
+       "group": "Consumer Discretionary",
+       "page": 9
+      },
+      {
+       "code": "00300",
+       "name": "美的集團",
+       "name_en": "MIDEA GROUP (H)",
+       "weight_pct": 2.2,
+       "faf_pct": 95.0,
+       "group": "Consumer Discretionary",
+       "page": 9
+      },
+      {
+       "code": "02015",
+       "name": "理想汽車-W",
+       "name_en": "LI AUTO - W",
+       "weight_pct": 2.16,
+       "faf_pct": 60.0,
+       "group": "Consumer Discretionary",
+       "page": 9
+      },
+      {
+       "code": "01347",
+       "name": "華虹宏力",
+       "name_en": "HUA HONG GRACE",
+       "weight_pct": 2.15,
+       "faf_pct": 60.0,
+       "group": "Information Technology",
+       "page": 8
+      },
+      {
+       "code": "06690",
+       "name": "海爾智家",
+       "name_en": "HAIER SMARTHOME (H)",
+       "weight_pct": 1.84,
+       "faf_pct": 85.0,
+       "group": "Consumer Discretionary",
+       "page": 9
+      },
+      {
+       "code": "02382",
+       "name": "舜宇光學科技",
+       "name_en": "SUNNY OPTICAL",
+       "weight_pct": 1.49,
+       "faf_pct": 65.0,
+       "group": "Information Technology",
+       "page": 8
+      },
+      {
+       "code": "09660",
+       "name": "地平線機器人-W",
+       "name_en": "HORIZONROBOT - W",
+       "weight_pct": 1.41,
+       "faf_pct": 75.0,
+       "group": "Information Technology",
+       "page": 8
+      },
+      {
+       "code": "06618",
+       "name": "京東健康",
+       "name_en": "JD HEALTH",
+       "weight_pct": 1.36,
+       "faf_pct": 35.0,
+       "group": "Healthcare",
+       "page": 9
+      },
+      {
+       "code": "00020",
+       "name": "商湯-W",
+       "name_en": "SENSETIME - W",
+       "weight_pct": 1.32,
+       "faf_pct": 85.0,
+       "group": "Information Technology",
+       "page": 8
+      },
+      {
+       "code": "02513",
+       "name": "智譜",
+       "name_en": "Z.AI (H)",
+       "weight_pct": 1.17,
+       "faf_pct": 35.0,
+       "group": "Information Technology",
+       "page": 8
+      },
+      {
+       "code": "09626",
+       "name": "嗶哩嗶哩-W",
+       "name_en": "BILIBILI - W",
+       "weight_pct": 1.03,
+       "faf_pct": 80.0,
+       "group": "Consumer Discretionary",
+       "page": 9
+      },
+      {
+       "code": "00100",
+       "name": "MINIMAX-W",
+       "name_en": "MINIMAX - W",
+       "weight_pct": 0.73,
+       "faf_pct": 55.0,
+       "group": "Information Technology",
+       "page": 8
+      },
+      {
+       "code": "09863",
+       "name": "零跑汽車",
+       "name_en": "LEAPMOTOR (H)",
+       "weight_pct": 0.7,
+       "faf_pct": 60.0,
+       "group": "Consumer Discretionary",
+       "page": 9
+      },
+      {
+       "code": "00241",
+       "name": "阿里健康",
+       "name_en": "ALI HEALTH",
+       "weight_pct": 0.61,
+       "faf_pct": 40.0,
+       "group": "Healthcare",
+       "page": 9
+      },
+      {
+       "code": "00285",
+       "name": "比亞迪電子",
+       "name_en": "BYD ELECTRONIC",
+       "weight_pct": 0.52,
+       "faf_pct": 35.0,
+       "group": "Information Technology",
+       "page": 8
+      },
+      {
+       "code": "09866",
+       "name": "蔚來-SW",
+       "name_en": "NIO - SW",
+       "weight_pct": 0.49,
+       "faf_pct": 25.0,
+       "group": "Consumer Discretionary",
+       "page": 9
+      },
+      {
+       "code": "09903",
+       "name": "天數智芯",
+       "name_en": "ILUVATAR COREX (H)",
+       "weight_pct": 0.11,
+       "faf_pct": 20.0,
+       "group": "Information Technology",
+       "page": 8
+      },
+      {
+       "code": "01698",
+       "name": "騰訊音樂-SW",
+       "name_en": "TME - SW",
+       "weight_pct": 0.08,
+       "faf_pct": 3.0,
+       "group": "Consumer Discretionary",
+       "page": 9
+      }
+     ]
+    },
+    {
+     "id": "hstech-2026-12-07",
+     "status": "announced",
+     "effective_from": "2026-12-07",
+     "implemented_after_close": "2026-12-04",
+     "weights_column": "After",
+     "weights_as_of": "2026-11-18",
+     "weights_note": "Pro-forma weighting after the announced re-capping and constituent changes. Not in force before the effective date.",
+     "source_pages": "Appendix 3, pp.8-9",
+     "count": 50,
+     "added": [
+      "00148",
+      "00522",
+      "01729",
+      "01888",
+      "02018",
+      "02475",
+      "02476",
+      "02525",
+      "02577",
+      "02706",
+      "03308",
+      "03317",
+      "03750",
+      "03896",
+      "06082",
+      "06809",
+      "06869",
+      "09678",
+      "09698",
+      "09880"
+     ],
+     "removed": [],
+     "members": [
+      {
+       "code": "00700",
+       "name": "騰訊控股",
+       "name_en": "TENCENT",
+       "weight_pct": 8.0,
+       "faf_pct": 70.0,
+       "group": "Information Technology",
+       "page": 8
+      },
+      {
+       "code": "01810",
+       "name": "小米集團-W",
+       "name_en": "XIAOMI - W",
+       "weight_pct": 8.0,
+       "faf_pct": 70.0,
+       "group": "Information Technology",
+       "page": 8
+      },
+      {
+       "code": "03690",
+       "name": "美團-W",
+       "name_en": "MEITUAN - W",
+       "weight_pct": 8.0,
+       "faf_pct": 90.0,
+       "group": "Consumer Discretionary",
+       "page": 9
+      },
+      {
+       "code": "09988",
+       "name": "阿里巴巴-W",
+       "name_en": "BABA - W",
+       "weight_pct": 8.0,
+       "faf_pct": 100.0,
+       "group": "Consumer Discretionary",
+       "page": 9
+      },
+      {
+       "code": "09999",
+       "name": "網易",
+       "name_en": "NTES",
+       "weight_pct": 8.0,
+       "faf_pct": 55.0,
+       "group": "Information Technology",
+       "page": 8
+      },
+      {
+       "code": "00981",
+       "name": "中芯國際",
+       "name_en": "SMIC",
+       "weight_pct": 7.12,
+       "faf_pct": 85.0,
+       "group": "Information Technology",
+       "page": 8
+      },
+      {
+       "code": "01211",
+       "name": "比亞迪股份",
+       "name_en": "BYD COMPANY (H)",
+       "weight_pct": 6.67,
+       "faf_pct": 100.0,
+       "group": "Consumer Discretionary",
+       "page": 9
+      },
+      {
+       "code": "09888",
+       "name": "百度集團-W",
+       "name_en": "BIDU - W",
+       "weight_pct": 4.38,
+       "faf_pct": 80.0,
+       "group": "Consumer Discretionary",
+       "page": 9
+      },
+      {
+       "code": "09618",
+       "name": "京東集團-SW",
+       "name_en": "JD - SW",
+       "weight_pct": 4.28,
+       "faf_pct": 55.0,
+       "group": "Consumer Discretionary",
+       "page": 9
+      },
+      {
+       "code": "00992",
+       "name": "聯想集團",
+       "name_en": "LENOVO GROUP",
+       "weight_pct": 3.74,
+       "faf_pct": 60.0,
+       "group": "Information Technology",
+       "page": 8
+      },
+      {
+       "code": "09961",
+       "name": "攜程集團-S",
+       "name_en": "TRIP.COM - S",
+       "weight_pct": 3.35,
+       "faf_pct": 50.0,
+       "group": "Consumer Discretionary",
+       "page": 9
+      },
+      {
+       "code": "01024",
+       "name": "快手-W",
+       "name_en": "KUAISHOU - W",
+       "weight_pct": 2.2,
+       "faf_pct": 75.0,
+       "group": "Consumer Discretionary",
+       "page": 9
+      },
+      {
+       "code": "03750",
+       "name": "寧德時代",
+       "name_en": "CATL (H)",
+       "weight_pct": 2.17,
+       "faf_pct": 95.0,
+       "group": "Industrials",
+       "page": 9
+      },
+      {
+       "code": "09868",
+       "name": "小鵬集團-W",
+       "name_en": "XPENG - W",
+       "weight_pct": 1.82,
+       "faf_pct": 85.0,
+       "group": "Consumer Discretionary",
+       "page": 9
+      },
+      {
+       "code": "00300",
+       "name": "美的集團",
+       "name_en": "MIDEA GROUP (H)",
+       "weight_pct": 1.79,
+       "faf_pct": 95.0,
+       "group": "Consumer Discretionary",
+       "page": 9
+      },
+      {
+       "code": "01347",
+       "name": "華虹宏力",
+       "name_en": "HUA HONG GRACE",
+       "weight_pct": 1.75,
+       "faf_pct": 60.0,
+       "group": "Information Technology",
+       "page": 8
+      },
+      {
+       "code": "02015",
+       "name": "理想汽車-W",
+       "name_en": "LI AUTO - W",
+       "weight_pct": 1.59,
+       "faf_pct": 60.0,
+       "group": "Consumer Discretionary",
+       "page": 9
+      },
+      {
+       "code": "06690",
+       "name": "海爾智家",
+       "name_en": "HAIER SMARTHOME (H)",
+       "weight_pct": 1.5,
+       "faf_pct": 85.0,
+       "group": "Consumer Discretionary",
+       "page": 9
+      },
+      {
+       "code": "02382",
+       "name": "舜宇光學科技",
+       "name_en": "SUNNY OPTICAL",
+       "weight_pct": 1.21,
+       "faf_pct": 65.0,
+       "group": "Information Technology",
+       "page": 8
+      },
+      {
+       "code": "09660",
+       "name": "地平線機器人-W",
+       "name_en": "HORIZONROBOT - W",
+       "weight_pct": 1.17,
+       "faf_pct": 75.0,
+       "group": "Information Technology",
+       "page": 8
+      },
+      {
+       "code": "06618",
+       "name": "京東健康",
+       "name_en": "JD HEALTH",
+       "weight_pct": 1.1,
+       "faf_pct": 35.0,
+       "group": "Healthcare",
+       "page": 9
+      },
+      {
+       "code": "00020",
+       "name": "商湯-W",
+       "name_en": "SENSETIME - W",
+       "weight_pct": 1.07,
+       "faf_pct": 85.0,
+       "group": "Information Technology",
+       "page": 8
+      },
+      {
+       "code": "02513",
+       "name": "智譜",
+       "name_en": "Z.AI (H)",
+       "weight_pct": 0.96,
+       "faf_pct": 35.0,
+       "group": "Information Technology",
+       "page": 8
+      },
+      {
+       "code": "06869",
+       "name": "長飛光纖光纜",
+       "name_en": "YOFC (H)",
+       "weight_pct": 0.94,
+       "faf_pct": 100.0,
+       "group": "Information Technology",
+       "page": 8
+      },
+      {
+       "code": "01888",
+       "name": "建滔積層板",
+       "name_en": "KB LAMINATES",
+       "weight_pct": 0.91,
+       "faf_pct": 40.0,
+       "group": "Industrials",
+       "page": 9
+      },
+      {
+       "code": "09626",
+       "name": "嗶哩嗶哩-W",
+       "name_en": "BILIBILI - W",
+       "weight_pct": 0.89,
+       "faf_pct": 80.0,
+       "group": "Consumer Discretionary",
+       "page": 9
+      },
+      {
+       "code": "00522",
+       "name": "ASMPT",
+       "name_en": "ASMPT",
+       "weight_pct": 0.87,
+       "faf_pct": 80.0,
+       "group": "Information Technology",
+       "page": 8
+      },
+      {
+       "code": "00148",
+       "name": "建滔集團",
+       "name_en": "KINGBOARD HLDG",
+       "weight_pct": 0.86,
+       "faf_pct": 70.0,
+       "group": "Industrials",
+       "page": 9
+      },
+      {
+       "code": "02018",
+       "name": "瑞聲科技",
+       "name_en": "AAC TECH",
+       "weight_pct": 0.71,
+       "faf_pct": 65.0,
+       "group": "Information Technology",
+       "page": 8
+      },
+      {
+       "code": "09880",
+       "name": "優必選",
+       "name_en": "UBTECH ROBOTICS (H)",
+       "weight_pct": 0.67,
+       "faf_pct": 80.0,
+       "group": "Information Technology",
+       "page": 8
+      },
+      {
+       "code": "00100",
+       "name": "MINIMAX-W",
+       "name_en": "MINIMAX - W",
+       "weight_pct": 0.66,
+       "faf_pct": 55.0,
+       "group": "Information Technology",
+       "page": 8
+      },
+      {
+       "code": "09863",
+       "name": "零跑汽車",
+       "name_en": "LEAPMOTOR (H)",
+       "weight_pct": 0.57,
+       "faf_pct": 60.0,
+       "group": "Consumer Discretionary",
+       "page": 9
+      },
+      {
+       "code": "03308",
+       "name": "中際旭創",
+       "name_en": "ZJ INNOLIGHT (H)",
+       "weight_pct": 0.54,
+       "faf_pct": 60.0,
+       "group": "Information Technology",
+       "page": 8
+      },
+      {
+       "code": "00241",
+       "name": "阿里健康",
+       "name_en": "ALI HEALTH",
+       "weight_pct": 0.5,
+       "faf_pct": 40.0,
+       "group": "Healthcare",
+       "page": 9
+      },
+      {
+       "code": "06082",
+       "name": "壁仞科技",
+       "name_en": "BIREN TECH (H)",
+       "weight_pct": 0.43,
+       "faf_pct": 45.0,
+       "group": "Information Technology",
+       "page": 8
+      },
+      {
+       "code": "00285",
+       "name": "比亞迪電子",
+       "name_en": "BYD ELECTRONIC",
+       "weight_pct": 0.42,
+       "faf_pct": 35.0,
+       "group": "Information Technology",
+       "page": 8
+      },
+      {
+       "code": "09866",
+       "name": "蔚來-SW",
+       "name_en": "NIO - SW",
+       "weight_pct": 0.4,
+       "faf_pct": 25.0,
+       "group": "Consumer Discretionary",
+       "page": 9
+      },
+      {
+       "code": "02525",
+       "name": "禾賽-W",
+       "name_en": "HESAI - W",
+       "weight_pct": 0.38,
+       "faf_pct": 85.0,
+       "group": "Information Technology",
+       "page": 8
+      },
+      {
+       "code": "02577",
+       "name": "英諾賽科",
+       "name_en": "INNOSCIENCE (H)",
+       "weight_pct": 0.34,
+       "faf_pct": 50.0,
+       "group": "Information Technology",
+       "page": 8
+      },
+      {
+       "code": "09903",
+       "name": "天數智芯",
+       "name_en": "ILUVATAR COREX (H)",
+       "weight_pct": 0.32,
+       "faf_pct": 20.0,
+       "group": "Information Technology",
+       "page": 8
+      },
+      {
+       "code": "06809",
+       "name": "瀾起科技",
+       "name_en": "MONTAGE TECH (H)",
+       "weight_pct": 0.3,
+       "faf_pct": 90.0,
+       "group": "Information Technology",
+       "page": 8
+      },
+      {
+       "code": "03896",
+       "name": "金山雲",
+       "name_en": "KINGSOFT CLOUD",
+       "weight_pct": 0.27,
+       "faf_pct": 60.0,
+       "group": "Information Technology",
+       "page": 8
+      },
+      {
+       "code": "02475",
+       "name": "立訊精密",
+       "name_en": "LUXSHARE ICT (H)",
+       "weight_pct": 0.26,
+       "faf_pct": 50.0,
+       "group": "Information Technology",
+       "page": 8
+      },
+      {
+       "code": "01729",
+       "name": "匯聚科技",
+       "name_en": "TIME INTERCON",
+       "weight_pct": 0.25,
+       "faf_pct": 40.0,
+       "group": "Information Technology",
+       "page": 8
+      },
+      {
+       "code": "02476",
+       "name": "勝宏科技",
+       "name_en": "VGT (H)",
+       "weight_pct": 0.21,
+       "faf_pct": 70.0,
+       "group": "Industrials",
+       "page": 9
+      },
+      {
+       "code": "09698",
+       "name": "萬國數據-SW",
+       "name_en": "GDS - SW",
+       "weight_pct": 0.15,
+       "faf_pct": 20.0,
+       "group": "Information Technology",
+       "page": 8
+      },
+      {
+       "code": "01698",
+       "name": "騰訊音樂-SW",
+       "name_en": "TME - SW",
+       "weight_pct": 0.1,
+       "faf_pct": 3.0,
+       "group": "Consumer Discretionary",
+       "page": 9
+      },
+      {
+       "code": "03317",
+       "name": "迅策",
+       "name_en": "XUNCE (H)",
+       "weight_pct": 0.06,
+       "faf_pct": 15.0,
+       "group": "Information Technology",
+       "page": 8
+      },
+      {
+       "code": "09678",
+       "name": "雲知聲",
+       "name_en": "UNISOUND (H)",
+       "weight_pct": 0.05,
+       "faf_pct": 85.0,
+       "group": "Information Technology",
+       "page": 8
+      },
+      {
+       "code": "02706",
+       "name": "海致科技集團",
+       "name_en": "HAIZHI TECH GP (H)",
+       "weight_pct": 0.03,
+       "faf_pct": 8.0,
+       "group": "Information Technology",
+       "page": 8
+      }
+     ]
+    }
+   ]
+  }
+ }
+}

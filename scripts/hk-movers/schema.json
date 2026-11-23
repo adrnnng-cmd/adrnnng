@@ -1,15 +1,19 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://news-chart.com/hk-movers/schema.json",
-  "title": "HK Movers snapshot",
-  "description": "One JSON document. The collector (scripts/hk_movers_sync.py) writes it to the KV key hk-movers:latest.json; /hk-movers/data/latest serves it; /hk-movers/data/sample.json is the labelled demo copy. Money is HK$ in plain numbers. Percentages are percent points (1.5 means +1.5%).",
+  "$id": "https://news-chart.com/movers/schema.json",
+  "title": "Movers snapshot",
+  "description": "One JSON document. The collector (scripts/hk_movers_sync.py) writes it to the KV key hk-movers:latest.json (unchanged); /movers/data/latest serves it, and so does the old /hk-movers/data/latest; /movers/data/sample.json is the labelled demo copy. Money is HK$ in plain numbers. Percentages are percent points (1.5 means +1.5%). schema_version stays 1: the hstech, members, roster, returns and movers.hstech fields are optional additions, so a document written by an older collector still validates and the page shows the missing parts as unavailable.",
   "type": "object",
   "required": ["schema_version", "data_source", "updated_at_hkt", "market_session", "hsi", "hk_market", "macro_sectors", "movers"],
   "properties": {
     "schema_version": { "const": 1 },
     "data_source": { "enum": ["live", "demo"], "description": "demo marks synthetic data; the page shows a banner." },
     "notice": { "type": "string", "description": "Optional extra line for the demo banner." },
-    "updated_at_hkt": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}[ T]\\d{2}:\\d{2}(:\\d{2})?$", "description": "Hong Kong wall-clock time the collector run started. It is the snapshot time, not an exchange quote time. The page calls this a snapshot (快照), not a live stream." },
+    "updated_at_hkt": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}[ T]\\d{2}:\\d{2}(:\\d{2})?$",
+      "description": "Hong Kong wall-clock time the collector run started. It is the snapshot time, not an exchange quote time. The page calls this a snapshot (快照), not a live stream."
+    },
     "market_session": { "enum": ["pre_open", "morning", "lunch", "afternoon", "closing_auction", "closed"] },
     "hsi": {
       "type": "object",
@@ -28,7 +32,14 @@
         },
         "breadth": { "$ref": "#/$defs/breadth" },
         "turnover_hkd": { "type": "number", "minimum": 0 },
-        "constituents": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/stock" }, "description": "About 95 Hang Seng Index members. No liquidity filter." }
+        "constituents": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/stock" },
+          "description": "The priced members of the official Hang Seng Index roster (95). No liquidity filter."
+        },
+        "members": { "$ref": "#/$defs/members" },
+        "roster": { "$ref": "#/$defs/roster" }
       }
     },
     "hk_market": {
@@ -47,7 +58,11 @@
         "qualified_count": { "type": "integer", "minimum": 0 },
         "breadth": { "$ref": "#/$defs/breadth" },
         "turnover_hkd": { "type": "number", "minimum": 0 },
-        "stocks": { "type": "array", "items": { "$ref": "#/$defs/stock" }, "description": "Only stocks that pass the filters." }
+        "stocks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/stock" },
+          "description": "Only stocks that pass the filters."
+        }
       }
     },
     "macro_sectors": {
@@ -66,7 +81,12 @@
           "up": { "type": "integer" },
           "down": { "type": "integer" },
           "flat": { "type": "integer" },
-          "leader": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/leader" }] },
+          "leader": {
+            "oneOf": [
+              { "type": "null" },
+              { "$ref": "#/$defs/leader" }
+            ]
+          },
           "industries": {
             "type": "array",
             "items": {
@@ -80,7 +100,10 @@
                 "up": { "type": "integer" },
                 "down": { "type": "integer" },
                 "flat": { "type": "integer" },
-                "leaders": { "type": "array", "items": { "$ref": "#/$defs/leader" } }
+                "leaders": {
+                  "type": "array",
+                  "items": { "$ref": "#/$defs/leader" }
+                }
               }
             }
           }
@@ -90,10 +113,11 @@
     "movers": {
       "type": "object",
       "required": ["hsi", "hk"],
-      "description": "Published Top 10 lists. The page recomputes rankings from hsi.constituents and hk_market.stocks, so these must match the default ranking by change_pct.",
+      "description": "Published Top 10 lists (at most 10, never padded with the other direction). The page recomputes rankings from hsi.constituents, hstech.constituents and hk_market.stocks.",
       "properties": {
         "hsi": { "$ref": "#/$defs/moverPair" },
-        "hk": { "$ref": "#/$defs/moverPair" }
+        "hk": { "$ref": "#/$defs/moverPair" },
+        "hstech": { "$ref": "#/$defs/moverPair" }
       }
     },
     "news": {
@@ -109,18 +133,84 @@
           "url": { "type": "string", "pattern": "^https?://" }
         }
       }
+    },
+    "hstech": {
+      "type": "object",
+      "description": "Hang Seng TECH Index view, same shape as hsi. Optional. index values may be null when the index quote is missing; the page then shows them as unavailable.",
+      "required": ["index", "breadth", "turnover_hkd", "constituents"],
+      "properties": {
+        "index": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "last": {
+              "oneOf": [
+                { "type": "null" },
+                { "type": "number" }
+              ]
+            },
+            "prev_close": {
+              "oneOf": [
+                { "type": "null" },
+                { "type": "number" }
+              ]
+            },
+            "change": {
+              "oneOf": [
+                { "type": "null" },
+                { "type": "number" }
+              ]
+            },
+            "change_pct": {
+              "oneOf": [
+                { "type": "null" },
+                { "type": "number" }
+              ]
+            }
+          }
+        },
+        "breadth": { "$ref": "#/$defs/breadth" },
+        "turnover_hkd": { "type": "number", "minimum": 0 },
+        "constituents": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/stock" },
+          "description": "The priced members of the current HSTECH roster. May be empty. No liquidity filter."
+        },
+        "members": { "$ref": "#/$defs/members" },
+        "roster": { "$ref": "#/$defs/roster" }
+      }
+    },
+    "returns": {
+      "type": "object",
+      "description": "Reference dates behind members[].ret_5d / ret_1m / ret_ytd. Returns are (current price / adjusted close on the reference date - 1) * 100. A horizon the history cannot support is null.",
+      "required": ["basis", "as_of"],
+      "properties": {
+        "basis": { "const": "adjusted_close" },
+        "as_of": { "type": "string", "description": "Latest trading day in the index's daily bars." },
+        "d5": { "type": ["string", "null"], "description": "Close 5 trading days before as_of." },
+        "m1": { "type": ["string", "null"], "description": "Last trading day on or before the same calendar day one month before as_of." },
+        "ytd": { "type": ["string", "null"], "description": "Last trading day of the previous calendar year." }
+      }
     }
   },
   "$defs": {
     "breadth": {
       "type": "object",
       "required": ["up", "down", "flat"],
-      "properties": { "up": { "type": "integer" }, "down": { "type": "integer" }, "flat": { "type": "integer" } }
+      "properties": {
+        "up": { "type": "integer" },
+        "down": { "type": "integer" },
+        "flat": { "type": "integer" }
+      }
     },
     "leader": {
       "type": "object",
       "required": ["code", "name", "change_pct"],
-      "properties": { "code": { "type": "string" }, "name": { "type": "string" }, "change_pct": { "type": "number" } }
+      "properties": {
+        "code": { "type": "string" },
+        "name": { "type": "string" },
+        "change_pct": { "type": "number" }
+      }
     },
     "stock": {
       "type": "object",
@@ -143,8 +233,115 @@
       "type": "object",
       "required": ["gainers", "losers"],
       "properties": {
-        "gainers": { "type": "array", "maxItems": 10, "items": { "$ref": "#/$defs/stock" } },
-        "losers": { "type": "array", "maxItems": 10, "items": { "$ref": "#/$defs/stock" } }
+        "gainers": {
+          "type": "array",
+          "maxItems": 10,
+          "items": { "$ref": "#/$defs/stock" }
+        },
+        "losers": {
+          "type": "array",
+          "maxItems": 10,
+          "items": { "$ref": "#/$defs/stock" }
+        }
+      }
+    },
+    "members": {
+      "type": "array",
+      "description": "The full official constituents table: every member of the roster in force, in official weight order, whether or not it has a quote. A member without a usable quote has available false and null numbers.",
+      "items": {
+        "type": "object",
+        "required": ["code", "name", "weight_pct", "available"],
+        "properties": {
+          "code": { "type": "string", "pattern": "^\\d{5}$" },
+          "name": { "type": "string" },
+          "weight_pct": { "type": "number", "description": "Official published index weighting in percent (Hang Seng Indexes Company). Not computed by this site." },
+          "available": { "type": "boolean" },
+          "last": {
+            "oneOf": [
+              { "type": "null" },
+              { "type": "number" }
+            ]
+          },
+          "prev_close": {
+            "oneOf": [
+              { "type": "null" },
+              { "type": "number" }
+            ]
+          },
+          "change_pct": {
+            "oneOf": [
+              { "type": "null" },
+              { "type": "number" }
+            ]
+          },
+          "ret_5d": {
+            "oneOf": [
+              { "type": "null" },
+              { "type": "number" }
+            ]
+          },
+          "ret_1m": {
+            "oneOf": [
+              { "type": "null" },
+              { "type": "number" }
+            ]
+          },
+          "ret_ytd": {
+            "oneOf": [
+              { "type": "null" },
+              { "type": "number" }
+            ]
+          },
+          "market_cap_hkd": {
+            "oneOf": [
+              { "type": "null" },
+              { "type": "number" }
+            ]
+          }
+        }
+      }
+    },
+    "roster": {
+      "type": "object",
+      "description": "Which official roster is in force and where it comes from. Never carries the member list of a future roster.",
+      "required": ["status", "count", "weights_as_of", "source"],
+      "properties": {
+        "status": {
+          "enum": ["current"],
+          "description": "Always the roster in force today. A later announced roster is only described under upcoming, and replaces this one on its effective date."
+        },
+        "count": { "type": "integer" },
+        "weights_as_of": { "type": "string", "description": "Reference date of the published weights (YYYY-MM-DD), not the snapshot date." },
+        "weights_basis": { "type": "string" },
+        "weights_stage": { "enum": ["pre_review", "post_review_pro_forma"], "description": "pre_review: weights of the current constituents before the review's re-capping. post_review_pro_forma: the review's pro-forma weights, in force from the effective date." },
+        "effective_from": { "type": ["string", "null"] },
+        "source": {
+          "type": "object",
+          "required": ["publisher", "announced", "pages", "url"],
+          "properties": {
+            "publisher": { "type": "string" },
+            "announced": { "type": "string" },
+            "pages": { "type": "string" },
+            "url": { "type": "string" }
+          }
+        },
+        "upcoming": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "required": ["effective_from", "count"],
+              "properties": {
+                "effective_from": { "type": "string" },
+                "count": { "type": "integer" },
+                "added_count": { "type": "integer" },
+                "removed_count": { "type": "integer" },
+                "announced": { "type": "string" }
+              }
+            }
+          ],
+          "description": "The announced next roster: effective date, size and how many members are added or removed. Never its member list or weights."
+        }
       }
     }
   }

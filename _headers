@@ -46,13 +46,13 @@
 /politician-tracker/*
   ! X-Robots-Tag
 
-/hk-movers
+/movers
   ! X-Robots-Tag
 
-/hk-movers/
+/movers/
   ! X-Robots-Tag
 
-/hk-movers/*
+/movers/*
   ! X-Robots-Tag
 
 /hsi-lab
@@ -117,13 +117,18 @@
   ! X-Robots-Tag
   X-Robots-Tag: noindex, nofollow
 
-# HK Movers browser JSON. /hk-movers/data/latest is a Pages Function; Pages does not
-# apply this file to Function responses, so the Function sets the same noindex itself.
+# Movers browser JSON. /movers/data/latest (and the old /hk-movers/data/latest, kept so the live
+# feed and any cached page keep working) are Pages Functions; Pages does not apply this file to
+# Function responses, so the Function sets the same noindex itself.
+/movers/data/latest
+  ! X-Robots-Tag
+  X-Robots-Tag: noindex, nofollow
+
 /hk-movers/data/latest
   ! X-Robots-Tag
   X-Robots-Tag: noindex, nofollow
 
-/hk-movers/data/sample.json
+/movers/data/sample.json
   ! X-Robots-Tag
   X-Robots-Tag: noindex, nofollow
   Cache-Control: public, max-age=300
