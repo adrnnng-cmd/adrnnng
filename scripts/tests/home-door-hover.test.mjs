@@ -17,9 +17,9 @@ const SHOT_DIR = process.env.HOME_SHOT_DIR || '';
 // cannot change on hover, however correct the CSS is, so the colour has to exist in the picture itself.
 
 test('the Movers thumbnail is a static heat-map picture: no text, no script, colours from the Movers palette', () => {
-  const home = read('assets/js/home.js');
+  const home = read('assets/js/chrome-html.js');
   const src = /src: '(\/assets\/img\/doors\/[^']+\.svg)'/.exec(home)?.[1];
-  assert.ok(src, 'home.js names the Movers thumbnail');
+  assert.ok(src, 'chrome-html.js names the Movers thumbnail');
   const svg = read(src.slice(1));
   assert.doesNotMatch(svg, /<text|<script|<style|<image|https?:\/\/(?!www\.w3\.org)/);
   const colours = [...svg.matchAll(/fill="(#[0-9a-fA-F]{6})"/g)].map((m) => m[1].toLowerCase());
@@ -36,8 +36,8 @@ test('the Movers thumbnail is a static heat-map picture: no text, no script, col
 // reuse it. That old URL still has to answer: a home.js cached for the zone's four hours still requests it.
 const ORIGINAL_MOVERS_SVG = '58480ae4ec8b3ffbfa37e30842232ee18f5bdc1a217dfb72a4e0c0328d394419';
 
-test('new home.js uses the coloured filename; the original movers.svg bytes stay for a warm older module', () => {
-  const home = read('assets/js/home.js');
+test('new markup uses the coloured filename; the original movers.svg bytes stay for a warm older module', () => {
+  const home = read('assets/js/chrome-html.js') + read('assets/js/home.js') + read('index.html');
   assert.match(home, /src: '\/assets\/img\/doors\/movers-heat\.svg'/);
   assert.doesNotMatch(home, /doors\/movers\.svg/, 'the new module does not ask for the old URL');
   const kept = readFileSync(join(root, 'assets/img/doors/movers.svg'));
@@ -200,7 +200,7 @@ async function hover(tab, point) {
 async function runViewport(t, name, viewport) {
   const { open } = await launch(t);
   const tab = await open('/', viewport);
-  await tab.waitFor(`document.querySelectorAll('#tools .door').length === 4 && [...document.querySelectorAll('#tools .door-photo img')].every((i) => i.complete)`, 'four doors with their pictures');
+  await tab.waitFor(`document.querySelectorAll('#tools .door').length === 4 && [...document.querySelectorAll('#tools .door')].every((d) => d.querySelector('.door-photo img')) && [...document.querySelectorAll('#tools .door-photo img')].every((i) => i.complete)`, 'four doors with their pictures');
   await settle(300);
   const doors = await tab.evaluate(DOOR_STATE);
   assert.deepEqual(doors.map((d) => d.href), ['/backtest/', '/movers/', '/politician-tracker/', '/news/']);
@@ -265,7 +265,7 @@ test('at 375 (touch viewport) the same rule holds when the pointer is over a car
 test('keyboard focus and reduced motion treat every door alike (focus ring on each, no colour change on focus, one transition)', { timeout: 120000 }, async (t) => {
   const { open } = await launch(t);
   const tab = await open('/', { width: 1280, height: 900, reducedMotion: true });
-  await tab.waitFor(`document.querySelectorAll('#tools .door').length === 4 && [...document.querySelectorAll('#tools .door-photo img')].every((i) => i.complete)`, 'four doors');
+  await tab.waitFor(`document.querySelectorAll('#tools .door').length === 4 && [...document.querySelectorAll('#tools .door')].every((d) => d.querySelector('.door-photo img')) && [...document.querySelectorAll('#tools .door-photo img')].every((i) => i.complete)`, 'four doors');
   await tab.evaluate(`document.querySelector('#tools').scrollIntoView(); document.activeElement.blur(); document.body.focus(); true`);
   const seen = [];
   for (let n = 0; n < 80 && seen.length < 4; n++) {

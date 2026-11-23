@@ -41,7 +41,13 @@
   </div>
 
   <header class="mast" data-site-header data-mast="home">
-    <div class="wrap mast-in"><a class="logo" href="/" aria-label="News Chart home"><img class="mark" src="/assets/brand/news-chart-white.svg" alt="News Chart" height="17"></a></div>
+    <div class="wrap mast-in">
+      <a class="logo" href="/" aria-label="News Chart home"><img class="mark" src="/assets/brand/news-chart-white.svg" alt="News Chart" height="17"></a>
+      <div class="mast-r">
+        <span class="d"></span>
+        <a class="box" href="/news/">Morning Report</a>
+      </div>
+    </div>
   </header>
 
   <main>
@@ -87,7 +93,32 @@
 
     <p class="nl-strip wrap"><a href="#newsletter">喜歡今日早報？每朝 9 點前免費送到你的信箱 →</a></p>
 
-    <nav class="doors wrap" id="tools" aria-label="Sections"></nav>
+    <nav class="doors wrap" id="tools" aria-label="Sections">
+      <a class="door" data-door="backtest" href="/backtest/">
+        <span class="ey">Research</span>
+        <h2>Backtest<span class="zh">策略回測</span></h2>
+        <div class="door-photo" data-door-body><picture><source srcset="/assets/img/doors/backtest.webp 2x" type="image/webp"><img src="/assets/img/doors/backtest.jpg" srcset="/assets/img/doors/backtest.jpg 2x" alt="" width="56" height="70"></picture><div><b>TD Sequential 9 / 13</b><span class="">Sharpe · CAGR · Max DD</span></div></div>
+        <span class="go">Open →</span>
+      </a>
+      <a class="door" data-door="movers" href="/movers/">
+        <span class="ey">Markets</span>
+        <h2>Movers<span class="zh">港股異動</span></h2>
+        <div class="door-photo" data-door-body><img src="/assets/img/doors/movers-heat.svg" alt="" width="56" height="70"><div><b>HSI · 升跌榜 · 板塊熱力圖</b><span class="">約 5–6 分鐘更新快照</span></div></div>
+        <span class="go">Open →</span>
+      </a>
+      <a class="door" data-door="politician-tracker" href="/politician-tracker/">
+        <span class="ey">Flow</span>
+        <h2>Politician Tracker<span class="zh">政治人物持股動向</span></h2>
+        <p data-door-body>New STOCK Act disclosures from a VIP list of market-beating members of Congress, plus any member&#39;s trade in a Watchlist ticker. Refreshed every morning.</p>
+        <span class="go">Open →</span>
+      </a>
+      <a class="door" data-door="news" href="/news/">
+        <span class="ey">News</span>
+        <h2>Morning Report<span class="zh">晨報</span></h2>
+        <div class="door-photo" data-door-body><picture><source srcset="/assets/img/doors/news.webp 2x" type="image/webp"><img src="/assets/img/doors/news.jpg" srcset="/assets/img/doors/news.jpg 2x" alt="" width="56" height="70"></picture><div><b>Morning Report</b><span class="">每朝 9 點前</span></div></div>
+        <span class="go">Open →</span>
+      </a>
+    </nav>
 
     <aside class="nl-card" id="newsletter" aria-labelledby="nl-heading">
       <div class="nl-card-in">
@@ -106,8 +137,16 @@
     </aside>
   </main>
 
-  <footer data-site-footer></footer>
+  <footer class="site-footer" data-site-footer>
+    <div class="wrap">
+      <div class="row">
+        <span>ADRRR · Hong Kong · News Chart</span>
+        <span><a href="/backtest/">Backtest</a> · <a href="/movers/">Movers</a> · <a href="/politician-tracker/">Politician Tracker</a> · <a href="/news/">Morning Report</a></span>
+      </div>
+      <div class="fine">Research and education only. Not investment advice. Backtests are hypothetical and do not predict future results.</div>
+    </div>
+  </footer>
   <script type="module" src="/assets/js/site.js"></script>
-  <script type="module" src="/assets/js/home.js?v=da3a82c983"></script>
+  <script type="module" src="/assets/js/home.js?v=3e9ffa08d1"></script>
 </body>
 </html>

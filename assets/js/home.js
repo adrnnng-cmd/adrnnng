@@ -1,4 +1,5 @@
 import { loadRegistry, esc } from './site.js';
+import { doorAnchor, doorPhoto, doorTools, staticDoorBody } from './chrome-html.js';
 import { newsDoorCaption, parseLatest } from './latest.js';
 import { memberPhotoImg } from './member-photo.js';
 import { tdSequential } from '/backtest/strategies/td-sequential.js';
@@ -115,41 +116,12 @@ function paintReport(r) {
     .join('');
 }
 
-function doorPhoto({ webp, jpg, src, img: imgHtml, title, sub, subClass = '' }) {
-  const img = imgHtml
-    ? imgHtml
-    : webp
-      ? `<picture><source srcset="${esc(webp)} 2x" type="image/webp"><img src="${esc(jpg)}" srcset="${esc(jpg)} 2x" alt="" width="56" height="70"></picture>`
-      : src
-        ? `<img src="${esc(src)}" alt="" width="56" height="70">`
-        : '';
-  return `<div class="door-photo">${img}<div><b>${esc(title)}</b><span class="${esc(subClass)}">${esc(sub)}</span></div></div>`;
-}
-
-// Door order and the registry ids each one answers to. The registry and this module are cached separately, so a
-// page can briefly see a registry from before the /hk-movers/ to /movers/ rename; accept the old id and always
-// link the canonical URL.
-const DOORS = [
-  { id: 'backtest' },
-  { id: 'movers', legacy: ['hk-movers'] },
-  { id: 'politician-tracker' },
-  { id: 'news' },
-];
-const CANONICAL_HREF = { movers: '/movers/' };
-
-function findDoor(reg, id, legacy = []) {
-  const tool = [id, ...legacy].map((want) => reg.tools.find((t) => t.id === want)).find(Boolean);
-  if (!tool) return null;
-  return { ...tool, id, href: CANONICAL_HREF[id] || tool.href };
-}
-
+// The committed HTML already has the four door anchors (scripts/static-chrome.mjs), so the links exist without this
+// script. Here only the bodies that depend on data are replaced, inside the existing anchors; the anchors are kept so
+// nothing disappears or reflows. If the markup is missing or does not match the registry, the whole row is rebuilt.
 async function renderDoors() {
   const reg = await loadRegistry();
-  const tools = DOORS.map(({ id, legacy = [] }) => {
-    const door = findDoor(reg, id, legacy);
-    if (!door) console.warn(`home: tools.json has no "${id}" entry`);
-    return door;
-  }).filter(Boolean);
+  const tools = doorTools(reg, (id) => console.warn(`home: tools.json has no "${id}" entry`));
   let filing = null;
   const latestRaw = await loadLatestRaw();
   try {
@@ -158,46 +130,42 @@ async function renderDoors() {
     if (trade) filing = trade;
   } catch { /* tracker data is optional on the cover */ }
   const newsCap = newsDoorCaption(latestRaw);
-  document.getElementById('tools').innerHTML = tools
-    .map((t) => {
-      let body = `<p>${esc(t.summary)}</p>`;
-      if (t.id === 'backtest') {
-        body = doorPhoto({
-          webp: '/assets/img/doors/backtest.webp',
-          jpg: '/assets/img/doors/backtest.jpg',
-          title: 'TD Sequential 9 / 13',
-          sub: 'Sharpe · CAGR · Max DD',
-        });
-      } else if (t.id === 'movers') {
-        body = doorPhoto({
-          src: '/assets/img/doors/movers-heat.svg',
-          title: 'HSI · 升跌榜 · 板塊熱力圖',
-          sub: '約 5–6 分鐘更新快照',
-        });
-      } else if (t.id === 'politician-tracker' && filing) {
-        body = doorPhoto({
-          img: memberPhotoImg(filing.bioguide),
-          title: filing.name,
-          sub: `${filing.tx} ${filing.ticker} · ${filing.amount}`,
-          subClass: filing.tx === 'Buy' ? 'up' : 'down',
-        });
-      } else if (t.id === 'news') {
-        body = doorPhoto({
-          webp: '/assets/img/doors/news.webp',
-          jpg: '/assets/img/doors/news.jpg',
-          title: newsCap.title,
-          sub: newsCap.sub,
-        });
-      }
-      const zh = t.id === 'movers' ? '港股異動' : t.zh;
-      return `<a class="door" href="${esc(t.href)}">
-        <span class="ey">${esc(t.category || '')}</span>
-        <h2>${esc(t.title)}${zh ? `<span class="zh">${esc(zh)}</span>` : ''}</h2>
-        ${body}
-        <span class="go">Open →</span>
-      </a>`;
-    })
-    .join('');
+  const bodyFor = (t) => {
+    if (t.id === 'politician-tracker' && filing) {
+      return doorPhoto({
+        img: memberPhotoImg(filing.bioguide),
+        title: filing.name,
+        sub: `${filing.tx} ${filing.ticker} · ${filing.amount}`,
+        subClass: filing.tx === 'Buy' ? 'up' : 'down',
+      });
+    }
+    if (t.id === 'news') {
+      return doorPhoto({
+        webp: '/assets/img/doors/news.webp',
+        jpg: '/assets/img/doors/news.jpg',
+        title: newsCap.title,
+        sub: newsCap.sub,
+      });
+    }
+    return staticDoorBody(t);
+  };
+  const row = document.getElementById('tools');
+  const anchors = [...row.querySelectorAll(':scope > a.door')];
+  const inPlace = anchors.length === tools.length && tools.every((t, i) => anchors[i].dataset.door === t.id && anchors[i].getAttribute('href') === t.href);
+  if (!inPlace) {
+    row.innerHTML = tools.map((t) => doorAnchor(t, bodyFor(t))).join('');
+    return;
+  }
+  const probe = document.createElement('div');
+  tools.forEach((t, i) => {
+    probe.innerHTML = doorAnchor(t, bodyFor(t));
+    const next = probe.firstElementChild;
+    for (const sel of ['.ey', 'h2', '[data-door-body]']) {
+      const have = anchors[i].querySelector(sel);
+      const want = next.querySelector(sel);
+      if (have && want && have.outerHTML !== want.outerHTML) have.replaceWith(want);
+    }
+  });
 }
 
 async function renderTape() {

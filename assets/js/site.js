@@ -4,6 +4,7 @@
 // Header nav and footer links come from /assets/tools.json.
 // Pages with a footer also get the newsletter end card, unless <body data-newsletter="off">.
 import { mountNewsletterCard } from './newsletter.js';
+import { esc, headerInner, footerInner } from './chrome-html.js';
 
 const REGISTRY_URL = '/assets/tools.json';
 let registryPromise = null;
@@ -16,7 +17,6 @@ export function loadRegistry() {
   return registryPromise;
 }
 
-const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 export { esc };
 
 export const BRAND_MARK = '';
@@ -34,36 +34,31 @@ export function icon(name, size = 20) {
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ICONS.tool}</svg>`;
 }
 
-function isActive(href, path) {
-  if (!href) return false;
-  if (href === '/') return path === '/' || path === '/index.html';
-  return path === href || path.startsWith(href);
-}
-
 export function mastDate(d = new Date()) {
   return d.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Hong_Kong' }).toUpperCase();
 }
 
+const hrefsOf = (root) => [...root.querySelectorAll('a[href]')].map((a) => a.getAttribute('href'));
+const sameList = (a, b) => a.length === b.length && a.every((h, i) => h === b[i]);
+
+// The committed HTML already carries these links (scripts/static-chrome.mjs). When they match the registry the
+// anchors are kept, so nothing disappears or reflows, and only what needs scripting is added: the date and the menu
+// button. When the registry differs (a tool was added or renamed since the HTML was built) the markup is rebuilt.
 function renderHeader(el, reg) {
   const path = location.pathname;
-  const items = reg.tools.filter((t) => t.nav && t.href);
-  const news = items.find((t) => t.id === 'news');
-  const rest = items.filter((t) => t.id !== 'news');
   const home = el.dataset.mast === 'home';
+  const opts = { path, home, date: mastDate(), toggle: true };
   el.classList.add('mast');
-  el.innerHTML = `<div class="wrap mast-in">
-    <a class="logo" href="/" aria-label="${esc(reg.site.name)} home">
-      <img class="mark" src="/assets/brand/news-chart-white.svg" alt="${esc(reg.site.name)}" height="17">
-    </a>
-    <button class="nav-toggle" aria-label="Menu" aria-expanded="false"><span></span></button>
-    <div class="mast-r">
-      <span class="d">${mastDate()} · HKT</span>
-      ${home ? '' : rest
-        .map((t) => `<a href="${esc(t.href)}"${isActive(t.href, path) ? ' aria-current="page"' : ''}>${esc(t.title)}</a>`)
-        .join('')}
-      ${news ? `<a class="box" href="${esc(news.href)}"${isActive(news.href, path) ? ' aria-current="page"' : ''}>${esc(news.title)}</a>` : ''}
-    </div>
-  </div>`;
+  const have = el.querySelector('.mast-r');
+  const want = document.createElement('div');
+  want.innerHTML = headerInner(reg, opts);
+  if (have && el.querySelector('.logo') && sameList(hrefsOf(have), hrefsOf(want.querySelector('.mast-r')))) {
+    const date = have.querySelector('.d');
+    if (date) date.textContent = `${mastDate()} · HKT`;
+    if (!el.querySelector('.nav-toggle')) have.insertAdjacentHTML('beforebegin', '<button class="nav-toggle" aria-label="Menu" aria-expanded="false"><span></span></button>');
+  } else {
+    el.innerHTML = headerInner(reg, opts);
+  }
   const btn = el.querySelector('.nav-toggle');
   btn.addEventListener('click', () => {
     const open = el.dataset.open !== 'true';
@@ -73,15 +68,10 @@ function renderHeader(el, reg) {
 }
 
 function renderFooter(el, reg) {
-  const live = reg.tools.filter((t) => t.href);
   el.classList.add('site-footer');
-  el.innerHTML = `<div class="wrap">
-    <div class="row">
-      <span>${esc(reg.site.owner)} · Hong Kong · ${esc(reg.site.name)}</span>
-      <span>${live.map((t) => `<a href="${esc(t.href)}">${esc(t.title)}</a>`).join(' · ')}</span>
-    </div>
-    <div class="fine">Research and education only. Not investment advice. Backtests are hypothetical and do not predict future results.</div>
-  </div>`;
+  const want = document.createElement('div');
+  want.innerHTML = footerInner(reg);
+  if (!sameList(hrefsOf(el), hrefsOf(want))) el.innerHTML = footerInner(reg);
 }
 
 export async function mountChrome() {
