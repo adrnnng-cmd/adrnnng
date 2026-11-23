@@ -27,7 +27,7 @@ test('registry names the page Movers and keeps its URL, order and other function
 
 test('home door order is Backtest, Movers, Politician Tracker, Morning Report and the Movers door has no data fetch', () => {
   const js = read('assets/js/home.js');
-  assert.match(js, /\['backtest', 'movers', 'politician-tracker', 'news'\]/);
+  assert.match(js, /const DOORS = \[\s*\{ id: 'backtest' \},\s*\{ id: 'movers', legacy: \['hk-movers'\] \},\s*\{ id: 'politician-tracker' \},\s*\{ id: 'news' \},\s*\];/);
   const block = js.slice(js.indexOf("t.id === 'movers') {"), js.indexOf("t.id === 'politician-tracker' && filing"));
   assert.match(block, /HSI · 升跌榜 · 板塊熱力圖/);
   assert.match(block, /約 5–6 分鐘更新快照/);

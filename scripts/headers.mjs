@@ -157,6 +157,18 @@ function checkResolved(text, errors, label) {
   if (cache !== 'public, max-age=300') {
     errors.push(`_headers: /assets/tools.json cache-control is ${cache || '(absent)'}${label}`);
   }
+  for (const path of ['/assets/js/home.js', '/assets/js/site.js', '/assets/css/theme.css']) {
+    const value = applyHeaders(text, path).get('cache-control');
+    if (value !== 'public, max-age=300, must-revalidate') {
+      errors.push(`_headers: ${path} cache-control is ${value || '(absent)'}${label}, want the registry's five-minute horizon with must-revalidate`);
+    }
+  }
+  for (const path of ['/', '/index.html']) {
+    const value = applyHeaders(text, path).get('cache-control');
+    if (value && !/max-age=0|no-cache|no-store/.test(value)) {
+      errors.push(`_headers: ${path} cache-control is ${value}${label}; the page that names the versioned boot URL must revalidate`);
+    }
+  }
 }
 
 export function indexingHeaderErrors(text, { keyFile } = {}) {
