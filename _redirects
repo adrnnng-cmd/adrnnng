@@ -11,8 +11,8 @@ http://www.adrnnng.com/* https://adrnnng.com/:splat 301
 /hsi-lab /backtest/?strategy=atr-supertrend&symbol=HSImain&tf=5m&xtf=5m&entry=clock&clock=09:30&exit=reenter&recipe=fast-response&session=year&year=all 301
 /hsi-lab/ /backtest/?strategy=atr-supertrend&symbol=HSImain&tf=5m&xtf=5m&entry=clock&clock=09:30&exit=reenter&recipe=fast-response&session=year&year=all 301
 # Movers moved from /hk-movers/ to /movers/. Only the page and the old demo file redirect. The old
-# /hk-movers/data/latest stays a live Pages Function (it is in _routes.json, and Pages does not apply
-# redirects to Function responses), so the collector's KV key and any cached page keep working.
+# /hk-movers/data/latest is deliberately not redirected: it stays a live Pages Function (it is in
+# _routes.json) serving the same KV key, so the running collector and any cached page keep working.
 /hk-movers /movers/ 301
 /hk-movers/ /movers/ 301
 /hk-movers/data/sample.json /movers/data/sample.json 301

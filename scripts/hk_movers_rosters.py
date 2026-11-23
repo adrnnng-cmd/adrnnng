@@ -58,7 +58,7 @@ NAMES = {"hsi": "恒生指數", "hstech": "恒生科技指數"}
 PAGE_MARK = re.compile(r"^=====PAGE (\d+)=====$")
 # 5 HSBC HOLDINGS 100 7.37 8.00   |   981 SMIC 85# 1.42 1.55   |   6869 YOFC (H) 100 - 0.94
 ROW = re.compile(r"^(?P<code>\d{1,5}) (?P<name>.+?) (?P<faf>\d{1,3}(?:\.\d+)?)\s?(?P<flag>#?) (?P<before>\d+\.\d+|-) (?P<after>\d+\.\d+|-)$")
-GROUP = re.compile(r"^.+ \(\d+ constituents?\) \d+\.\d+ \d+\.\d+$")
+GROUP = re.compile(r"^(?P<name>.+) \(\d+ constituents?\) \d+\.\d+ \d+\.\d+$")
 
 
 class RosterError(ValueError):
@@ -93,13 +93,19 @@ def short_code(code: str) -> str:
     return str(code).strip().zfill(5)
 
 
-def parse_rows(lines: list[str]) -> list[dict]:
+def parse_rows(lines: list[str], group: str | None = None) -> list[dict]:
+    """Constituent rows of one page. `group` is the sector heading carried over from the previous page."""
     rows = []
     for line in lines:
+        header = GROUP.match(line)
+        if header:
+            group = header["name"].strip()
+            continue
         m = ROW.match(line)
-        if not m or GROUP.match(line):
+        if not m:
             continue
         rows.append({
+            "group": group,
             "code": short_code(m["code"]),
             "name_en": m["name"].strip(),
             "faf_pct": float(m["faf"]),
@@ -114,12 +120,16 @@ def parse_appendix(text: str, index_id: str) -> list[dict]:
     spec = APPENDICES[index_id]
     pages = split_pages(text)
     rows = []
+    group = None
     for number in spec["pages"]:
         if number not in pages:
             raise RosterError(f"{index_id}: page {number} is missing from the text")
         if not any(spec["heading"] in line for line in pages[number]) and number == spec["pages"][0]:
             raise RosterError(f"{index_id}: page {number} does not carry '{spec['heading']}'")
-        for row in parse_rows(pages[number]):
+        page_rows = parse_rows(pages[number], group)
+        if page_rows:
+            group = page_rows[-1]["group"]
+        for row in page_rows:
             rows.append({**row, "page": number})
     codes = [r["code"] for r in rows]
     if len(codes) != len(set(codes)):
@@ -142,6 +152,7 @@ def _member(row: dict, column: str, names: dict[str, dict]) -> dict:
         "name_en": row["name_en"],
         "weight_pct": row[column],
         "faf_pct": row["faf_pct"],
+        "group": row["group"],
         "page": row["page"],
     }
 

@@ -20,6 +20,20 @@ export const SORTS = [
   { id: 'impact', label: '近似影響度' },
 ];
 
+/** The two index views. `hk` is the whole-market view and has its own filters. */
+export const INDEX_VIEWS = {
+  hsi: {
+    key: 'hsi', short: '恒指', name: '恒生指數', members: '恒生指數成分股', mapTitle: '恒指板塊熱力圖',
+    mapHint: '面積 = 總市值 · 顏色 = 今日漲跌幅',
+  },
+  hstech: {
+    key: 'hstech', short: '恒生科技', name: '恒生科技指數', members: '恒生科技指數成分股', mapTitle: '恒生科技板塊熱力圖',
+    mapHint: '面積 = 總市值 · 顏色 = 今日漲跌幅',
+  },
+};
+export const VIEW_ORDER = ['hsi', 'hk', 'hstech'];
+export const isIndexView = (v) => Object.hasOwn(INDEX_VIEWS, v);
+
 export const IMPACT_LABEL = '近似影響度（漲跌幅 × 總市值）';
 
 const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
@@ -237,9 +251,9 @@ export function acceptRefresh(prev, next) {
 }
 
 /** After new data arrives, keep the sector and stock the user picked only if they still exist. */
-export function reconcileSelection({ sector = null, selected = null } = {}, data) {
+export function reconcileSelection({ sector = null, selected = null } = {}, data, view = 'hsi') {
   const sectorOk = sector && data.macro_sectors?.some((s) => s.id === sector);
-  const stockOk = selected && data.hsi?.constituents?.some((r) => r.code === selected);
+  const stockOk = selected && isIndexView(view) && data[view]?.constituents?.some((r) => r.code === selected);
   return { sector: sectorOk ? sector : null, selected: stockOk ? selected : null };
 }
 
@@ -347,6 +361,46 @@ function checkStock(row, where, errors, sectorIds) {
   if (sectorIds && !sectorIds.has(row.sector)) errors.push(`${where}: unknown sector ${row.sector}`);
 }
 
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+const nullableNum = (v) => v == null || isNum(v);
+
+function validateExtras(block, where, errors) {
+  if (block.members != null) {
+    if (!Array.isArray(block.members)) errors.push(`${where}.members must be an array`);
+    else block.members.forEach((m, i) => {
+      const w = `${where}.members[${i}]`;
+      if (!m || typeof m !== 'object') return errors.push(`${w}: not an object`);
+      if (!CODE.test(m.code || '')) errors.push(`${w}: code must be 5 digits`);
+      if (!m.name || typeof m.name !== 'string') errors.push(`${w}: name missing`);
+      if (!isNum(m.weight_pct)) errors.push(`${w}: weight_pct must be a number`);
+      for (const k of ['last', 'change_pct', 'ret_5d', 'ret_1m', 'ret_ytd', 'market_cap_hkd']) {
+        if (!nullableNum(m[k])) errors.push(`${w}: ${k} must be a number or null`);
+      }
+    });
+  }
+  if (block.roster != null) {
+    const r = block.roster;
+    if (typeof r !== 'object' || Array.isArray(r)) errors.push(`${where}.roster must be an object`);
+    else {
+      if (!isNum(r.count)) errors.push(`${where}.roster.count must be a number`);
+      if (r.weights_as_of != null && !DAY.test(r.weights_as_of)) errors.push(`${where}.roster.weights_as_of must be YYYY-MM-DD`);
+    }
+  }
+}
+
+function validateIndexBlock(block, where, errors, sectorIds, { nullableIndex = false } = {}) {
+  if (!block || typeof block !== 'object') return errors.push(`${where} must be an object`);
+  for (const k of ['last', 'prev_close', 'change', 'change_pct']) {
+    const v = block.index?.[k];
+    if (nullableIndex ? !nullableNum(v) : !isNum(v)) errors.push(`${where}.index.${k} must be a number`);
+  }
+  for (const k of ['up', 'down', 'flat']) if (!isNum(block.breadth?.[k])) errors.push(`${where}.breadth.${k} must be a number`);
+  if (!isNum(block.turnover_hkd)) errors.push(`${where}.turnover_hkd must be a number`);
+  if (!Array.isArray(block.constituents)) errors.push(`${where}.constituents must be an array`);
+  else block.constituents.forEach((r, i) => checkStock(r, `${where}.constituents[${i}]`, errors, sectorIds));
+  validateExtras(block, where, errors);
+}
+
 /** Shape check for the document served by /movers/data/latest. */
 export function validateSnapshot(d) {
   const errors = [];
@@ -394,7 +448,19 @@ export function validateSnapshot(d) {
     else hk.stocks.forEach((r, i) => checkStock(r, `hk_market.stocks[${i}]`, errors, sectorIds));
   }
 
-  for (const u of ['hsi', 'hk']) {
+  const lists = ['hsi', 'hk'];
+  if (d.hstech != null) {
+    validateIndexBlock(d.hstech, 'hstech', errors, sectorIds, { nullableIndex: true });
+    lists.push('hstech');
+  }
+  if (hsi && typeof hsi === 'object') validateExtras(hsi, 'hsi', errors);
+  if (d.returns != null) {
+    if (typeof d.returns !== 'object' || Array.isArray(d.returns)) errors.push('returns must be an object');
+    else for (const k of ['d5', 'm1', 'ytd']) {
+      if (d.returns[k] != null && !DAY.test(d.returns[k])) errors.push(`returns.${k} must be YYYY-MM-DD or null`);
+    }
+  }
+  for (const u of lists) {
     for (const side of ['gainers', 'losers']) {
       if (!Array.isArray(d.movers?.[u]?.[side])) errors.push(`movers.${u}.${side} must be an array`);
     }
@@ -495,4 +561,99 @@ export function layoutGroups(groups, width, height, { gap = 2, labelH = 18, minL
     const inner = { x: box.x + gap, y: box.y + gap + top, w: Math.max(box.w - gap * 2, 0), h: Math.max(box.h - gap * 2 - top, 0) };
     return { id: g.id, box, label, tiles: squarify(g.items, inner.x, inner.y, inner.w, inner.h) };
   });
+}
+
+// ------------------------------------------------------- constituents table
+
+/**
+ * Sortable columns of the constituents table. `get` reads the raw value; null and non-finite values are
+ * "unavailable" and always sort last, in both directions.
+ */
+export const MEMBER_COLUMNS = [
+  { id: 'weight', label: '權重', unit: '%', get: (m) => m.weight_pct, first: 'desc' },
+  { id: 'd1', label: '1日', get: (m) => m.change_pct, first: 'desc' },
+  { id: 'd5', label: '5日', get: (m) => m.ret_5d, first: 'desc' },
+  { id: 'm1', label: '1個月', get: (m) => m.ret_1m, first: 'desc' },
+  { id: 'ytd', label: '年初至今', get: (m) => m.ret_ytd, first: 'desc' },
+  { id: 'last', label: '現價', get: (m) => m.last, first: 'desc' },
+  { id: 'cap', label: '總市值', get: (m) => m.market_cap_hkd, first: 'desc' },
+];
+export const DEFAULT_MEMBER_SORT = { key: 'weight', dir: 'desc' };
+const columnOf = (key) => MEMBER_COLUMNS.find((c) => c.id === key);
+
+/**
+ * Stable numeric sort. Ties keep the official roster order (the order of `members`), in both directions;
+ * unavailable values come last in both directions. Returns a new array.
+ */
+export function sortMembers(members, { key, dir } = DEFAULT_MEMBER_SORT) {
+  const col = columnOf(key) || columnOf(DEFAULT_MEMBER_SORT.key);
+  const sign = dir === 'asc' ? 1 : -1;
+  return members
+    .map((m, i) => ({ m, i, v: col.get(m) }))
+    .sort((a, b) => {
+      const an = isNum(a.v);
+      const bn = isNum(b.v);
+      if (an !== bn) return an ? -1 : 1;
+      if (an && a.v !== b.v) return a.v < b.v ? -sign : sign;
+      return a.i - b.i;
+    })
+    .map((x) => x.m);
+}
+
+/** Header click: the same column flips direction, a new column starts high to low. */
+export function nextSort(current, key) {
+  const col = columnOf(key);
+  if (!col) return current;
+  if (current?.key === key) return { key, dir: current.dir === 'desc' ? 'asc' : 'desc' };
+  return { key, dir: col.first };
+}
+
+export const ariaSort = (current, key) => (current?.key === key ? (current.dir === 'asc' ? 'ascending' : 'descending') : 'none');
+
+export function sortAnnouncement(sort) {
+  const col = columnOf(sort?.key);
+  return col ? `已按${col.label}由${sort.dir === 'asc' ? '低至高' : '高至低'}排序，沒有數據的成分股排在最後` : '';
+}
+
+/** "2026-11-16" -> "11-16"; a different year keeps the year ("2025-12-31"). */
+export function shortRefDate(day, asOf) {
+  if (!DAY.test(day || '')) return '';
+  return asOf && day.slice(0, 4) === String(asOf).slice(0, 4) ? day.slice(5) : day;
+}
+
+/** Reference dates behind the 5D / 1M / YTD columns, for headers and the footnote. */
+export function returnRefs(returns) {
+  const asOf = returns?.as_of && DAY.test(returns.as_of) ? returns.as_of : null;
+  const pick = (k) => (DAY.test(returns?.[k] || '') ? returns[k] : null);
+  const refs = { asOf, d5: pick('d5'), m1: pick('m1'), ytd: pick('ytd') };
+  const against = (d) => (d ? `相對 ${d} 收市價` : '歷史資料不足');
+  const note = refs.asOf
+    ? `5日：${against(refs.d5)}（5 個交易日前）；1個月：${against(refs.m1)}（一個月前或之前最近的交易日）；`
+      + `年初至今：${against(refs.ytd)}（上年最後交易日）。以上均為前復權收市價，最新交易日 ${refs.asOf}；1日為現價相對前收市價。`
+    : '5日、1個月、年初至今需要歷史收市價，目前尚未提供；1日為現價相對前收市價。';
+  return { ...refs, available: Boolean(refs.asOf), note };
+}
+
+export function memberStats(members) {
+  const list = Array.isArray(members) ? members : [];
+  const priced = list.filter((m) => m.available !== false && isNum(m.last)).length;
+  return { total: list.length, priced, missing: list.length - priced };
+}
+
+/** Text lines for the roster notice under an index view. */
+export function rosterNotes(roster, label) {
+  if (!roster) return { basis: '', upcoming: '' };
+  const up = roster.upcoming && roster.upcoming.effective_from ? roster.upcoming : null;
+  const basis = `${label}官方成分股 ${roster.count} 隻；權重由恒生指數公司公佈，`
+    + `${roster.weights_as_of ? `截至 ${roster.weights_as_of}` : '日期未註明'}${up ? '（指數檢討前）' : ''}。`;
+  let upcoming = '';
+  if (up) {
+    const added = up.added?.length || 0;
+    const removed = up.removed?.length || 0;
+    const change = added || removed || up.count !== roster.count
+      ? `成分股將由 ${roster.count} 隻調整為 ${up.count} 隻${added ? `（新增 ${added} 隻` : '（'}${removed ? `${added ? '、' : ''}剔除 ${removed} 隻` : ''}）`
+      : `成分股名單不變（${up.count} 隻），權重按檢討結果重設`;
+    upcoming = `已公佈：${up.effective_from} 起${change}。尚未生效，目前仍按現行名單與權重顯示。`;
+  }
+  return { basis, upcoming };
 }

@@ -71,7 +71,7 @@ const PROBE = `(() => {
   const q = (s) => document.querySelectorAll(s);
   const wide = [...q('body *')].filter((el) => {
     const r = el.getBoundingClientRect();
-    return r.width > 0 && r.right > doc.clientWidth + 1 && !el.closest('.hkm-map, .tape');
+    return r.width > 0 && r.right > doc.clientWidth + 1 && !el.closest('.hkm-map, .tape, .hkm-members-wrap');
   }).slice(0, 3).map((el) => el.tagName + '.' + el.className);
   return {
     scroll: doc.scrollWidth, client: doc.clientWidth, wide,
@@ -220,6 +220,196 @@ test('HK Movers renders both views without horizontal overflow at phone and desk
   }
 });
 
+// ------------------------------------------------------------ index views and the constituents table
+
+const TABLE = `(() => {
+  const q = (s) => [...document.querySelectorAll(s)];
+  const wrap = document.querySelector('.hkm-members-wrap');
+  const th = (id) => document.querySelector('[data-msort="' + id + '"]')?.closest('th');
+  const stock = document.querySelector('.hkm-members-table tbody th.m-stock');
+  const wr = wrap?.getBoundingClientRect();
+  return {
+    tab: document.querySelector('[role=tab][aria-selected=true]')?.dataset.view,
+    tabs: q('[role=tab]').map((b) => b.dataset.view),
+    tabText: q('[role=tab]').map((b) => b.innerText.replace(/\\s+/g, ' ')),
+    codes: q('.hkm-members-table tbody th.m-stock .code').map((el) => el.innerText),
+    rows: q('.hkm-members-table tbody tr').length,
+    naRows: q('.hkm-members-table tbody tr.is-na').map((tr) => tr.innerText.replace(/\\s+/g, ' ')),
+    heads: q('.hkm-members-table thead th').map((el) => el.innerText.replace(/\\s+/g, ' ')),
+    ariaSort: Object.fromEntries(['weight', 'd1', 'd5', 'm1', 'ytd', 'last', 'cap'].map((id) => [id, th(id)?.getAttribute('aria-sort')])),
+    sortButtons: q('[data-msort]').length,
+    btnH: Math.min(...q('[data-msort]').map((b) => b.getBoundingClientRect().height)),
+    btnTag: q('[data-msort]').every((b) => b.tagName === 'BUTTON' && b.type === 'button'),
+    active: document.activeElement?.dataset?.fk || '',
+    live: document.querySelector('#hkm-live')?.innerText || '',
+    firstRow: document.querySelector('.hkm-members-table tbody tr')?.innerText.replace(/\\s+/g, ' ') || '',
+    wrapScrollable: wrap ? wrap.scrollWidth > wrap.clientWidth : null,
+    wrapLeft: wr?.left, stockLeft: stock?.getBoundingClientRect().left,
+    scrollOk: document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+    members: !!document.querySelector('.hkm-members'),
+    roster: document.querySelector('.hkm-roster')?.innerText.replace(/\\s+/g, ' ') || '',
+    refnote: document.querySelector('.hkm-refnote')?.innerText || '',
+    aux: document.querySelector('.hkm-members .aux')?.innerText || '',
+    heads2: q('.hkm-list-h').map((el) => el.innerText.replace(/\\s+/g, ' ')),
+    notes: q('.hkm-note:not(.hkm-refnote)').map((el) => el.innerText),
+    criteria: document.querySelector('.hkm-criteria')?.innerText.replace(/\\s+/g, ' ') || '',
+    stats: document.querySelector('.hkm-stats')?.innerText.replace(/\\s+/g, ' ') || '',
+    url: location.search,
+    tiles: q('.hm-tile').length,
+    text: document.documentElement.innerText,
+  };
+})()`;
+
+test('HSI and HSTECH views: full constituents table, sorting, accessibility, layout', { timeout: 180000 }, async (t) => {
+  const { readFileSync } = await import('node:fs');
+  const { sortMembers, nextSort, DEFAULT_MEMBER_SORT } = await import('../../movers/lib.js');
+  const sample = JSON.parse(readFileSync(join(root, 'movers/data/sample.json'), 'utf8'));
+  const server = await serve();
+  const { port } = server.address();
+  const debugPort = await startChrome(t, server);
+  const shotDir = process.env.HKM_SHOT_DIR;
+  const { writeFile, mkdir } = await import('node:fs/promises');
+
+  for (const width of [375, 1440]) {
+    const tab = await openTab(debugPort, 'about:blank');
+    const { send, evaluate } = tab;
+    await send('Page.enable');
+    await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: width < 800 });
+    const waitFor = async (predicate, label, ms = 12000) => {
+      const until = Date.now() + ms;
+      let last = null;
+      while (Date.now() < until) {
+        last = await evaluate(TABLE);
+        if (last && predicate(last)) return last;
+        await new Promise((r) => setTimeout(r, 120));
+      }
+      throw new Error(`${width}px: ${label} never happened; last ${JSON.stringify({ ...last, text: undefined })}`);
+    };
+    const go = async (path) => {
+      await send('Page.navigate', { url: `http://127.0.0.1:${port}${path}` });
+      return waitFor((s) => s.tiles > 0 || s.members, `load ${path}`);
+    };
+    const shotEl = async (selector, name) => {
+      if (!shotDir) return;
+      await new Promise((r) => setTimeout(r, 300));
+      const box = await evaluate(`(() => { const r = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); return { x: r.left + scrollX, y: r.top + scrollY, w: r.width, h: r.height }; })()`);
+      const out = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true, clip: { x: 0, y: Math.max(box.y - 8, 0), width, height: Math.ceil(box.h + 16), scale: 1 } });
+      await mkdir(shotDir, { recursive: true });
+      await writeFile(join(shotDir, `${name}.png`), Buffer.from(out.data, 'base64'));
+    };
+    const shotPage = async (name) => {
+      if (!shotDir) return;
+      await new Promise((r) => setTimeout(r, 400));
+      const metrics = await send('Page.getLayoutMetrics');
+      const h = Math.ceil(metrics.cssContentSize?.height || metrics.contentSize.height);
+      const out = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true, clip: { x: 0, y: 0, width, height: h, scale: 1 } });
+      await mkdir(shotDir, { recursive: true });
+      await writeFile(join(shotDir, `${name}.png`), Buffer.from(out.data, 'base64'));
+    };
+    const label = width < 800 ? `mobile-${width}` : `desktop-${width}`;
+
+    for (const [view, key, total, priced] of [['hsi', 'hsi', 95, 95], ['hstech', 'hstech', 30, 29]]) {
+      const members = sample[key].members;
+      const s0 = await go(view === 'hsi' ? '/movers/' : '/movers/?view=hstech');
+      assert.equal(s0.tab, view);
+      assert.deepEqual(s0.tabs, ['hsi', 'hk', 'hstech'], 'three views in order');
+      assert.match(s0.tabText.join('|'), /HSI 恒生指數 95 隻成分股\|HK 港股全市場.*\|HSTECH 恒生科技指數 30 隻成分股/);
+      assert.equal(s0.rows, total, `${view}: every official member has a row`);
+      assert.equal(s0.sortButtons, 7);
+      assert.ok(s0.btnTag, 'headers are real buttons');
+      assert.ok(s0.btnH >= 32, `sort buttons are tappable (${s0.btnH}px)`);
+      assert.deepEqual(s0.ariaSort, { weight: 'descending', d1: 'none', d5: 'none', m1: 'none', ytd: 'none', last: 'none', cap: 'none' });
+      assert.deepEqual(s0.codes, sortMembers(members, DEFAULT_MEMBER_SORT).map((m) => m.code), 'default order is official weight, high to low');
+      assert.match(s0.heads.join('|'), /5日 對比 11-13.*1個月 對比 10-20.*年初至今 對比 2025-12-31/);
+      assert.match(s0.refnote, /前復權收市價/);
+      assert.match(s0.aux, new RegExp(`共 ${total} 隻官方成分股 · ${priced} 隻有報價`));
+      assert.match(s0.roster, /不套用成交額／市值篩選/);
+      assert.match(s0.roster, /截至 2026-11-18/);
+      assert.match(s0.roster, /已公佈 · 未生效/);
+      assert.match(s0.roster, /尚未生效，目前仍按現行名單與權重顯示/);
+      if (view === 'hstech') {
+        assert.match(s0.roster, /由 30 隻調整為 50 隻（新增 20 隻）/);
+        assert.equal(s0.naRows.length, 1);
+        assert.match(s0.naRows[0], /騰訊音樂-SW 01698暫無報價 0\.08% — — — — — —/);
+        assert.equal(s0.codes.at(-1), '01698', 'the member without a quote sorts last by weight too');
+        assert.ok(s0.heads2.some((h) => /跌幅榜.*實際 5 隻/.test(h)), s0.heads2.join('|'));
+        assert.ok(s0.notes.some((n) => /恒生科技指數成分股共 29 隻，只有 5 隻下跌.*不以上升股補位/.test(n)), s0.notes.join('|'));
+        assert.match(s0.stats, /恒生科技指數成分股 29 隻合計/);
+      } else {
+        assert.match(s0.roster, /名單不變（95 隻）/);
+        assert.equal(s0.codes[0], '00005');
+        assert.match(s0.firstRow, /匯豐控股 00005 7\.37%/);
+      }
+      assert.ok(s0.scrollOk, `${label} ${view}: no page-level horizontal overflow`);
+      if (width < 800) assert.equal(s0.wrapScrollable, true, 'phone: the table scrolls inside its own region');
+      await shotPage(`${label}-${view}`);
+      await shotEl('.hkm-members', `${label}-${view}-table`);
+
+      // every column, both directions: DOM order == the library order, aria-sort follows, unavailable last, focus stays.
+      let sort = { ...DEFAULT_MEMBER_SORT };
+      for (const col of ['d5', 'm1', 'ytd', 'd1', 'last', 'cap', 'weight']) {
+        for (let i = 0; i < 2; i++) {
+          sort = nextSort(sort, col);
+          await evaluate(`(() => { const b = document.querySelector('[data-msort="${col}"]'); b.focus(); b.click(); return true; })()`);
+          const want = sortMembers(members, sort).map((m) => m.code);
+          const got = await waitFor((s) => s.ariaSort[col] === (sort.dir === 'asc' ? 'ascending' : 'descending'), `${view} ${col} ${sort.dir}`);
+          assert.deepEqual(got.codes, want, `${view} ${col} ${sort.dir}`);
+          assert.equal(Object.values(got.ariaSort).filter((v) => v !== 'none').length, 1, 'exactly one sorted column');
+          assert.equal(got.active, `msort-${col}`, 'keyboard focus stays on the header button');
+          assert.match(got.live, sort.dir === 'asc' ? /由低至高/ : /由高至低/);
+          assert.equal(got.rows, total, 'sorting never drops a member');
+          if (view === 'hstech' && col !== 'weight') assert.equal(got.codes.at(-1), '01698', `${col} ${sort.dir}: unavailable member stays last`);
+          assert.ok(got.scrollOk);
+        }
+      }
+      // d5 ascending then descending screenshots
+      await evaluate(`document.querySelector('[data-msort="d5"]').click(); true`);
+      await waitFor((s) => s.ariaSort.d5 === 'descending', 'd5 desc');
+      await shotEl('.hkm-members', `${label}-${view}-table-sorted-5d-desc`);
+      await evaluate(`document.querySelector('[data-msort="d5"]').click(); true`);
+      await waitFor((s) => s.ariaSort.d5 === 'ascending', 'd5 asc');
+      await shotEl('.hkm-members', `${label}-${view}-table-sorted-5d-asc`);
+
+      if (width < 800) {
+        await evaluate(`document.querySelector('.hkm-members-wrap').scrollLeft = 260; true`);
+        await new Promise((r) => setTimeout(r, 150));
+        const sticky = await evaluate(TABLE);
+        assert.ok(Math.abs(sticky.stockLeft - sticky.wrapLeft) <= 1.5, `stock column stays pinned while scrolled (${sticky.stockLeft} vs ${sticky.wrapLeft})`);
+        await shotEl('.hkm-members', `${label}-${view}-table-scrolled`);
+      }
+    }
+
+    // the sort state of a view survives a tab round trip, and HK has no constituents table.
+    await go('/movers/?view=hstech');
+    await evaluate(`document.querySelector('[data-msort="ytd"]').click(); document.querySelector('[data-view=hk]').click(); true`);
+    const hk = await waitFor((s) => s.tab === 'hk' && s.criteria.includes('篩選條件'), 'HK view');
+    assert.equal(hk.members, false, 'the whole-market view has no constituents table');
+    assert.match(hk.criteria, /成交額 ≥ HK\$1,000 萬.*總市值 > HK\$10 億/);
+    assert.match(hk.url, /view=hk/);
+    await evaluate(`document.querySelector('[data-view=hstech]').click(); true`);
+    const back = await waitFor((s) => s.tab === 'hstech' && s.members, 'back to HSTECH');
+    assert.equal(back.ariaSort.ytd, 'descending', 'sort choice is kept per view');
+    assert.match(back.url, /view=hstech/);
+    await evaluate(`document.querySelector('[data-view=hsi]').click(); true`);
+    const hsi = await waitFor((s) => s.tab === 'hsi' && s.members, 'HSI view');
+    assert.doesNotMatch(hsi.url, /view=/);
+    assert.equal(hsi.ariaSort.weight, 'descending', 'the HSI table keeps its own sort');
+    await shotPage(`${label}-hk-view`);
+
+    // keyboard: arrow keys walk the three tabs in order and wrap.
+    await evaluate(`document.querySelector('#tab-hsi').focus(); true`);
+    for (const next of ['hk', 'hstech', 'hsi']) {
+      await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 });
+      await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 });
+      await waitFor((s) => s.tab === next, `arrow to ${next}`);
+    }
+    await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'ArrowLeft', code: 'ArrowLeft', windowsVirtualKeyCode: 37 });
+    await waitFor((s) => s.tab === 'hstech', 'arrow left wraps');
+    assert.doesNotMatch((await evaluate(TABLE)).text, /\bfutu\b|富途|moomoo|\byahoo\b|雅虎/i);
+    await tab.close();
+  }
+});
+
 // ------------------------------------------------------------ live refresh in a real browser
 
 const BASE = Date.parse('2026-11-20T14:00:00+08:00');
@@ -322,7 +512,7 @@ test('live page polls, recovers on focus, never overlaps, keeps state, and flags
   assert.equal(first.downRows, 10);
   assert.match(first.upHead, /升幅榜.*實際 5 隻 · 最多 10 隻/);
   assert.match(first.downHead, /跌幅榜 Top 10/);
-  assert.ok(first.notes.some((n) => /恒指成分股共 95 隻，只有 5 隻上升（89 隻下跌、1 隻持平），不足 10 隻.*不以下跌股補位/.test(n)), first.notes.join('|'));
+  assert.ok(first.notes.some((n) => /恒生指數成分股共 95 隻，只有 5 隻上升（89 隻下跌、1 隻持平），不足 10 隻.*不以下跌股補位/.test(n)), first.notes.join('|'));
   assert.ok(first.scroll);
   assert.ok(first.newsEmpty.length >= 1 && first.newsEmpty.every((x) => x === '暫無近3日相關新聞'), 'old headlines show the 3-day empty state');
   for (const stamp of first.newsTimes) {

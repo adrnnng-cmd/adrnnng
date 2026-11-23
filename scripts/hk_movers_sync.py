@@ -69,6 +69,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import hk_movers_names as names_mod  # noqa: E402
 import hk_movers_news as news_mod  # noqa: E402
+import hk_movers_returns as returns_mod  # noqa: E402
+import hk_movers_rosters as rosters_mod  # noqa: E402
 
 SCHEMA_VERSION = 1
 KV_KEY = "hk-movers:latest.json"
@@ -77,6 +79,9 @@ MIN_TURNOVER_HKD = 10_000_000
 MIN_MARKET_CAP_HKD = 1_000_000_000
 TOP_N = 10
 HSI_PLATE = "HK.800000"
+HSTECH_PLATE = "HK.800700"
+INDEX_CODES = {"hsi": HSI_PLATE, "hstech": HSTECH_PLATE}
+INDEX_NAMES = {"hsi": "恒生指數", "hstech": "恒生科技指數"}
 SNAPSHOT_CHUNK = 400
 SECTOR_MAP_PATH = Path(__file__).resolve().parent / "hk-movers" / "sector-map.json"
 
@@ -389,32 +394,90 @@ def build_macro_sectors(industries: list[dict], stocks: list[dict], mapper: Sect
     return out
 
 
+def index_block(name: str, index_in: dict | None, rows: list[dict], *, estimate: bool) -> dict:
+    """One index view: quote, breadth, turnover and the priced constituents (largest market cap first).
+
+    `estimate` fills a missing index level from the cap-weighted move of the constituents. It is on for
+    the Hang Seng Index (kept from before) and off for HSTECH, where a missing quote stays missing.
+    """
+    rows = sorted(rows, key=lambda r: -r["market_cap_hkd"])
+    mcap = sum(r["market_cap_hkd"] for r in rows)
+    weighted = (sum(r["change_pct"] * r["market_cap_hkd"] for r in rows) / mcap) if mcap else 0.0
+    index = dict(index_in or {})
+    prev = index.get("prev_close")
+    if estimate and index.get("last") is None and prev:
+        index["last"] = prev * (1 + weighted / 100.0)
+    if index.get("last") is not None and prev:
+        index["change"] = index["last"] - prev
+        index["change_pct"] = (index["last"] / prev - 1) * 100.0
+    index.setdefault("name", name)
+    turnover = index.pop("turnover_hkd", None)
+    if turnover is None:
+        turnover = sum(r["turnover_hkd"] for r in rows)
+    return {
+        "index": {
+            "name": index["name"],
+            "last": _r(index.get("last"), 2),
+            "prev_close": _r(prev, 2),
+            "change": _r(index.get("change"), 2),
+            "change_pct": _r(index.get("change_pct"), 4),
+        },
+        "breadth": breadth(rows),
+        "turnover_hkd": _r(turnover, 0),
+        "constituents": rows,
+    }
+
+
+def build_members(roster_members: list[dict], rows: list[dict], returns: dict[str, dict] | None = None) -> list[dict]:
+    """The full constituents table: every official member, in official weight order, priced or not.
+
+    A member without a usable quote stays in the list with `available: false` and null numbers, so the page
+    can show it as unavailable instead of dropping it. Weights are the official published figures.
+    """
+    by_code = {r["code"]: r for r in rows}
+    returns = returns or {}
+    out = []
+    for m in roster_members:
+        row = by_code.get(m["code"])
+        ret = returns.get(m["code"]) or {}
+        out.append({
+            "code": m["code"],
+            "name": m["name"],
+            "weight_pct": _r(m["weight_pct"], 2),
+            "available": row is not None,
+            "last": row["last"] if row else None,
+            "prev_close": row["prev_close"] if row else None,
+            "change_pct": row["change_pct"] if row else None,
+            "ret_5d": ret.get("ret_5d") if row else None,
+            "ret_1m": ret.get("ret_1m") if row else None,
+            "ret_ytd": ret.get("ret_ytd") if row else None,
+            "market_cap_hkd": row["market_cap_hkd"] if row else None,
+        })
+    return out
+
+
 def build_snapshot(*, now: datetime, hsi_index: dict | None, hsi_rows: list[dict],
                    stocks: list[dict], industries: list[dict] | None, news: dict | None,
                    mapper: SectorMapper, universe_count: int | None = None,
                    data_source: str = "live", notice: str | None = None,
                    min_turnover: float = MIN_TURNOVER_HKD,
                    min_market_cap: float = MIN_MARKET_CAP_HKD,
-                   session: str | None = None) -> dict:
-    """Assemble the public document. `hsi_rows` and `stocks` are build_stock() outputs."""
+                   session: str | None = None,
+                   hstech_index: dict | None = None, hstech_rows: list[dict] | None = None,
+                   members: dict[str, list[dict]] | None = None,
+                   roster_meta: dict[str, dict] | None = None,
+                   returns_ref: dict | None = None) -> dict:
+    """Assemble the public document. `hsi_rows`, `hstech_rows` and `stocks` are build_stock() outputs.
+
+    Without the HSTECH, members, roster_meta and returns_ref arguments the document is the original
+    schema; with them it gains the optional `hstech` block, `members`/`roster` per index, `movers.hstech`
+    and `returns` (see scripts/hk-movers/schema.json). `schema_version` stays 1 because every addition is optional.
+    """
     now = now.astimezone(HKT)
     qualified = [r for r in stocks if qualifies(r["turnover_hkd"], r["market_cap_hkd"], min_turnover, min_market_cap)]
     qualified.sort(key=lambda r: -r["turnover_hkd"])
-    hsi_rows = sorted(hsi_rows, key=lambda r: -r["market_cap_hkd"])
-
-    hsi_mcap = sum(r["market_cap_hkd"] for r in hsi_rows)
-    hsi_weighted = (sum(r["change_pct"] * r["market_cap_hkd"] for r in hsi_rows) / hsi_mcap) if hsi_mcap else 0.0
-    index = dict(hsi_index or {})
-    prev = index.get("prev_close")
-    if index.get("last") is None and prev:
-        index["last"] = prev * (1 + hsi_weighted / 100.0)
-    if index.get("last") is not None and prev:
-        index["change"] = index["last"] - prev
-        index["change_pct"] = (index["last"] / prev - 1) * 100.0
-    index.setdefault("name", "恒生指數")
-    hsi_turnover = index.pop("turnover_hkd", None)
-    if hsi_turnover is None:
-        hsi_turnover = sum(r["turnover_hkd"] for r in hsi_rows)
+    hsi = index_block(INDEX_NAMES["hsi"], hsi_index, hsi_rows, estimate=True)
+    hsi_rows = hsi["constituents"]
 
     # Sector leaders and counts come from the qualified list, so the sector panel obeys the same filter as the rankings.
     macro = build_macro_sectors(
@@ -424,25 +487,26 @@ def build_snapshot(*, now: datetime, hsi_index: dict | None, hsi_rows: list[dict
         "hk": {"gainers": rank(qualified, "up"), "losers": rank(qualified, "down")},
     }
     known = {r["code"] for r in hsi_rows} | {r["code"] for r in qualified}
+    hstech = None
+    if hstech_rows is not None:
+        hstech = index_block(INDEX_NAMES["hstech"], hstech_index, hstech_rows, estimate=False)
+        movers["hstech"] = {"gainers": rank(hstech["constituents"], "up"), "losers": rank(hstech["constituents"], "down")}
+        known |= {r["code"] for r in hstech["constituents"]}
     kept_news = {code: item for code, item in (news or {}).items() if code in known and item}
+    for key, block in (("hsi", hsi), ("hstech", hstech)):
+        if block is None:
+            continue
+        if members and key in members:
+            block["members"] = members[key]
+        if roster_meta and key in roster_meta:
+            block["roster"] = roster_meta[key]
 
     doc = {
         "schema_version": SCHEMA_VERSION,
         "data_source": data_source,
         "updated_at_hkt": now.strftime("%Y-%m-%d %H:%M:%S"),
         "market_session": session or market_session(now),
-        "hsi": {
-            "index": {
-                "name": index["name"],
-                "last": _r(index.get("last"), 2),
-                "prev_close": _r(prev, 2),
-                "change": _r(index.get("change"), 2),
-                "change_pct": _r(index.get("change_pct"), 4),
-            },
-            "breadth": breadth(hsi_rows),
-            "turnover_hkd": _r(hsi_turnover, 0),
-            "constituents": hsi_rows,
-        },
+        "hsi": hsi,
         "hk_market": {
             "filters": {"min_turnover_hkd": min_turnover, "min_market_cap_hkd": min_market_cap},
             "universe_count": universe_count if universe_count is not None else len(stocks),
@@ -455,6 +519,10 @@ def build_snapshot(*, now: datetime, hsi_index: dict | None, hsi_rows: list[dict
         "movers": movers,
         "news": kept_news,
     }
+    if hstech is not None:
+        doc["hstech"] = hstech
+    if returns_ref:
+        doc["returns"] = returns_ref
     if notice:
         doc["notice"] = notice
     return doc
@@ -490,6 +558,26 @@ def _code_of(row: dict) -> str | None:
 
 def fetch_hsi_codes(ctx) -> list[str]:
     return [r["code"] for r in _records(_ok(ctx.get_plate_stock(HSI_PLATE), "get_plate_stock"))]
+
+
+def fetch_history_bars(ctx, code: str, start: str, end: str) -> list[tuple[str, float]]:
+    """Adjusted (qfq) daily closes for one code. UNVERIFIED against a live gateway: check the kline field names.
+
+    request_history_kline pages with page_req_key; the loop follows it until it is exhausted. The quota
+    counts distinct codes per rolling 30 days, so refetching the same code every day costs no extra quota.
+    """
+    from futu import AuType, KLType  # lazy: tests need no SDK
+
+    rows: list[dict] = []
+    page_key = None
+    while True:
+        result = ctx.request_history_kline(code, start=start, end=end, ktype=KLType.K_DAY, autype=AuType.QFQ,
+                                           max_count=1000, page_req_key=page_key)
+        rows.extend(_records(_ok(result, "request_history_kline")))
+        page_key = result[2] if len(result) > 2 else None
+        if page_key is None:
+            break
+    return returns_mod.parse_kline_rows(rows)
 
 
 def fetch_snapshots(ctx, codes: list[str]) -> list[dict]:
@@ -607,18 +695,36 @@ def apply_tc_names(snap_rows: list[dict], names: dict[str, dict]) -> None:
             raw["name_tc"] = entry["name"]
 
 
-def collect_live(args) -> dict:
+def collect_live(args, now: datetime | None = None) -> dict:
     from futu import Market, OpenQuoteContext, RankSortDir, SecurityType  # lazy: tests need no SDK
 
     mapper = SectorMapper(load_sector_map())
-    now = datetime.now(HKT)
+    now = now or datetime.now(HKT)
     names = names_mod.load_names(Path(args.names_cache))
     if not names:
         print("warning: no Traditional Chinese name list; names stay as the gateway returns them", file=sys.stderr)
     ctx = OpenQuoteContext(host=args.host, port=args.port)
     try:
-        hsi_codes = fetch_hsi_codes(ctx)
-        index_snap = fetch_snapshots(ctx, [HSI_PLATE])
+        rosters = rosters_mod.load_rosters(Path(args.rosters))
+        today = now.date()
+        chosen = {}
+        for key in rosters_mod.INDEX_IDS:
+            version, upcoming = rosters_mod.select_version(rosters["indices"][key], today)
+            chosen[key] = {
+                "members": version["members"],
+                "meta": rosters_mod.roster_meta(version, upcoming, rosters["source"]),
+            }
+        roster_codes = {key: [f"HK.{m['code']}" for m in c["members"]] for key, c in chosen.items()}
+        try:
+            plate = fetch_hsi_codes(ctx)
+            gap = rosters_mod.drift(roster_codes["hsi"], plate)
+            if gap["missing_from_gateway"] or gap["extra_in_gateway"]:
+                print(f"note: gateway HSI plate differs from the official roster (the roster is used): {gap}", file=sys.stderr)
+        except RuntimeError as exc:
+            print(f"note: gateway HSI plate unavailable ({exc}); the official roster is used", file=sys.stderr)
+        hsi_codes = roster_codes["hsi"]
+        hstech_codes = roster_codes["hstech"]
+        index_snap = fetch_snapshots(ctx, [HSI_PLATE, HSTECH_PLATE])
         industries = fetch_heatmap(ctx, Market.HK)
         listed = fetch_hk_stock_codes(ctx, Market.HK, SecurityType.STOCK)
         if listed:
@@ -627,11 +733,13 @@ def collect_live(args) -> dict:
             print("warning: empty share list; falling back to the top movers rank", file=sys.stderr)
             universe = keep_candidates(
                 fetch_top_movers(ctx, Market.HK, args.candidates, (RankSortDir.DESCENDING, RankSortDir.ASCENDING)), listed, names)
-        snap_rows = fetch_snapshots(ctx, list(dict.fromkeys(hsi_codes + universe)))
+        snap_rows = fetch_snapshots(ctx, list(dict.fromkeys(hsi_codes + hstech_codes + universe)))
 
         hsi_set = set(hsi_codes)
+        hstech_set = set(hstech_codes)
         needed = [r["code"] for r in snap_rows
-                  if r["code"] in hsi_set or qualifies(r.get("turnover"), r.get("total_market_val"))]
+                  if r["code"] in hsi_set or r["code"] in hstech_set
+                  or qualifies(r.get("turnover"), r.get("total_market_val"))]
         reits = {c for c in needed if is_reit(c, names)}
         owner_codes = [c for c in needed if c not in reits and (not listed or names_mod.short_code(c) in listed)]
         known = {r["name"].casefold() for r in industries}
@@ -642,10 +750,33 @@ def collect_live(args) -> dict:
         apply_tc_names(snap_rows, names)
 
         hsi_rows = [s for s in (build_stock(r, mapper) for r in snap_rows if r["code"] in hsi_set) if s]
+        hstech_rows = [s for s in (build_stock(r, mapper) for r in snap_rows if r["code"] in hstech_set) if s]
         stocks = [s for s in (build_stock(r, mapper) for r in snap_rows) if s]
 
+        returns_by_code, returns_ref = {}, None
+        if args.history_batch > 0:
+            cache = returns_mod.HistoryCache(Path(args.history_cache))
+            member_codes = list(dict.fromkeys(hsi_codes + hstech_codes))
+            stats = returns_mod.refresh_history(
+                [HSI_PLATE, *member_codes], cache, today=today.isoformat(),
+                fetch=lambda code, start, end: fetch_history_bars(ctx, code, start, end),
+                budget=args.history_batch, delay=args.history_delay)
+            cache.save()
+            if stats["failed"]:
+                print(f"history: {len(stats['failed'])} codes failed (quota or lookup), first: {stats['failed'][0]}", file=sys.stderr)
+            if stats["deferred"]:
+                print(f"history: {stats['deferred']} codes deferred to the next runs", file=sys.stderr)
+            refs = returns_mod.reference_dates(returns_mod.trading_days_for(cache, HSI_PLATE, member_codes))
+            if refs:
+                returns_ref = {"basis": "adjusted_close", **refs}
+                last_of = {r["code"]: r["last"] for r in hsi_rows + hstech_rows}
+                for code in member_codes:
+                    short = names_mod.short_code(code)
+                    if short in last_of:
+                        returns_by_code[short] = returns_mod.compute_returns(last_of[short], cache.bars(code), refs)
+
         shortlist: dict[str, dict] = {}
-        for pool in (hsi_rows, [r for r in stocks if qualifies(r["turnover_hkd"], r["market_cap_hkd"])]):
+        for pool in (hsi_rows, hstech_rows, [r for r in stocks if qualifies(r["turnover_hkd"], r["market_cap_hkd"])]):
             for direction in ("up", "down"):
                 for row in rank(pool, direction, args.news_top):
                     shortlist[row["code"]] = row
@@ -657,17 +788,21 @@ def collect_live(args) -> dict:
             time.sleep(args.news_delay)
         news = news_mod.keep_fresh(news)
 
-        index = {}
-        if index_snap:
-            raw = index_snap[0]
-            index = {
+        quotes = {}
+        for raw in index_snap:
+            quotes[raw.get("code")] = {
                 "last": _num(raw.get("last_price")) or None,
                 "prev_close": _num(raw.get("prev_close_price")) or None,
                 "turnover_hkd": _num(raw.get("turnover")) or None,
             }
-        doc = build_snapshot(now=now, hsi_index=index, hsi_rows=hsi_rows, stocks=stocks,
+        members = {key: build_members(c["members"], rows, returns_by_code)
+                   for key, c, rows in (("hsi", chosen["hsi"], hsi_rows), ("hstech", chosen["hstech"], hstech_rows))}
+        doc = build_snapshot(now=now, hsi_index=quotes.get(HSI_PLATE, {}), hsi_rows=hsi_rows, stocks=stocks,
                              industries=industries, news=news, mapper=mapper,
-                             universe_count=len(listed) or None)
+                             universe_count=len(listed) or None,
+                             hstech_index=quotes.get(HSTECH_PLATE, {}), hstech_rows=hstech_rows,
+                             members=members, roster_meta={k: c["meta"] for k, c in chosen.items()},
+                             returns_ref=returns_ref)
     finally:
         ctx.close()
     if mapper.unmapped:
@@ -736,6 +871,13 @@ def parse_args(argv=None):
     p.add_argument("--wrangler-bin", default=None, help="wrangler executable (default: env HK_MOVERS_WRANGLER_BIN, else `npx wrangler`)")
     p.add_argument("--names-cache", default=os.environ.get("HK_MOVERS_NAMES_CACHE", str(names_mod.CACHE_PATH)),
                    help="cache file for the Traditional Chinese name list (refreshed every 7 days)")
+    p.add_argument("--rosters", default=str(rosters_mod.ROSTER_PATH),
+                   help="official HSI and HSTECH rosters (scripts/hk-movers/index-rosters.json); replace it after each quarterly review")
+    p.add_argument("--history-cache", default=os.environ.get("HK_MOVERS_HISTORY_CACHE", "/tmp/hk_movers_history.json"),
+                   help="cache file for adjusted daily closes behind the 5D / 1M / YTD returns")
+    p.add_argument("--history-batch", type=int, default=int(os.environ.get("HK_MOVERS_HISTORY_BATCH", "25")),
+                   help="most codes whose history is fetched per run (0 disables the returns columns); a code is refetched at most once per HK day")
+    p.add_argument("--history-delay", type=float, default=0.6, help="seconds between history requests (the gateway limits request rate)")
     p.add_argument("--candidates", type=int, default=100, help="fallback only: candidates per direction from the rank endpoint when the share list is empty")
     p.add_argument("--news-top", type=int, default=30, help="stocks per direction and universe that get a news lookup")
     p.add_argument("--news-delay", type=float, default=0.3, help="seconds between news requests")

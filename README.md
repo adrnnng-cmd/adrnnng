@@ -12,7 +12,7 @@ static JSON/CSV.
 | `/` | Landing page (`index.html`, `assets/js/home.js`) | this repo |
 | `/backtest/` | Backtest tool | this repo; prices refreshed by `backtest-prices.yml` |
 | `/politician-tracker/` | Politician Tracker | this repo; page rebuilt by `politician-tracker.yml` |
-| `/hk-movers/` | Movers 港股異動與板塊熱力圖 | this repo; data from the local collector `scripts/hk_movers_sync.py` via KV |
+| `/movers/` | Movers 港股異動與板塊熱力圖 (the old `/hk-movers/` redirects here) | this repo; data from the local collector `scripts/hk_movers_sync.py` via KV |
 | `/news/` | Morning Report | **News Analyst agent** (direct Wrangler upload, ~08:15 HKT). Not in this repo. |
 
 ## Layout
@@ -292,12 +292,39 @@ applies all of them.
   the engine on real SPY data for four configurations (daily/weekly, long-only/long-short, costs,
   stop loss), plus a printed walk-through of the first TD trade for checking by hand.
 
-## HK Movers
+## Movers
 
-`/hk-movers/` is a Traditional Chinese page with two views: **HSI 恒生指數** (about 95 constituents) and
-**HK 港股全市場** (turnover at least HK$10 million and market cap above HK$1 billion). Each view has a
-heat map, a gainers table and a losers table (at most 10 each), and every ranked stock carries one related
-news preview. No quote vendor is named anywhere on the public page.
+`/movers/` (formerly `/hk-movers/`) is a Traditional Chinese page with three views: **HSI 恒生指數** (95
+official constituents), **HK 港股全市場** (turnover at least HK$10 million and market cap above HK$1 billion) and
+**HSTECH 恒生科技指數** (30 official constituents today, 50 from 2026-12-07). Each view has a heat map, a
+gainers table and a losers table (at most 10 each), and every ranked stock carries one related news preview.
+The two index views also have a full constituents table. No quote vendor is named anywhere on the public page.
+
+- **Index universe.** HSI and HSTECH views rank, count and map the priced members of the official roster. The HK
+  filters (turnover, market cap) are for the whole-market view only and are never applied to an index view. The
+  full constituents table lists every official member, with or without a quote or news; a member without a
+  quote shows 暫無報價 and `—` instead of being dropped. HSTECH movers, breadth and heat map are built from the
+  HSTECH members only, so a short list is shown short, not padded.
+- **Official rosters and weights.** Source: Hang Seng Indexes Company, *Quarterly review results* announced
+  2026-11-20 (`20261120T174500.pdf`), Appendix 1 (HSI, pp. 4-5) and Appendix 3 (HSTECH, pp. 8-9). The PDF's
+  "before" column is the weighting of the current constituents on the review reference date 2026-11-18; the
+  "after" column is the pro-forma result effective 2026-12-07 (implemented after the close of 2026-12-04). HSI stays
+  at 95 constituents with weights re-capped; HSTECH grows from 30 to 50. The site uses the current roster and the
+  "before" weights until the effective date. `scripts/hk-movers/index-rosters.json` holds both rosters as dated
+  versions; `select_version(index, today_hkt)` switches on the effective date, and the document's `roster`
+  block publishes only the announced roster's date, size and changes, never its member list. The published
+  weights are as of 2026-11-18, not live: they drift with prices until the next review and the page says so.
+  Regenerate after a review with `python3 scripts/hk_movers_rosters.py --pdf-text <pdftotext -layout output>`.
+- **1D / 5D / 1M / YTD.** 1D is the current price against the previous close. The others are the current price against
+  adjusted (前復權) daily closes on reference dates that the document publishes in `returns` and the table prints in
+  its headers: 5D is the close 5 trading days before the latest bar, 1M the last trading day on or before the same
+  calendar day one month earlier, YTD the last trading day of the previous calendar year. No bar on or before a
+  reference date means `null`, shown as `—`, never an estimate. Public holidays come from the real bar calendar,
+  not from a holiday table.
+- **Sorting.** Each numeric header is a button inside a `th` with `aria-sort`; the first click sorts high to low, the
+  next flips. Ties keep the official roster order in both directions and missing values always sort last. Sort
+  choices are kept per view across refreshes. On phones the table scrolls inside its own region with the stock
+  column pinned.
 
 - **Breadth bar.** Advance / flat / decline counts are a stacked bar in the morning report's market-breadth style
   (`#008259` up, grey flat, `#A50034` down), with actual counts, a legend with shares, an `aria-label`, and a
@@ -314,12 +341,16 @@ news preview. No quote vendor is named anywhere on the public page.
   than 10 minutes (30 during lunch) is flagged 快照過時. View, sector, stock, sort and weight choices persist.
 
 ```
-hk-movers/index.html, app.js, hk-movers.css   page, shared chrome (theme.css + site.js)
-hk-movers/lib.js                              pure helpers: formatting, ranking, freshness gates, validation, treemap layout
-hk-movers/poll.js                             background refresh controller (no overlap, backoff, recovery)
-hk-movers/data/sample.json                    labelled demo document (data_source "demo"), also the offline fallback
-functions/hk-movers/data/latest.js            Pages Function for GET /hk-movers/data/latest
+movers/index.html, app.js, movers.css         page, shared chrome (theme.css + site.js)
+movers/lib.js                                 pure helpers: formatting, ranking, sorting, freshness gates, validation, treemap layout
+movers/poll.js                                background refresh controller (no overlap, backoff, recovery)
+movers/data/sample.json                       labelled demo document (data_source "demo"), also the offline fallback
+functions/movers/data/latest.js               Pages Function for GET /movers/data/latest (the shared implementation)
+functions/hk-movers/data/latest.js            same document at the old GET /hk-movers/data/latest (kept for the running collector and cached pages)
 scripts/hk_movers_sync.py                     collector for a machine with a local OpenD
+scripts/hk_movers_rosters.py                  official HSI / HSTECH roster file: PDF parser, dated versions, date-aware selection
+scripts/hk_movers_returns.py                  5D / 1M / YTD reference dates, returns, history cache and batched refresh
+scripts/hk-movers/index-rosters.json          the two official rosters with weights, pages, as-of and effective dates
 scripts/hk_movers_names.py                    Traditional Chinese stock names from the exchange list (7-day cache)
 scripts/hk_movers_news.py                     one Traditional Chinese headline per stock (Google News HK RSS)
 scripts/hk_movers_demo.py                     regenerates sample.json (seeded, synthetic)
@@ -329,14 +360,16 @@ scripts/hk-movers/schema.json                 JSON Schema of the document
 
 | Item | Value |
 | --- | --- |
-| Route | `GET /hk-movers/data/latest` (listed in `_routes.json`; everything else stays static) |
+| Route | `GET /movers/data/latest` (canonical) and `GET /hk-movers/data/latest` (old path, same document, same KV key); both are listed in `_routes.json`, everything else stays static |
+| Old page URL | `_redirects` sends `/hk-movers`, `/hk-movers/` and `/hk-movers/data/sample.json` to the `/movers/` equivalents with 301. The old data route is deliberately not redirected: it stays a live Function, so the collector, cached pages and anything polling it keep working without depending on how Pages orders redirects and Functions. Redirects do not carry a `?query` on their own in the documented behaviour, so verify `?view=hstech` on the preview before relying on it. |
 | KV key | `hk-movers:latest.json` |
 | Binding | `env.HK_MOVERS`, else `env.HSI_BARS` (already bound). Add a dedicated `HK_MOVERS` binding later and the Function switches with no code change. |
 | Response header | `X-HK-Movers-Source`: `kv:HK_MOVERS`, `kv:HSI_BARS` or `demo` (plus `X-HK-Movers-Reason` when it is `demo`) |
-| Empty or invalid KV | The Function returns `sample.json` (`data_source: "demo"`). The page also falls back to `/hk-movers/data/sample.json` when the route is missing, as in `npm run serve`, and shows a 示範數據 banner. `?demo=1` forces the demo. |
+| Empty or invalid KV | The Function returns `sample.json` (`data_source: "demo"`). The page also falls back to `/movers/data/sample.json` when the route is missing, as in `npm run serve`, and shows a 示範數據 banner. `?demo=1` forces the demo. |
 
 Top-level keys: `schema_version`, `data_source`, `updated_at_hkt`, `market_session`, `hsi`, `hk_market`,
-`macro_sectors`, `movers`, `news` (see `scripts/hk-movers/schema.json`). Impact is
+`macro_sectors`, `movers`, `news`, plus the optional `hstech`, `returns`, `hsi.members`, `hsi.roster`,
+`hstech.members`, `hstech.roster` and `movers.hstech` (see `scripts/hk-movers/schema.json`; `schema_version` stays 1). Impact is
 `change % x market cap`, shown as 近似影響度 and never as official index points.
 
 Collector, run next to OpenD (`127.0.0.1:11111`, LV1; checked against futu-api 10.12.7208). Credentials are never in the repo:
@@ -345,7 +378,7 @@ Collector, run next to OpenD (`127.0.0.1:11111`, LV1; checked against futu-api 1
 python3 scripts/hk_movers_sync.py --out /tmp/hk-movers-latest.json
 HK_MOVERS_KV_NAMESPACE_ID=<namespace id> python3 scripts/hk_movers_sync.py --push-kv   # wrangler login or CLOUDFLARE_API_TOKEN
 python3 scripts/hk_movers_sync.py --push-kv --wrangler-bin /path/to/wrangler            # or env HK_MOVERS_WRANGLER_BIN; default `npx wrangler`
-python3 scripts/hk_movers_demo.py --out hk-movers/data/sample.json                    # refresh the demo file
+python3 scripts/hk_movers_demo.py --out movers/data/sample.json                       # refresh the demo file
 ```
 
 What the collector handles, as measured on a real OpenD:
@@ -360,6 +393,34 @@ What the collector handles, as measured on a real OpenD:
 - News comes from Google News Hong Kong RSS (`zh-HK`). Titles drop the trailing outlet, times are HKT, and any headline or source that names a quote vendor is skipped. The gateway's own news search is a backup only when its result is Chinese and vendor-free.
 
 The pure pipeline and every adapter are unit tested with fake SDK replies in the measured shapes. The site has no dark theme, so this page has none either.
+
+### Index tables: collector update and migration checklist
+
+The index tables need a newer collector and a new page deploy, in this order, and each step is safe on its own.
+
+1. **Page and Functions first (News Analyst, full-site assemble only).** The page tolerates an old document:
+   no `hstech` block means the HSTECH tab says its data is not provided yet, no `members` means the table says so,
+   no `returns` shows `—` in the 5D / 1M / YTD columns. The old `/hk-movers/data/latest` Function and the KV key
+   `hk-movers:latest.json` do not change, so the running collector keeps feeding the page.
+2. **Collector on the box with OpenD.** Pull this branch, then restart the existing run loop with the same
+   arguments. Nothing needs configuring: it reads `scripts/hk-movers/index-rosters.json` from the checkout and keeps its
+   history cache in `/tmp/hk_movers_history.json` (`--history-cache`). New flags, all optional:
+   `--rosters` (roster file), `--history-cache`, `--history-batch` (default 25 codes per run, 0 turns the returns off and
+   leaves the old behaviour for those columns), `--history-delay` (default 0.6 s between history requests).
+3. **First day.** Constituent history is fetched oldest-first, at most 25 codes per run, at most once per HK day per
+   code, so the 5D / 1M / YTD columns fill in over the first few runs; members without history yet show `—`. A failed
+   request for one code (quota, delisted, network) leaves that code `—` and does not stop the run. History quota is
+   counted per distinct code over a rolling window and is account-dependent: HSI (95) + HSTECH (30) + the index calendar
+   is about 120 distinct codes, 140 or more once the 50-member HSTECH roster takes effect. If the gateway reports the quota is
+   exhausted, lower `--history-batch` or accept `—` for the remaining codes.
+4. **Quarterly review.** Replace the roster file with the new announcement (`hk_movers_rosters.py --pdf-text`), commit
+   it with the new `effective_from`; the page switches by date. Weights are as published on the reference date.
+5. **Rollback.** Start the previous collector build: the document it writes is still valid for the new page.
+
+Not verified live: this was built without OpenD access. The roster parser runs against the real PDF text; the collector, the
+history fetch (`request_history_kline`, `KLType.K_DAY`, `AuType.QFQ`, the HSTECH index code `HK.800700`) and the
+quota behaviour are covered only by fixtures that mimic the measured reply shapes. Check the first live run's
+document (`hstech.index.last`, `returns`, a few `members[].ret_*`) before announcing the feature.
 
 ## Host migration to news-chart.com
 

@@ -192,6 +192,6 @@ test('app wiring: one interval, visibility/focus/online recovery, strict refresh
   assert.match(app, /loadData\(\{ strict: true \}\)/);
   assert.match(app, /cache: 'no-store'/);
   assert.match(app, /AbortController/);
-  assert.match(app, /reconcileSelection\(state, doc\)/);
+  assert.match(app, /reconcileSelection\(state, doc, state\.view\)/);
   assert.equal((app.match(/setInterval\(/g) || []).length, 1, 'a single timer');
 });

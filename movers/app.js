@@ -1,8 +1,9 @@
 import {
-  BREADTH_COLORS, IMPACT_LABEL, NEWS_EMPTY_TEXT, SESSION_LABELS, SORTS,
-  ageMinutes, arrow, breadthSegments, esc, fmtAge, fmtHkd, fmtPct, fmtPoints, fmtPrice, fmtSigned, fmtUpdated,
-  heatColor, impactOf, isStale, layoutGroups, newsReference, rankStocks, rankSummary, reconcileSelection,
-  safeUrl, sectorName, squarify, tone, usableNews, validateSnapshot, weightedChange,
+  BREADTH_COLORS, DEFAULT_MEMBER_SORT, IMPACT_LABEL, INDEX_VIEWS, MEMBER_COLUMNS, NEWS_EMPTY_TEXT, SESSION_LABELS, SORTS, VIEW_ORDER,
+  ageMinutes, ariaSort, arrow, breadthSegments, esc, fmtAge, fmtHkd, fmtPct, fmtPoints, fmtPrice, fmtSigned, fmtUpdated,
+  heatColor, impactOf, isIndexView, isNum, isStale, layoutGroups, memberStats, newsReference, nextSort, rankStocks, rankSummary,
+  reconcileSelection, returnRefs, rosterNotes, safeUrl, sectorName, shortRefDate, sortAnnouncement, sortMembers, squarify, tone,
+  usableNews, validateSnapshot, weightedChange,
 } from './lib.js';
 import { createRefresher } from './poll.js';
 
@@ -13,11 +14,12 @@ const params = new URLSearchParams(location.search);
 const state = {
   data: null,
   load: null,
-  view: params.get('view') === 'hk' ? 'hk' : 'hsi',
+  view: VIEW_ORDER.includes(params.get('view')) ? params.get('view') : 'hsi',
   sector: null,
   selected: null,
   sort: 'change',
-  weight: { hsi: 'market_cap', hk: 'turnover' },
+  weight: { hsi: 'market_cap', hk: 'turnover', hstech: 'market_cap' },
+  msort: { hsi: { ...DEFAULT_MEMBER_SORT }, hstech: { ...DEFAULT_MEMBER_SORT } },
 };
 
 const $ = (sel) => document.querySelector(sel);
@@ -160,12 +162,86 @@ const legendHtml = (cap) => `<div class="hkm-legend" aria-hidden="true">
   <span>跌</span><i style="background:${heatColor(-cap, cap).bg}"></i><i style="background:${heatColor(-cap / 2, cap).bg}"></i><i style="background:${heatColor(0, cap).bg}"></i><i style="background:${heatColor(cap / 2, cap).bg}"></i><i style="background:${heatColor(cap, cap).bg}"></i><span>升</span>
   <em>顏色：漲跌幅（±${cap}% 為最深）</em></div>`;
 
-// ---------------------------------------------------------------------- HSI
+// -------------------------------------------------------------- index views
 
-function hsiHtml() {
-  const { hsi } = state.data;
-  const idx = hsi.index;
-  const rows = hsi.constituents;
+const na = (label = '暫無資料') => `<span class="na" aria-label="${esc(label)}">—</span>`;
+
+function missingViewHtml(key) {
+  const view = INDEX_VIEWS[key];
+  return `<div class="hkm-empty"><b>${esc(view.name)}的資料尚未提供</b>目前的快照不包含此指數。收集程式更新並寫入新快照後，此視圖會自動出現；其他視圖不受影響。</div>`;
+}
+
+function rosterNoteHtml(block, view) {
+  const notes = rosterNotes(block.roster, view.name);
+  const count = block.members?.length || block.roster?.count || block.constituents.length;
+  return `<div class="hkm-criteria hkm-roster" role="note" aria-label="成分股名單與計算範圍">
+      <b>計算範圍</b>
+      <span class="hkm-tag">官方成分股 ${count} 隻</span>
+      <span class="hkm-tag">不套用成交額／市值篩選</span>
+      <span class="hkm-hint">${esc(notes.basis)}成分股一律全部計入，沒有報價的成員在下方表內顯示為「暫無報價」。</span>
+      ${notes.upcoming ? `<p class="hkm-upcoming"><span class="hkm-pill">已公佈 · 未生效</span><span>${esc(notes.upcoming)}</span></p>` : ''}
+    </div>`;
+}
+
+function memberCell(m, col) {
+  const v = col.get(m);
+  if (col.id === 'weight' && isNum(v)) return fmtPct(v, 2, { sign: false });
+  if (m.available === false || !isNum(v)) return na(m.available === false ? '暫無報價' : '暫無資料');
+  if (col.id === 'last') return fmtPrice(v);
+  if (col.id === 'cap') return fmtHkd(v);
+  return chg(v);
+}
+
+function sortHead(col, sort, refs) {
+  const refLine = {
+    d5: refs.d5, m1: refs.m1, ytd: refs.ytd,
+  };
+  let sub = '';
+  if (col.id in refLine) {
+    sub = !refs.available ? '未提供' : refLine[col.id] ? `對比 ${shortRefDate(refLine[col.id], refs.asOf)}` : '無資料';
+    sub = `<small>${esc(sub)}</small>`;
+  } else if (col.id === 'd1') sub = '<small>對比前收</small>';
+  const on = sort.key === col.id;
+  const mark = on ? (sort.dir === 'asc' ? '▲' : '▼') : '↕';
+  const hint = on ? `目前由${sort.dir === 'asc' ? '低至高' : '高至低'}，再按一次反轉` : '按此排序';
+  return `<th scope="col" class="r" aria-sort="${ariaSort(sort, col.id)}"><button type="button" class="hkm-sortbtn${on ? ' is-on' : ''}" data-msort="${col.id}" data-fk="msort-${col.id}" title="${esc(`${col.label}：${hint}`)}"><span class="lbl">${esc(col.label)}${col.unit ? ` ${esc(col.unit)}` : ''}</span>${sub}<span class="arr" aria-hidden="true">${mark}</span></button></th>`;
+}
+
+function membersHtml(key) {
+  const block = state.data[key];
+  const view = INDEX_VIEWS[key];
+  const members = block.members;
+  if (!Array.isArray(members) || !members.length) {
+    return `<section class="hkm-members" aria-labelledby="hkm-members-h"><div class="sh"><h2 id="hkm-members-h">全部成分股</h2></div>
+      <div class="hkm-empty"><b>成分股權重表尚未提供</b>目前的快照沒有官方成分股與權重資料，待收集程式更新後會顯示。</div></section>`;
+  }
+  const sort = state.msort[key];
+  const refs = returnRefs(state.data.returns);
+  const stats = memberStats(members);
+  const rows = sortMembers(members, sort).map((m) => `<tr class="${m.available === false ? 'is-na' : ''}">
+      <th scope="row" class="m-stock"><b>${esc(m.name)}</b><span class="code num">${esc(m.code)}</span>${m.available === false ? '<span class="hkm-tag hkm-tag-na">暫無報價</span>' : ''}</th>
+      ${MEMBER_COLUMNS.map((col) => `<td class="r num" data-l="${esc(col.label)}">${memberCell(m, col)}</td>`).join('')}
+    </tr>`).join('');
+  const head = MEMBER_COLUMNS.map((col) => sortHead(col, sort, refs)).join('');
+  const count = `共 ${stats.total} 隻官方成分股 · ${stats.priced} 隻有報價${stats.missing ? ` · ${stats.missing} 隻暫無報價（仍列於表內）` : ''}`;
+  return `<section class="hkm-members" aria-labelledby="hkm-members-h">
+    <div class="sh"><h2 id="hkm-members-h">全部成分股</h2><span class="aux">${esc(count)} · 不受板塊篩選影響</span></div>
+    <p class="hkm-hint hkm-members-hint">點擊欄位標題排序：再按一次由高至低／由低至高切換；沒有數據的成分股一律排在最後，同值時維持官方名單順序。</p>
+    <div class="table-wrap hkm-members-wrap" tabindex="0" role="region" aria-label="${esc(view.name)}全部成分股，可橫向捲動">
+      <table class="hkm-table hkm-members-table"><caption class="sr-only">${esc(view.name)}全部成分股：官方權重、升跌幅、現價與總市值</caption>
+        <thead><tr><th scope="col" class="m-stock">股票</th>${head}</tr></thead>
+        <tbody>${rows}</tbody></table>
+    </div>
+    <p class="hkm-note hkm-refnote" role="note">${esc(refs.note)}</p>
+  </section>`;
+}
+
+function indexHtml(key) {
+  const view = INDEX_VIEWS[key];
+  const block = state.data[key];
+  if (!block) return missingViewHtml(key);
+  const idx = block.index || {};
+  const rows = block.constituents;
   const sectors = state.data.macro_sectors
     .map((s) => ({ s, rows: rows.filter((r) => r.sector === s.id) }))
     .filter((g) => g.rows.length);
@@ -176,31 +252,35 @@ function hsiHtml() {
       return `<button type="button" class="hkm-chip" data-sector="${esc(s.id)}" data-fk="chip-${esc(s.id)}" aria-pressed="${state.sector === s.id}"><span class="sw" style="${heatStyle(pct, 2)}"></span>${esc(s.name)}<span class="num ${tone(pct)}">${fmtPct(pct)}</span></button>`;
     }),
   ].join('');
-  const detail = detailHtml();
+  const stats = block.members ? memberStats(block.members) : null;
+  const unpriced = stats && stats.missing ? `（另有 ${stats.missing} 隻暫無報價）` : '';
+  const weight = state.weight[key];
   return `
-    <section class="hkm-stats" aria-label="恒生指數概況">
-      ${statHtml('恒生指數', fmtPoints(idx.last), `<span class="${tone(idx.change_pct)}">${arrow(idx.change_pct)} ${fmtSigned(idx.change)} (${fmtPct(idx.change_pct)})</span>`, tone(idx.change_pct))}
-      ${statHtml('總成交額', fmtHkd(hsi.turnover_hkd), `恒指成分股 ${rows.length} 隻合計`)}
+    <section class="hkm-stats" aria-label="${esc(view.name)}概況">
+      ${statHtml(view.name, fmtPoints(idx.last), isNum(idx.change_pct) ? `<span class="${tone(idx.change_pct)}">${arrow(idx.change_pct)} ${fmtSigned(idx.change)} (${fmtPct(idx.change_pct)})</span>` : '<span class="flat">指數報價暫無資料</span>', tone(idx.change_pct))}
+      ${statHtml('總成交額', fmtHkd(block.turnover_hkd), `${esc(view.members)} ${rows.length} 隻合計`)}
       ${statHtml('更新快照（HKT）', esc(fmtUpdated(state.data.updated_at_hkt).slice(5)), esc(SESSION_LABELS[state.data.market_session] || ''))}
     </section>
-    ${breadthBarHtml(hsi.breadth, '恒指成分股 升跌家數', '隻')}
+    ${breadthBarHtml(block.breadth, `${view.short}成分股 升跌家數`, '隻')}
+    ${rosterNoteHtml(block, view)}
     <section class="panel hkm-panel" aria-labelledby="hkm-heat-h">
-      <div class="panel-head"><h2 class="panel-title" id="hkm-heat-h">恒指成分股熱力圖</h2>
-        <div class="field hkm-inline"><span class="field-label">面積</span>${seg('weight', [{ id: 'market_cap', label: '總市值' }, { id: 'impact', label: '影響度（絕對值）' }], state.weight.hsi, '熱力圖面積')}</div>
+      <div class="panel-head"><h2 class="panel-title" id="hkm-heat-h">${esc(view.short)}成分股熱力圖</h2>
+        <div class="field hkm-inline"><span class="field-label">面積</span>${seg('weight', [{ id: 'market_cap', label: '總市值' }, { id: 'impact', label: '影響度（絕對值）' }], weight, '熱力圖面積')}</div>
       </div>
       <div class="panel-body">
-        <p class="panel-sub hkm-hint">按大類板塊分組，面積代表${state.weight.hsi === 'impact' ? '「漲跌幅 × 總市值」的絕對值' : '總市值'}。點擊板塊標題或下方標籤篩選榜單，點擊個股查看詳情。</p>
+        <p class="panel-sub hkm-hint">按大類板塊分組，面積代表${weight === 'impact' ? '「漲跌幅 × 總市值」的絕對值' : '總市值'}。點擊板塊標題或下方標籤篩選榜單，點擊個股查看詳情。</p>
         <div class="hkm-chips" role="group" aria-label="板塊強弱（按市值加權漲跌幅）">${chips}</div>
-        <div class="hkm-map" id="hkm-map" data-kind="hsi" role="group" aria-label="恒指成分股熱力圖"></div>
+        <div class="hkm-map" id="hkm-map" data-kind="index" data-index="${key}" role="group" aria-label="${esc(view.short)}成分股熱力圖"></div>
         ${legendHtml(4)}
       </div>
     </section>
-    ${detail}
-    ${moversHtml(rows, `恒指成分股 ${rows.length} 隻 · 近似影響度＝漲跌幅 × 總市值，非官方指數貢獻點數`, '恒指成分股')}`;
+    ${detailHtml(key)}
+    ${moversHtml(rows, `${view.members} ${rows.length} 隻${unpriced} · 近似影響度＝漲跌幅 × 總市值，非官方指數貢獻點數`, view.members)}
+    ${membersHtml(key)}`;
 }
 
-function detailHtml() {
-  const row = state.selected && state.data.hsi.constituents.find((r) => r.code === state.selected);
+function detailHtml(key) {
+  const row = state.selected && state.data[key].constituents.find((r) => r.code === state.selected);
   if (!row) {
     return `<section class="panel hkm-detail"><div class="panel-body"><p class="hkm-hint">尚未選擇個股。點擊熱力圖中的個股，這裡會顯示價格、成交額、市值與最新相關新聞。</p></div></section>`;
   }
@@ -305,13 +385,13 @@ function sectorDetailHtml() {
 const px = (n) => `${Math.round(n * 10) / 10}px`;
 const boxStyle = (b, inset = 0) => `left:${px(b.x + inset)};top:${px(b.y + inset)};width:${px(Math.max(b.w - inset * 2, 0))};height:${px(Math.max(b.h - inset * 2, 0))}`;
 
-function drawHsiMap(el) {
+function drawIndexMap(el, key) {
   const W = el.clientWidth;
   const H = W < 560 ? 480 : W < 900 ? 500 : 540;
   el.style.height = `${H}px`;
-  const rows = state.data.hsi.constituents;
-  const weightOf = state.weight.hsi === 'impact' ? (r) => Math.abs(impactOf(r)) : (r) => r.market_cap_hkd;
-  const floor = Math.max(...rows.map(weightOf)) * 0.004;
+  const rows = state.data[key].constituents;
+  const weightOf = state.weight[key] === 'impact' ? (r) => Math.abs(impactOf(r)) : (r) => r.market_cap_hkd;
+  const floor = rows.length ? Math.max(...rows.map(weightOf)) * 0.004 : 0;
   const groups = state.data.macro_sectors
     .map((s) => {
       const members = rows.filter((r) => r.sector === s.id);
@@ -368,7 +448,7 @@ function drawMap() {
   if (!el || !state.data) return;
   if (!el.clientWidth) return;
   lastMapWidth = el.clientWidth;
-  if (el.dataset.kind === 'hsi') drawHsiMap(el);
+  if (el.dataset.kind === 'index') drawIndexMap(el, el.dataset.index);
   else drawSectorMap(el);
 }
 
@@ -427,6 +507,15 @@ function renderStatus() {
   }
 }
 
+/** Tab sub-labels follow the roster in force, so the count changes by itself once a new roster takes effect. */
+function syncTabs() {
+  for (const key of Object.keys(INDEX_VIEWS)) {
+    const count = state.data[key]?.members?.length || state.data[key]?.roster?.count;
+    const small = document.querySelector(`#tab-${key} small`);
+    if (small && count) small.textContent = `${count} 隻成分股`;
+  }
+}
+
 function render() {
   const active = document.activeElement?.dataset?.fk;
   for (const tab of document.querySelectorAll('[data-view]')) {
@@ -437,7 +526,8 @@ function render() {
   body.setAttribute('aria-labelledby', `tab-${state.view}`);
   if (state.data) {
     renderStatus();
-    body.innerHTML = state.view === 'hsi' ? hsiHtml() : hkHtml();
+    syncTabs();
+    body.innerHTML = state.view === 'hk' ? hkHtml() : indexHtml(state.view);
     drawMap();
     if (active) document.querySelector(`[data-fk="${CSS.escape(active)}"]`)?.focus({ preventScroll: true });
   }
@@ -457,8 +547,8 @@ function setView(view) {
   state.sector = null;
   state.selected = null;
   const url = new URL(location.href);
-  if (view === 'hk') url.searchParams.set('view', 'hk');
-  else url.searchParams.delete('view');
+  if (view === 'hsi') url.searchParams.delete('view');
+  else url.searchParams.set('view', view);
   history.replaceState(null, '', url);
   render();
 }
@@ -470,7 +560,7 @@ function applyData(doc, { changed, meta }) {
   const wasFallback = state.load?.fellBack;
   state.load = { fellBack: Boolean(meta?.fellBack), data: doc };
   if (!changed && wasFallback === state.load.fellBack) return;
-  const keep = reconcileSelection(state, doc);
+  const keep = reconcileSelection(state, doc, state.view);
   state.data = doc;
   state.sector = keep.sector;
   state.selected = keep.selected;
@@ -543,6 +633,12 @@ body.addEventListener('click', (e) => {
   const t = e.target.closest('button');
   if (!t) return;
   if (t.dataset.retry !== undefined) return void start();
+  if (t.dataset.msort && isIndexView(state.view)) {
+    state.msort[state.view] = nextSort(state.msort[state.view], t.dataset.msort);
+    render();
+    $('#hkm-live').textContent = sortAnnouncement(state.msort[state.view]);
+    return;
+  }
   if (t.dataset.weight) state.weight[state.view] = t.dataset.weight;
   else if (t.dataset.sort) state.sort = t.dataset.sort;
   else if (t.dataset.sector) state.sector = state.sector === t.dataset.sector ? null : t.dataset.sector;
@@ -560,7 +656,8 @@ tabs.addEventListener('click', (e) => {
 });
 tabs.addEventListener('keydown', (e) => {
   if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-  const next = state.view === 'hsi' ? 'hk' : 'hsi';
+  const at = VIEW_ORDER.indexOf(state.view);
+  const next = VIEW_ORDER[(at + (e.key === 'ArrowRight' ? 1 : VIEW_ORDER.length - 1)) % VIEW_ORDER.length];
   setView(next);
   document.getElementById(`tab-${next}`).focus();
 });

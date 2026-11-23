@@ -251,7 +251,7 @@ test('schema.json lists the keys the document and validator require', () => {
     assert.ok(schema.required.includes(key), key);
     assert.ok(key in sample, key);
   }
-  assert.deepEqual(Object.keys(schema.properties.hsi.properties).sort(), ['breadth', 'constituents', 'index', 'turnover_hkd']);
+  assert.deepEqual(Object.keys(schema.properties.hsi.properties).sort(), ['breadth', 'constituents', 'index', 'members', 'roster', 'turnover_hkd']);
   assert.deepEqual(schema.$defs.stock.required.sort(), ['change_pct', 'code', 'industry', 'last', 'market_cap_hkd', 'name', 'sector', 'turnover_hkd']);
 });
 
@@ -568,7 +568,8 @@ test('both universes in the sample use the honest headings', () => {
   const hk = rankSummary(sample.hk_market.stocks, { dir: 'down', universeLabel: '合資格股票' });
   for (const s of [hsi, hk]) assert.ok(s.shown <= 10 && s.shown === Math.min(s.matching, 10));
   const app = read('movers/app.js');
-  assert.match(app, /moversHtml\(rows, [^\n]*'恒指成分股'\)/);
+  assert.match(app, /moversHtml\(rows, [^\n]*view\.members\)/);
+  assert.match(read('movers/lib.js'), /members: '恒生指數成分股'/);
   assert.match(app, /'合資格股票'\)\}`;/);
 });
 
