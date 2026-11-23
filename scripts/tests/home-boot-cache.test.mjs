@@ -180,14 +180,22 @@ test('warm cached modules and registries from either side of the Movers rename s
     await send('Runtime.enable');
     await send('Page.navigate', { url: `http://127.0.0.1:${port}/` });
     const evaluate = async (expression) => (await send('Runtime.evaluate', { expression, returnByValue: true })).result.value;
+    const doorList = `[...document.querySelectorAll('#tools .door')].map((a) => a.getAttribute('href') + '|' + (a.querySelector('h2')?.firstChild?.textContent || '').trim())`;
+    // Static HTML already has four doors, so "any door exists" is true before the module runs. The legacy module
+    // replaces the row and does not set data-door. The current module keeps data-door and fills the filing photo.
+    const painted = `(() => {
+      const doors = [...document.querySelectorAll('#tools .door')];
+      if (!doors.length) return false;
+      if (doors.some((a) => !a.hasAttribute('data-door'))) return true;
+      return !!document.querySelector('#tools [data-door="politician-tracker"] img');
+    })()`;
     let doors = [];
     for (let i = 0; i < 40; i++) {
-      doors = await evaluate(`[...document.querySelectorAll('#tools .door')].map((a) => a.getAttribute('href') + '|' + (a.querySelector('h2')?.firstChild?.textContent || '').trim())`);
-      if (doors.length) break;
+      if (await evaluate(painted)) break;
       await settle(200);
     }
-    await settle(600);
-    doors = await evaluate(`[...document.querySelectorAll('#tools .door')].map((a) => a.getAttribute('href') + '|' + (a.querySelector('h2')?.firstChild?.textContent || '').trim())`);
+    await settle(200);
+    doors = await evaluate(doorList);
     ws.close();
     await fetch(`http://127.0.0.1:${debugPort}/json/close/${target.id}`);
     return { doors, requests: requests.slice(mark) };
