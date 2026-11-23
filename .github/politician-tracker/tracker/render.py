@@ -499,7 +499,7 @@ def render_page(cfg: dict, payload: dict, now: datetime) -> str:
 
 <p class="disc">Disclosures are not investment advice. The STOCK Act allows members up to ~45 days to report a trade, so every row is delayed; <b>lag</b> = filing date − trade date, and rows over 45 days are marked late. Sizes are the statutory reporting bands, so any leaderboard returns cited here are estimates derived from those bands.</p>
 {NEWSLETTER_CARD}
-<footer class="foot"><div class="row"><span>非投資建議。 Not investment advice.</span><span><a href="{_e(site['archive_url'])}">Morning Report archive</a> · <a href="/{_e(site['path'])}/data.json">data.json</a></span></div></footer>
+<footer class="foot"><div class="row"><span>非投資建議。 Not investment advice.</span><span><a href="/backtest/">Backtest</a> · <a href="/movers/">Movers</a> · <a href="/politician-tracker/">Politician Tracker</a> · <a href="{_e(site['archive_url'])}">Morning Report</a> · <a href="/about/">About</a> · <a href="/{_e(site['path'])}/data.json">data.json</a></span></div></footer>
 </main>
 <script>{JS}</script>
 </body></html>
