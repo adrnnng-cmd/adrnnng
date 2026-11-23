@@ -246,7 +246,8 @@ test('canonical /movers/ everywhere users or crawlers look; the old URL only in 
   assert.doesNotMatch(read('sitemap-pages.xml'), /hk-movers/);
   assert.doesNotMatch(read('llms.txt'), /hk-movers/);
   assert.doesNotMatch(read('assets/tools.json'), /hk-movers/);
-  assert.doesNotMatch(read('assets/js/home.js'), /hk-movers/);
+  const homeJs = read('assets/js/home.js').split('\n').filter((line) => /hk-movers/.test(line));
+  assert.ok(homeJs.every((line) => /^\s*\/\//.test(line) || /legacy: \['hk-movers'\]/.test(line)), `home.js may name the old id only as the registry alias: ${homeJs.join(' | ')}`);
   assert.doesNotMatch(page, /hk-movers/);
   for (const file of ['movers/app.js', 'movers/lib.js', 'movers/poll.js', 'movers/movers.css']) assert.doesNotMatch(read(file), /\/hk-movers\//, file);
 });

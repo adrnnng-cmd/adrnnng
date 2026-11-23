@@ -597,8 +597,8 @@ test('market-open staleness follows the clock, not the snapshot label', () => {
   const live = { data_source: 'live', market_session: 'afternoon', updated_at_hkt: '2026-11-20 14:00:00' };
   assert.equal(isStale(live, at('2026-11-20T14:09:59')), false);
   assert.equal(isStale(live, at('2026-11-20T14:10:01')), true);
-  assert.equal(isStale(live, at('2026-11-20T12:30:00')), false, 'lunch break: wider allowance');
-  assert.equal(isStale({ ...live, updated_at_hkt: '2026-11-20 11:50:00' }, at('2026-11-20T12:30:00')), true);
+  assert.equal(isStale({ ...live, updated_at_hkt: '2026-11-20 12:04:00' }, at('2026-11-20T12:51:00')), false, 'lunch break: an old snapshot is expected');
+  assert.equal(isStale({ ...live, updated_at_hkt: '2026-11-20 11:30:00' }, at('2026-11-20T12:30:00')), true, 'lunch break, but the snapshot predates the end of the morning session');
   assert.equal(isStale({ ...live, updated_at_hkt: 'garbage' }, at('2026-11-20T14:10:01')), false, 'unreadable time is not guessed');
   assert.equal(fmtAge(0.2), '不足 1 分鐘');
   assert.equal(fmtAge(12), '12 分鐘');
@@ -628,13 +628,14 @@ test('a refresh keeps the sector and stock only while they still exist', () => {
 
 test('source: no streaming claims, snapshot wording, honest stale labels', () => {
   const app = read('movers/app.js');
+  const lib = read('movers/lib.js');
   const html = read('movers/index.html');
   assert.match(app, /快照更新/);
   assert.match(app, /更新失敗/);
-  assert.match(app, /快照過時/);
-  assert.match(app, /並非最新資料/);
+  assert.match(lib, /快照過時/);
+  assert.match(lib, /並非最新資料/);
   assert.match(html, /更新快照/);
   assert.match(html, /不是即時串流/);
   assert.match(html, /並非個別股票的報價時間/);
-  assert.doesNotMatch(app + html, /即時更新|即時串流報價|LIVE\b/);
+  assert.doesNotMatch(app + lib + html, /即時更新|即時串流報價|LIVE\b/);
 });

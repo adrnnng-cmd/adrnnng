@@ -347,8 +347,21 @@ The two index views also have a full constituents table. No quote vendor is name
 - **Refresh.** `updated_at_hkt` is when the collector run started (a run takes about a minute and the next starts
   300 s after it finishes), not a quote time, so the page calls it a snapshot, not a stream. It re-checks every
   60 s in trading hours (5 min otherwise), on focus, tab visibility and reconnect, never with two requests at once.
-  A failed or invalid response keeps the last good snapshot and shows 更新失敗; in trading hours a snapshot older
-  than 10 minutes (30 during lunch) is flagged 快照過時. View, sector, stock, sort and weight choices persist.
+  A failed or invalid response keeps the last good snapshot and shows 更新失敗. View, sector, stock, sort and weight
+  choices persist.
+- **Market state.** Two clocks are kept apart: the Asia/Hong_Kong wall clock (whatever the viewer's time zone) decides
+  the session now, and the document's `market_session` is only what the collector wrote when it ran, shown as
+  快照時段 next to 現時. `marketStatus()` in `movers/lib.js` is the one place that decides, on the weekday schedule
+  09:00 pre-open, 09:30 morning, 12:00-13:00 lunch, 13:00 afternoon, 16:00-16:10 closing auction, closed after 16:10:
+  in an active session a snapshot older than 10 minutes is flagged 快照過時 (and a snapshot taken before 13:00 is
+  never current once the afternoon runs); during lunch and after the close nothing trades, so an old snapshot shows
+  as 午間休市 / 已收市 with its timestamp, age and the next scheduled open, not as a warning. A calm state still says
+  so when the snapshot predates the end of the session before it (the morning close minus 10 minutes, or the 16:10
+  close), and the warning returns for a snapshot from a missing earlier session or older than four days. There is no
+  holiday or half-day table in this repository and none is invented: public holidays read as weekdays, so the page
+  says it follows the weekday schedule and hedges the "no snapshot today" and "earlier than the close" notes for a
+  possible holiday or half day. If the collector ever publishes OpenD's own market state, it can replace that guess;
+  the collector is not changed here.
 
 ```
 movers/index.html, app.js, movers.css         page, shared chrome (theme.css + site.js)
