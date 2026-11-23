@@ -126,9 +126,30 @@ function doorPhoto({ webp, jpg, src, img: imgHtml, title, sub, subClass = '' }) 
   return `<div class="door-photo">${img}<div><b>${esc(title)}</b><span class="${esc(subClass)}">${esc(sub)}</span></div></div>`;
 }
 
+// Door order and the registry ids each one answers to. The registry and this module are cached separately, so a
+// page can briefly see a registry from before the /hk-movers/ to /movers/ rename; accept the old id and always
+// link the canonical URL.
+const DOORS = [
+  { id: 'backtest' },
+  { id: 'movers', legacy: ['hk-movers'] },
+  { id: 'politician-tracker' },
+  { id: 'news' },
+];
+const CANONICAL_HREF = { movers: '/movers/' };
+
+function findDoor(reg, id, legacy = []) {
+  const tool = [id, ...legacy].map((want) => reg.tools.find((t) => t.id === want)).find(Boolean);
+  if (!tool) return null;
+  return { ...tool, id, href: CANONICAL_HREF[id] || tool.href };
+}
+
 async function renderDoors() {
   const reg = await loadRegistry();
-  const tools = ['backtest', 'movers', 'politician-tracker', 'news'].map((id) => reg.tools.find((t) => t.id === id)).filter(Boolean);
+  const tools = DOORS.map(({ id, legacy = [] }) => {
+    const door = findDoor(reg, id, legacy);
+    if (!door) console.warn(`home: tools.json has no "${id}" entry`);
+    return door;
+  }).filter(Boolean);
   let filing = null;
   const latestRaw = await loadLatestRaw();
   try {

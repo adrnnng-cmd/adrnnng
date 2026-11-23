@@ -1,9 +1,9 @@
 import {
   BREADTH_COLORS, DEFAULT_MEMBER_SORT, IMPACT_LABEL, INDEX_VIEWS, MEMBER_COLUMNS, NEWS_EMPTY_TEXT, SESSION_LABELS, SORTS, VIEW_ORDER,
-  ageMinutes, ariaSort, arrow, breadthSegments, esc, fmtAge, fmtHkd, fmtPct, fmtPoints, fmtPrice, fmtSigned, fmtUpdated,
-  heatColor, impactOf, isIndexView, isNum, isStale, layoutGroups, memberStats, newsReference, nextSort, rankStocks, rankSummary,
+  ariaSort, arrow, breadthSegments, esc, fmtHkd, fmtPct, fmtPoints, fmtPrice, fmtSigned, fmtUpdated,
+  heatColor, impactOf, isIndexView, isNum, marketStatus, layoutGroups, memberStats, newsReference, nextSort, rankStocks, rankSummary,
   membersLabels, membersWindow, reconcileSelection, returnRefs, rosterNotes, safeUrl, sectorName, shortRefDate, sortAnnouncement,
-  squarify, tone,
+  sessionAt, squarify, tone,
   usableNews, validateSnapshot, weightedChange,
 } from './lib.js';
 import { createRefresher } from './poll.js';
@@ -272,7 +272,7 @@ function indexHtml(key) {
     <section class="hkm-stats" aria-label="${esc(view.name)}概況">
       ${statHtml(view.name, fmtPoints(idx.last), isNum(idx.change_pct) ? `<span class="${tone(idx.change_pct)}">${arrow(idx.change_pct)} ${fmtSigned(idx.change)} (${fmtPct(idx.change_pct)})</span>` : '<span class="flat">指數報價暫無資料</span>', tone(idx.change_pct))}
       ${statHtml('總成交額', fmtHkd(block.turnover_hkd), `${esc(view.members)} ${rows.length} 隻合計`)}
-      ${statHtml('更新快照（HKT）', esc(fmtUpdated(state.data.updated_at_hkt).slice(5)), esc(SESSION_LABELS[state.data.market_session] || ''))}
+      ${statHtml('更新快照（HKT）', esc(fmtUpdated(state.data.updated_at_hkt).slice(5)), esc(state.data.market_session in SESSION_LABELS ? `快照時段：${SESSION_LABELS[state.data.market_session]}` : ''))}
     </section>
     ${breadthBarHtml(block.breadth, `${view.short}成分股 升跌家數`, '隻')}
     ${rosterNoteHtml(block, view)}
@@ -323,7 +323,7 @@ function hkHtml() {
     <section class="hkm-stats" aria-label="港股全市場概況">
       ${statHtml('合資格股票', `${hk.qualified_count.toLocaleString('en-US')}`, `全市場 ${hk.universe_count.toLocaleString('en-US')} 隻`)}
       ${statHtml('合資格成交額', fmtHkd(hk.turnover_hkd), '合資格股票合計')}
-      ${statHtml('更新快照（HKT）', esc(fmtUpdated(state.data.updated_at_hkt).slice(5)), esc(SESSION_LABELS[state.data.market_session] || ''))}
+      ${statHtml('更新快照（HKT）', esc(fmtUpdated(state.data.updated_at_hkt).slice(5)), esc(state.data.market_session in SESSION_LABELS ? `快照時段：${SESSION_LABELS[state.data.market_session]}` : ''))}
     </section>
     ${breadthBarHtml(hk.breadth, '合資格股票 升跌家數', '隻')}
     <div class="hkm-criteria" role="note" aria-label="篩選條件">
@@ -484,9 +484,11 @@ function noticesHtml(now) {
   if (d.data_source === 'live' && rs.fails > 0) {
     out.push(`<div class="notice notice-error hkm-alert" role="status"><span class="badge badge-stale">更新失敗</span><span>無法取得最新快照（已連續失敗 ${rs.fails} 次，最近一次嘗試 ${esc(clock(rs.lastAttemptAt))} HKT）。畫面仍是 <b>${esc(fmtUpdated(d.updated_at_hkt))}（HKT）</b>的舊快照，並非最新資料；系統會自動重試。</span>${retry}</div>`);
   }
-  if (isStale(d, now)) {
-    const age = ageMinutes(d.updated_at_hkt, now);
-    out.push(`<div class="notice notice-warn hkm-alert" role="status"><span class="badge badge-stale">快照過時</span><span>最新快照時間為 ${esc(fmtUpdated(d.updated_at_hkt))}（HKT），距今 ${esc(fmtAge(age))}，超過預期的更新間隔。目前顯示的並非最新資料。</span>${rs.fails > 0 ? '' : retry}</div>`);
+  const ms = marketStatus(d, now);
+  if (ms?.stale) {
+    out.push(`<div class="notice notice-warn hkm-alert" data-market-state="${ms.state}" role="status"><span class="badge badge-stale">${esc(ms.badge)}</span><span>${esc(ms.text)}</span>${rs.fails > 0 ? '' : retry}</div>`);
+  } else if (ms && ms.tone === 'info') {
+    out.push(`<div class="notice hkm-market" data-market-state="${ms.state}" role="status"><span class="badge">${esc(ms.badge)}</span><span>${esc(ms.text)}</span></div>`);
   }
   return out.join('');
 }
@@ -500,10 +502,13 @@ function renderStatus() {
   const now = new Date();
   const d = state.data;
   const rs = refreshState();
-  const stale = isStale(d, now);
+  const ms = marketStatus(d, now);
+  const stale = Boolean(ms?.stale);
   const failing = d.data_source === 'live' && rs.fails > 0;
   const checked = rs.lastCheckedAt ? ` · 上次檢查 <span class="num">${esc(clock(rs.lastCheckedAt))}</span>` : '';
-  const html = `快照更新：<span class="num">${esc(fmtUpdated(d.updated_at_hkt))}</span>（HKT） · ${esc(SESSION_LABELS[d.market_session] || '')}${d.data_source === 'demo' ? ' <span class="badge badge-sample">示範數據</span>' : ''}${stale ? ' <span class="badge badge-stale">資料已過時</span>' : failing ? ' <span class="badge badge-stale">更新失敗</span>' : ''}${checked}`;
+  const snapLabel = SESSION_LABELS[d.market_session] ? ` · 快照時段：${esc(SESSION_LABELS[d.market_session])}` : '';
+  const clockLabel = d.data_source === 'live' ? ` · <span class="badge badge-market" data-market-clock="${esc(sessionAt(now))}">現時：${esc(SESSION_LABELS[sessionAt(now)])}</span>` : '';
+  const html = `快照更新：<span class="num">${esc(fmtUpdated(d.updated_at_hkt))}</span>（HKT）${snapLabel}${clockLabel}${d.data_source === 'demo' ? ' <span class="badge badge-sample">示範數據</span>' : ''}${stale ? ' <span class="badge badge-stale">資料已過時</span>' : failing ? ' <span class="badge badge-stale">更新失敗</span>' : ''}${checked}`;
   if (html !== lastUpdated) {
     $('#hkm-updated').innerHTML = html;
     lastUpdated = html;

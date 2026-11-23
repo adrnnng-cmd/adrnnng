@@ -12,6 +12,15 @@
 /assets/vendor/*
   Cache-Control: public, max-age=604800
 
+# Modules and stylesheets pair with /assets/tools.json (five minutes), so they revalidate on the same horizon
+# instead of Pages' four-hour default. An old module cached before this rule keeps its old max-age; the
+# landing page gets past that with the ?v= boot URL in index.html (scripts/home-assets.mjs).
+/assets/js/*
+  Cache-Control: public, max-age=300, must-revalidate
+
+/assets/css/*
+  Cache-Control: public, max-age=300, must-revalidate
+
 # Indexing.
 # Cloudflare applies every matching rule in file order. A repeated
 # X-Robots-Tag is joined with a comma, and a joined value that still contains

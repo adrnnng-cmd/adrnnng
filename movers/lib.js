@@ -177,7 +177,11 @@ export function ageMinutes(updatedAtHkt, now = new Date()) {
   return t == null ? null : (toMs(now) - t) / 60000;
 }
 
-/** Hong Kong trading session at an instant. Weekday schedule only; public holidays are not modelled. */
+/**
+ * Hong Kong trading session at an instant, from the clock alone (Asia/Hong_Kong, whatever the viewer's time zone).
+ * Weekday schedule only: there is no holiday or half-day table in this repository, so public holidays read as
+ * ordinary weekdays and half-day markets keep the full-day times. Callers that warn must say so.
+ */
 export function sessionAt(now = new Date()) {
   const hk = new Date(toMs(now) + HKT_OFFSET_MS);
   const day = hk.getUTCDay();
@@ -193,9 +197,112 @@ export function sessionAt(now = new Date()) {
 
 export const isTradingNow = (now = new Date()) => OPEN_SESSIONS.has(sessionAt(now));
 
+/** Clock times of each session on the weekday schedule, for notices. */
+export const SESSION_HOURS = {
+  pre_open: '09:00–09:30',
+  morning: '09:30–12:00',
+  lunch: '12:00–13:00',
+  afternoon: '13:00–16:00',
+  closing_auction: '16:00–16:10',
+};
+
 /** Minutes a snapshot may age before it is called stale. The collector writes about every 6 minutes. */
-export const STALE_AFTER_MIN = { trading: 10, lunch: 30 };
+export const STALE_AFTER_MIN = { trading: 10 };
 export const STALE_AFTER_CLOSED_MIN = 4 * 24 * 60;
+
+const WEEKDAYS_ZH = ['日', '一', '二', '三', '四', '五', '六'];
+
+/** Minutes after midnight (HKT) at which a snapshot taken in each session counts as covering that session's end. */
+const END_MINUTES = { lunch: 12 * 60, closed: 16 * 60 + 10 };
+
+/** The next weekday 09:00 after `ms`, as `{ day: 'YYYY-MM-DD', text }`. Holidays are not skipped. */
+export function nextScheduledOpen(ms) {
+  const hk = new Date(ms + HKT_OFFSET_MS);
+  let day = Date.UTC(hk.getUTCFullYear(), hk.getUTCMonth(), hk.getUTCDate());
+  const minutes = hk.getUTCHours() * 60 + hk.getUTCMinutes();
+  const weekday = hk.getUTCDay() >= 1 && hk.getUTCDay() <= 5;
+  if (!(weekday && minutes < 9 * 60)) day += 86400000;
+  while ([0, 6].includes(new Date(day).getUTCDay())) day += 86400000;
+  const d = new Date(day);
+  return { day: d.toISOString().slice(0, 10), text: `${d.getUTCMonth() + 1}月${d.getUTCDate()}日（星期${WEEKDAYS_ZH[d.getUTCDay()]}）09:00` };
+}
+
+const SCHEDULE_NOTE = '時段按平日時間表判斷，未計公眾假期及半日市。';
+
+/**
+ * Market state for a document at `now`. Two clocks are kept apart:
+ *   clockSession     the session the Hong Kong wall clock says it is now
+ *   snapshotSession  what the collector wrote into the document when it ran (may be old)
+ * Staleness follows the clock. Inside a session a snapshot more than 10 minutes old is stale. During the
+ * 12:00-13:00 break, and after the close, nothing trades, so an old snapshot is the expected state and is shown as
+ * 午間休市 / 已收市 with its timestamp, unless it predates the end of the last session (then the notice says the
+ * snapshot may not reflect it). A snapshot taken before 13:00 is never current once the afternoon session runs.
+ *
+ * @returns {{state: string, stale: boolean, tone: string, badge: string, text: string, clockSession: string, snapshotSession: string, ageMin: number|null, hours: string|null}|null}
+ *   null for demo data, or when updated_at_hkt cannot be read (the time is not guessed).
+ */
+export function marketStatus(data, now = new Date()) {
+  if (!data || data.data_source === 'demo') return null;
+  const nowMs = toMs(now);
+  const snapMs = parseHktStamp(data.updated_at_hkt);
+  if (snapMs == null) return null;
+  const age = (nowMs - snapMs) / 60000;
+  const clockSession = sessionAt(nowMs);
+  const base = { clockSession, snapshotSession: data.market_session, ageMin: age, hours: SESSION_HOURS[clockSession] || null };
+  const snapAt = fmtUpdated(data.updated_at_hkt);
+  const today = hktDay(nowMs);
+  const snapDay = hktDay(snapMs);
+  const snapMinutes = new Date(snapMs + HKT_OFFSET_MS).getUTCHours() * 60 + new Date(snapMs + HKT_OFFSET_MS).getUTCMinutes();
+  const grace = STALE_AFTER_MIN.trading;
+  const ageText = fmtAge(age);
+
+  if (OPEN_SESSIONS.has(clockSession)) {
+    if (age <= grace) return { ...base, state: 'live', stale: false, tone: 'none', badge: '', text: '' };
+    const snapClock = sessionAt(snapMs);
+    const earlier = snapClock !== clockSession && snapDay === today && snapClock === 'lunch'
+      ? `這份快照取自午間休市期間，${clockSession === 'afternoon' ? '下午盤已於 13:00 重開' : `現時已是${SESSION_LABELS[clockSession]}`}，新快照尚未寫入。`
+      : snapClock !== clockSession && snapDay === today
+        ? `這份快照取自${SESSION_LABELS[snapClock]}，現時已是${SESSION_LABELS[clockSession]}。`
+        : '';
+    return {
+      ...base, state: 'stale', stale: true, tone: 'warn', badge: '快照過時',
+      text: `現時為${SESSION_LABELS[clockSession]}（${SESSION_HOURS[clockSession]}），最新快照時間為 ${snapAt}（HKT），距今 ${ageText}，超過預期的更新間隔。${earlier}目前顯示的並非最新資料。${SCHEDULE_NOTE}`,
+    };
+  }
+
+  if (clockSession === 'lunch') {
+    const covers = snapDay === today && snapMinutes >= END_MINUTES.lunch - grace;
+    if (!covers) {
+      return {
+        ...base, state: 'stale', stale: true, tone: 'warn', badge: '快照過時',
+        text: `午間休市中（${SESSION_HOURS.lunch}），但最新快照 ${snapAt}（HKT）早於上午盤結束前 ${grace} 分鐘，距今 ${ageText}，可能缺少上午盤尾段的資料。${SCHEDULE_NOTE}`,
+      };
+    }
+    return {
+      ...base, state: 'break', stale: false, tone: 'info', badge: '午間休市',
+      text: `午間休市（${SESSION_HOURS.lunch}），13:00 重開。休市期間沒有新成交，數字不變屬正常；目前顯示 ${snapAt}（HKT）的快照，距今 ${ageText}。13:00 重開後若超過 ${grace} 分鐘仍未寫入新快照，此處會改為提出警告。${SCHEDULE_NOTE}`,
+    };
+  }
+
+  if (age > STALE_AFTER_CLOSED_MIN) {
+    return {
+      ...base, state: 'stale', stale: true, tone: 'warn', badge: '快照過時',
+      text: `目前休市，但最新快照時間為 ${snapAt}（HKT），距今 ${ageText}，已超過連續假期的合理間隔。目前顯示的並非最新資料。`,
+    };
+  }
+  const weekend = [0, 6].includes(new Date(nowMs + HKT_OFFSET_MS).getUTCDay());
+  const next = nextScheduledOpen(nowMs);
+  const beforeOpen = !weekend && new Date(nowMs + HKT_OFFSET_MS).getUTCHours() < 9;
+  let gap = '';
+  if (!weekend && !beforeOpen) {
+    if (snapDay < today) gap = `今日尚無快照；若今日為公眾假期，屬正常情況。`;
+    else if (snapMinutes < END_MINUTES.closed - grace) gap = `這份快照早於 16:10 收市，未必是收市價；若今日為半日市，屬正常情況。`;
+  }
+  return {
+    ...base, state: 'closed', stale: false, tone: 'info', badge: '已收市',
+    text: `${weekend ? '週末休市' : beforeOpen ? '尚未開市' : '已收市'}。常規交易時段為 09:30–12:00、13:00–16:00（收市競價至 16:10）。目前顯示 ${snapAt}（HKT）的最後快照；下一個預定開市前時段為 ${next.text}。${gap}${SCHEDULE_NOTE}`,
+  };
+}
 
 /**
  * True when a live document is late for the clock at `now`. The session is read from the clock, not from the
@@ -203,13 +310,7 @@ export const STALE_AFTER_CLOSED_MIN = 4 * 24 * 60;
  * updated_at_hkt is when the collector run started, not an exchange quote time.
  */
 export function isStale(data, now = new Date()) {
-  if (!data || data.data_source === 'demo') return false;
-  const age = ageMinutes(data.updated_at_hkt, now);
-  if (age == null) return false;
-  const session = sessionAt(now);
-  if (OPEN_SESSIONS.has(session)) return age > STALE_AFTER_MIN.trading;
-  if (session === 'lunch') return age > STALE_AFTER_MIN.lunch;
-  return age > STALE_AFTER_CLOSED_MIN;
+  return marketStatus(data, now)?.stale ?? false;
 }
 
 /** "5 分鐘" / "2 小時 5 分鐘" / "1 日 3 小時" for an age in minutes. */
