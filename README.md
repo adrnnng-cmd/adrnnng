@@ -88,9 +88,10 @@ npm run new-tool -- options-flow "Options Flow" --zh "期權資金流" --categor
 ```
 
 This creates `options-flow/{index.html,app.js,style.css}` from `scripts/templates/tool/` and adds
-an entry to `assets/tools.json`. The header nav, footer and landing page pick it up from the
-registry; `new-tool` also runs `scripts/static-chrome.mjs`, so the new section is a real `<a href>` in the
-committed header, footer and homepage cards (see "Static header, footer and homepage links" below). Then:
+an entry to `assets/tools.json`. The header nav and footer on that new page still come from `site.js`.
+`new-tool` also runs `scripts/static-chrome.mjs`, which rewrites only the homepage, so the new section is a
+real `<a href>` in the homepage footer and, when it is one of the four cover doors, in the cards
+(see "Static header, footer and homepage links" below). Then:
 
 1. Build the tool in `options-flow/app.js`. Use the components in `assets/css/theme.css`
    (`panel`, `field`, `select`, `input`, `seg`, `check`, `table`, `badge`, `btn`, `notice`) and
@@ -109,37 +110,38 @@ include `theme.css` + `site.js`, checked by `npm run check`; `own` = page has it
 
 ### Static header, footer and homepage links
 
-The header nav, the footer and the four homepage cards (`/backtest/`, `/movers/`,
-`/politician-tracker/`, `/news/`) are real links in the committed HTML, not something `site.js` or
-`home.js` has to draw first. View-source, a crawler without JavaScript and a visitor with scripting
+The homepage header, the homepage footer and the four homepage cards (`/backtest/`, `/movers/`,
+`/politician-tracker/`, `/news/`) are real links in `index.html`, not something `site.js` or `home.js`
+has to draw first. View-source of the homepage, a crawler without JavaScript and a visitor with scripting
 off all find them, and they work as plain navigation.
 
-- One source of truth: `assets/tools.json`. `assets/js/chrome-html.js` turns it into markup with pure
-  string functions. The browser (`site.js`, `home.js`) and the Node generator use the same functions.
+`/backtest/`, `/movers/`, `/thanks/`, `/about/` and `404.html` are left as they are on live main. Their
+committed header and footer stay empty shells (About keeps its own fine-line link). `site.js` still fills
+those shells in the browser.
+
+- One source of truth for the homepage markup: `assets/tools.json`. `assets/js/chrome-html.js` turns it
+  into markup with pure string functions. The browser (`site.js`, `home.js`) and the Node generator use
+  the same functions.
 - `node scripts/static-chrome.mjs` writes `<header data-site-header>`, `<footer data-site-footer>` and
-  `<nav id="tools">` in every shared-chrome page (and `scripts/templates/tool/index.html`, so new tools
-  start with them). `--check` exits 1 when a page is stale; `npm run check` runs it.
-  After editing `assets/tools.json`, run `npm run static-chrome` and commit the result.
-- JavaScript is a progressive enhancement. When the HTML links match the registry, the scripts keep
-  the anchors and only add the date, the phone Menu button and the data-dependent card bodies
-  (Politician Tracker filing, Morning Report caption). If the HTML and registry disagree, or the
-  HTML is an old copy with empty regions, they rebuild the regions from the registry.
+  `<nav id="tools">` in `index.html` only. `--check` exits 1 when that page is stale; `npm run check` runs it.
+  After editing `assets/tools.json`, run `npm run static-chrome` and commit `index.html`.
+- JavaScript is a progressive enhancement on the homepage. When the HTML links match the registry, the
+  scripts keep the anchors and only add the date, the phone Menu button and the data-dependent card bodies
+  (Politician Tracker filing, Morning Report caption). If the HTML and registry disagree, or the HTML is an
+  old copy with empty regions, they rebuild the regions from the registry.
 - `scripts/home-preview.mjs`, `seo-meta.mjs`, `news-feed.mjs` and `build-sitemap.mjs` (assemble time)
   do not touch these regions; `scripts/tests/static-links.test.mjs` runs them on a copy to prove it.
 - On a phone with scripting off the header nav is collapsed by the stylesheet (its Menu button needs
-  JavaScript); the cards on the home page and the footer on every page carry the same links.
+  JavaScript); the homepage cards and the homepage footer carry the same links.
 
-**Outside this repo (handoff dependency, not changed here):**
+**News Analyst and Politician Tracker:**
 
-- `/news/` and `/news/YYYYMMDD/` are generated and uploaded by the News Analyst. Their header and footer
-  are theirs. To give those pages the same no-JS links the News Analyst's generator should emit the
-  output of `headerInner(reg, { path })` and `footerInner(reg)` from `assets/js/chrome-html.js` (or
-  copy the four canonical links) into its header and footer. Until then those pages are unchanged and
-  still get the links from `site.js` when scripting is on.
-- `.github/politician-tracker/tracker/render.py` writes `politician-tracker/index.html` with its own static
-  header and footer. The header already links the other sections from the registry; the footer only has the
-  Morning Report archive and `data.json`. Adding the four canonical links to that footer is a change to the
-  tracker workflow, not made here.
+- `/news/` and `/news/YYYYMMDD/` stay with the News Analyst. This repo does not apply their generator patch
+  and does not rebuild dated editions. A future generator can add the four canonical links and a fine-line
+  About anchor under the existing footer row, without importing `site.js` or `chrome-html.js`. Editions
+  already published stay byte-identical.
+- `politician-tracker/index.html` keeps its own page. Its footer adds the four section links, About, and
+  the existing `data.json` link. The disclaimer line stays. The tracker renderer writes that same footer.
 
 ## Backtest
 

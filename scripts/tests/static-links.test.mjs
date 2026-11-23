@@ -47,25 +47,21 @@ test('every door card has its visible name and a description in the source, not 
 });
 
 test('links are the canonical production paths: relative, no preview host, no legacy /hk-movers/', () => {
-  for (const file of ['index.html', 'movers/index.html', 'backtest/index.html', '404.html', 'thanks/index.html']) {
-    const html = read(file);
-    const chrome = [part(html, HEADER), part(html, FOOTER), part(html, DOORS)].join('\n');
-    assert.doesNotMatch(chrome, /hk-movers|localhost|127\.0\.0\.1|pages\.dev|workers\.dev|demo|preview|https?:\/\/(?!buttondown)/i, file);
-    for (const href of hrefs(chrome)) assert.match(href, /^\/(?:[a-z-]+\/)?$/, `${file}: ${href}`);
-  }
+  const html = read('index.html');
+  const chrome = [part(html, HEADER), part(html, FOOTER), part(html, DOORS)].join('\n');
+  assert.doesNotMatch(chrome, /hk-movers|localhost|127\.0\.0\.1|pages\.dev|workers\.dev|demo|preview|https?:\/\/(?!buttondown)/i);
+  for (const href of hrefs(chrome)) assert.match(href, /^\/(?:[a-z-]+\/)?$/, href);
 });
 
-test('shared pages carry the whole footer and the primary nav as links in their own source', () => {
-  for (const file of ['movers/index.html', 'backtest/index.html', '404.html', 'thanks/index.html']) {
-    const html = withoutScripts(read(file));
-    const footer = hrefs(part(html, FOOTER));
-    const header = hrefs(part(html, HEADER));
-    for (const href of CANONICAL) assert.ok(footer.includes(href), `${file} footer -> ${href}`);
-    for (const href of ['/', '/backtest/', '/movers/', '/politician-tracker/', '/news/']) assert.ok(header.includes(href), `${file} header -> ${href}`);
+test('pages outside the homepage stay the live empty chrome shells', () => {
+  for (const file of ['movers/index.html', 'backtest/index.html', '404.html', 'thanks/index.html', 'scripts/templates/tool/index.html']) {
+    assert.match(read(file), /<footer data-site-footer><\/footer>/, file);
+    assert.doesNotMatch(part(read(file), FOOTER), /href="\/backtest\/"/, `${file} footer is not rewritten`);
   }
-  const movers = part(read('movers/index.html'), HEADER);
-  assert.match(movers, /<a href="\/movers\/" aria-current="page">Movers<\/a>/);
-  assert.doesNotMatch(movers, /aria-current="page">(Backtest|Politician)/);
+  const about = read('about/index.html');
+  assert.match(about, /<link rel="canonical" href="https:\/\/news-chart.com\/about\/">/);
+  assert.match(about, /<footer data-site-footer>\s*<div class="wrap"><div class="fine"><a href="\/about\/">About<\/a><\/div><\/div>\s*<\/footer>/);
+  assert.doesNotMatch(part(about, FOOTER), /href="\/backtest\/"/);
 });
 
 test('the Morning Report cover rewritten at assemble time is outside the generated regions', () => {
@@ -85,13 +81,14 @@ test('committed pages are exactly what the generator writes; a stale page is rep
       mkdirSync(dirname(join(tmp, f)), { recursive: true });
       cpSync(join(root, f), join(tmp, f));
     }
-    const movers = join(tmp, 'movers/index.html');
-    writeFileSync(movers, readFileSync(movers, 'utf8').replace(/<footer[\s\S]*?<\/footer>/, '<footer data-site-footer></footer>'));
-    assert.deepEqual(staleFiles(tmp), ['movers/index.html']);
-    assert.match(staticChromeError(tmp), /stale in movers\/index\.html/);
-    assert.deepEqual(writeAll(tmp), ['movers/index.html']);
+    assert.deepEqual(pages(tmp), ['index.html']);
+    const homeShell = join(tmp, 'index.html');
+    writeFileSync(homeShell, readFileSync(homeShell, 'utf8').replace(/<footer[\s\S]*?<\/footer>/, '<footer data-site-footer></footer>'));
+    assert.deepEqual(staleFiles(tmp), ['index.html']);
+    assert.match(staticChromeError(tmp), /stale in index\.html/);
+    assert.deepEqual(writeAll(tmp), ['index.html']);
     assert.deepEqual(writeAll(tmp), [], 'second run changes nothing');
-    assert.equal(readFileSync(movers, 'utf8'), read('movers/index.html'));
+    assert.equal(readFileSync(homeShell, 'utf8'), read('index.html'));
     const index = join(tmp, 'index.html');
     writeFileSync(index, readFileSync(index, 'utf8').replace(/<nav\b[^>]*id="tools"[\s\S]*?<\/nav>/, '<nav class="doors wrap" id="tools" aria-label="Sections"></nav>'));
     assert.deepEqual(staleFiles(tmp), ['index.html']);
@@ -124,7 +121,7 @@ test('npm run new-tool leaves the new section in every static header, footer and
   const tmp = mkdtempSync(join(tmpdir(), 'static-chrome-'));
   try {
     const files = [...pages(root), 'assets/tools.json', 'scripts/new-tool.mjs', 'scripts/static-chrome.mjs', 'assets/js/chrome-html.js', 'assets/js/latest.js',
-      'scripts/templates/tool/app.js', 'scripts/templates/tool/style.css', 'package.json'];
+      'scripts/templates/tool/index.html', 'scripts/templates/tool/app.js', 'scripts/templates/tool/style.css', 'movers/index.html', 'package.json'];
     for (const f of files) {
       if (!existsSync(join(root, f))) continue;
       mkdirSync(dirname(join(tmp, f)), { recursive: true });
@@ -132,17 +129,12 @@ test('npm run new-tool leaves the new section in every static header, footer and
     }
     const out = execFileSync(process.execPath, ['scripts/new-tool.mjs', 'fx-lab', 'FX Lab', '--summary', 'Currency pairs.'], { cwd: tmp, encoding: 'utf8' });
     assert.match(out, /static links added to/);
-    for (const file of ['index.html', 'movers/index.html', '404.html']) {
-      const html = readFileSync(join(tmp, file), 'utf8');
-      assert.ok(hrefs(part(html, FOOTER)).includes('/fx-lab/'), `${file} footer`);
-    }
     const home = readFileSync(join(tmp, 'index.html'), 'utf8');
-    assert.ok(hrefs(part(home, HEADER)).length >= 1);
+    assert.ok(hrefs(part(home, FOOTER)).includes('/fx-lab/'), 'homepage footer');
+    assert.equal(readFileSync(join(tmp, 'movers/index.html'), 'utf8'), read('movers/index.html'), 'movers is not rewritten');
     assert.deepEqual(staleFiles(tmp), []);
     const created = readFileSync(join(tmp, 'fx-lab/index.html'), 'utf8');
-    assert.ok(hrefs(part(created, HEADER)).includes('/fx-lab/'), 'the new page has the static header too');
-    assert.ok(hrefs(part(created, FOOTER)).includes('/fx-lab/'));
-    assert.match(part(created, HEADER), /aria-current="page"/, 'it also marks itself as the current page');
+    assert.match(created, /<footer data-site-footer><\/footer>/, 'the new page keeps the template shell');
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }

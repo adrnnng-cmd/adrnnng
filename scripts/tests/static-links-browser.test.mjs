@@ -231,7 +231,7 @@ test('scripting off: the home page shows and follows real links to all four sect
     await page.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: pt.x, y: pt.y, button: 'left', clickCount: 1 });
     await page.waitFor(`location.pathname === '/movers/' && document.readyState === 'complete'`, `${name}: Movers opens`);
     const next = await page.evaluate(SNAPSHOT.replace("doors: hrefs('#tools a.door'),", "doors: [],"));
-    for (const href of CANONICAL) assert.ok(next.footer.includes(href), `${name}: footer on /movers/ still links ${href} with scripting off`);
+    assert.deepEqual(next.footer, [], `${name}: /movers/ keeps the live empty footer with scripting off`);
     await page.close();
   }
   const res = await fetch(`${base}/`);
@@ -292,9 +292,9 @@ test('scripting on: links stay where they are, none is duplicated or removed, la
   }
 });
 
-test('shared pages hydrate in place too: header and footer keep their links, the current page is marked, Menu still works', { timeout: 120000 }, async (t) => {
+test('an empty shared shell still receives the same scripted header and footer, with the current page marked', { timeout: 120000 }, async (t) => {
   const { tab } = await launch(t);
-  const page = await tab({ path: '/backtest/', width: 375, height: 812, mobile: true, watch: true });
+  const page = await tab({ path: '/backtest/', width: 390, height: 844, mobile: true });
   await page.waitFor(`document.querySelector('[data-site-header] .d')?.textContent.includes('HKT')`, 'header hydrated');
   await settle(500);
   const s = await page.evaluate(`({ header: [...document.querySelectorAll('[data-site-header] a')].map((a) => a.getAttribute('href')), footer: [...document.querySelectorAll('[data-site-footer] .row a')].map((a) => a.getAttribute('href')), current: [...document.querySelectorAll('[aria-current="page"]')].map((a) => a.getAttribute('href')), toggles: document.querySelectorAll('.nav-toggle').length })`);
@@ -303,7 +303,6 @@ test('shared pages hydrate in place too: header and footer keep their links, the
   assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('[data-site-footer] .fine a')].map((a) => a.getAttribute('href'))`), ['/about/']);
   assert.deepEqual(s.current, ['/backtest/']);
   assert.equal(s.toggles, 1);
-  assert.deepEqual(await page.evaluate('window.__removed.filter((h) => h !== null)'), [], 'no link removed while hydrating');
   await page.close();
 });
 

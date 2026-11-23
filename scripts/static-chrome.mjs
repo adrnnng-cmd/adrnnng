@@ -1,48 +1,30 @@
-// Keeps the shared header, the shared footer and the four homepage doors in the committed HTML as real links.
+// Writes the homepage header, footer and four door cards into index.html as real links.
 //
-// Those parts used to be empty elements that site.js filled in, so view-source (and any crawler or visitor with
-// scripting off) saw no link to /backtest/, /movers/, /politician-tracker/ or /news/. The markup now comes from the
-// same pure functions the browser uses (assets/js/chrome-html.js) and is generated from assets/tools.json:
+// The approved static pages are the homepage, the News Analyst pages (outside this repo) and the Politician
+// Tracker (its own renderer). /backtest/, /movers/, /thanks/, /about/, 404 and the tool template stay the
+// bytes on live main. site.js still fills those empty shells in the browser, as it does on main.
 //
-//   node scripts/static-chrome.mjs           rewrite the pages in place
-//   node scripts/static-chrome.mjs --check   exit 1 when a page is stale (npm run check does this too)
+//   node scripts/static-chrome.mjs           rewrite index.html in place
+//   node scripts/static-chrome.mjs --check   exit 1 when index.html is stale (npm run check does this too)
 //
-// Add a tool with `npm run new-tool` (it runs this) or edit assets/tools.json and run this. Only the contents of
-// <header data-site-header>, <footer data-site-footer> and <nav id="tools" class="doors"> are touched, so the
-// Morning Report cover that scripts/home-preview.mjs rewrites at assemble time is not.
+// Only the contents of <header data-site-header>, <footer data-site-footer> and <nav id="tools"> on index.html
+// are touched, so the Morning Report cover that scripts/home-preview.mjs rewrites at assemble time is not.
 
-import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
-import { dirname, join, relative, resolve } from 'node:path';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { doorsInner, footerInner, headerInner } from '../assets/js/chrome-html.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const SKIP = new Set(['node_modules', '.git', '.github', 'news', 'scripts', 'functions', 'assets']);
-const TEMPLATE = 'scripts/templates/tool/index.html';
+// Homepage only. Other shared-chrome HTML stays byte-identical to live main.
+const APPROVED = ['index.html'];
 
 const HEADER_RE = /(<header\b[^>]*\bdata-site-header\b[^>]*>)([\s\S]*?)(<\/header>)/;
 const FOOTER_RE = /(<footer\b[^>]*\bdata-site-footer\b[^>]*>)([\s\S]*?)(<\/footer>)/;
 const DOORS_RE = /(<nav\b[^>]*\bid="tools"[^>]*>)([\s\S]*?)(<\/nav>)/;
 
 export function pages(root = ROOT) {
-  const found = [];
-  const walk = (dir) => {
-    for (const name of readdirSync(dir)) {
-      if (SKIP.has(name) && dir === root) continue;
-      const abs = join(dir, name);
-      const st = statSync(abs);
-      if (st.isDirectory()) {
-        if (name === 'tests' || name === 'node_modules') continue;
-        walk(abs);
-      } else if (name.endsWith('.html')) {
-        const html = readFileSync(abs, 'utf8');
-        if (/data-site-header|data-site-footer/.test(html)) found.push(relative(root, abs).split('\\').join('/'));
-      }
-    }
-  };
-  walk(root);
-  if (existsSync(join(root, TEMPLATE))) found.push(TEMPLATE);
-  return found.sort();
+  return APPROVED.filter((file) => existsSync(join(root, file)));
 }
 
 /** The path the browser will report for this file, so the current page gets aria-current. */

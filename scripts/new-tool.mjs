@@ -66,7 +66,7 @@ const entry = {
 const soon = reg.tools.findIndex((t) => !t.href);
 reg.tools.splice(soon < 0 ? reg.tools.length : soon, 0, entry);
 writeFileSync(regPath, JSON.stringify(reg, null, 2) + '\n');
-// The header, footer and landing-page cards are committed as real links; add the new tool to all of them.
+// Homepage footer (and cover doors) are committed links. Other pages stay on the live shells.
 const restamped = writeStaticChrome(ROOT);
 
 console.log(`created /${slug}/ (index.html, app.js, style.css) and registered it in assets/tools.json.
