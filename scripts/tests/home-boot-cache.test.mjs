@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { cp, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
@@ -198,6 +199,10 @@ test('warm cached modules and registries from either side of the Movers rename s
   const before = await visit();
   assert.deepEqual(before.doors, ['/backtest/|Backtest', '/hk-movers/|Movers', '/politician-tracker/|Politician Tracker', '/news/|Morning Report']);
   assert.ok(before.requests.includes('/assets/js/home.js'), 'the old module was fetched and cached');
+  assert.ok(before.requests.includes('/assets/img/doors/movers.svg'), 'the warm older module still asks for the original thumbnail URL');
+  const oldAsset = await fetch(`http://127.0.0.1:${port}/assets/img/doors/movers.svg`);
+  assert.equal(oldAsset.status, 200, 'that URL still answers, so the cached module does not 404');
+  assert.equal(createHash('sha256').update(Buffer.from(await oldAsset.arrayBuffer())).digest('hex'), '58480ae4ec8b3ffbfa37e30842232ee18f5bdc1a217dfb72a4e0c0328d394419');
 
   // Release: the registry now says "movers" and the module file is replaced.
   state.registry = 'current';

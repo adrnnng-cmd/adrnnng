@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
@@ -31,15 +32,17 @@ test('the Movers thumbnail is a static heat-map picture: no text, no script, col
   assert.ok(greens.length >= 2 && reds.length >= 2, 'a diverging up/down picture, like the heat map');
 });
 
-test('the thumbnail URL changes with the picture, so a browser that cached the grey one asks again', () => {
-  const home = read('assets/js/home.js');
-  assert.doesNotMatch(home, /doors\/movers\.svg/, 'the old grey asset URL is not referenced any more');
-  assert.equal(readFileSyncOrNull('assets/img/doors/movers.svg'), null, 'the grey asset is removed, not left to be served from cache');
-});
+// The coloured picture has its own filename, so a browser that cached the grey one under the old URL does not
+// reuse it. That old URL still has to answer: a home.js cached for the zone's four hours still requests it.
+const ORIGINAL_MOVERS_SVG = '58480ae4ec8b3ffbfa37e30842232ee18f5bdc1a217dfb72a4e0c0328d394419';
 
-function readFileSyncOrNull(p) {
-  try { return read(p); } catch { return null; }
-}
+test('new home.js uses the coloured filename; the original movers.svg bytes stay for a warm older module', () => {
+  const home = read('assets/js/home.js');
+  assert.match(home, /src: '\/assets\/img\/doors\/movers-heat\.svg'/);
+  assert.doesNotMatch(home, /doors\/movers\.svg/, 'the new module does not ask for the old URL');
+  const kept = readFileSync(join(root, 'assets/img/doors/movers.svg'));
+  assert.equal(createHash('sha256').update(kept).digest('hex'), ORIGINAL_MOVERS_SVG);
+});
 
 // ------------------------------------------------------------------ real browser
 
