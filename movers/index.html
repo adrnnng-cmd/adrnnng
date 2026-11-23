@@ -23,9 +23,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;700&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap">
-  <link rel="stylesheet" href="/assets/css/theme.css">
-  <link rel="stylesheet" href="/movers/movers.css">
-  <link rel="stylesheet" href="/assets/css/newsletter.css">
+  <link rel="stylesheet" href="/assets/css/theme.css?v=43ccc51167">
+  <link rel="stylesheet" href="/movers/movers.css?v=a4702a7e27">
+  <link rel="stylesheet" href="/assets/css/newsletter.css?v=76e3a9abdf">
 <meta property="og:locale" content="zh_HK">
 <meta name="twitter:site" content="@adrnnng">
 <script type="application/ld+json" id="adrnnng-breadcrumb">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://news-chart.com/"},{"@type":"ListItem","position":2,"name":"Movers","item":"https://news-chart.com/movers/"}]}</script>
@@ -79,7 +79,30 @@
   </main>
 
   <footer data-site-footer></footer>
-  <script type="module" src="/assets/js/site.js"></script>
-  <script type="module" src="/movers/app.js"></script>
+  <script>
+    // Classic script on purpose: it still runs when the module graph fails to load or link (for example an old cached
+    // module next to a new one), so the page never sits on 資料載入中… with nothing behind it.
+    (function () {
+      var shown = false;
+      function show() {
+        var body = document.getElementById('hkm-body');
+        if (shown || document.documentElement.dataset.hkmBoot === 'ready' || !body || !body.querySelector('.hkm-loading')) return;
+        shown = true;
+        body.innerHTML = '<div class="hkm-empty hkm-error" role="alert"><b>頁面程式未能載入</b>可能是網絡中斷，或瀏覽器保留了舊版檔案。請按「重新載入」；若仍然如此，請強制重新整理（Ctrl／Cmd + Shift + R）。<br></div>';
+        var button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'btn btn-sm';
+        button.textContent = '重新載入';
+        button.addEventListener('click', function () { location.reload(); });
+        body.firstChild.appendChild(button);
+        var updated = document.getElementById('hkm-updated');
+        if (updated) updated.textContent = '頁面程式未能載入';
+      }
+      window.addEventListener('error', function () { setTimeout(show, 0); });
+      setTimeout(show, 12000);
+    })();
+  </script>
+  <script type="module" src="/assets/js/site.js?v=c486917671"></script>
+  <script type="module" src="/movers/app.js?v=43dd86d85c"></script>
 </body>
 </html>

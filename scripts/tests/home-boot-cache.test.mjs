@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { extname, join, dirname, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-import { bootStampError, bootTag, bootVersion, stampedHtml } from '../home-assets.mjs';
+import { plan, stampError } from '../asset-versions.mjs';
 import { indexingHeaderErrors } from '../headers.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -21,38 +21,33 @@ const types = {
 
 // ------------------------------------------------------------------ source contract
 
-test('index.html names the home.js boot module with the hash of its module graph', () => {
+const homeVersion = (dir = root) => plan(dir).versions['/assets/js/home.js'];
+
+test('index.html loads home.js and site.js at the version of their stamped module graph', () => {
   const html = read('index.html');
-  assert.equal(bootStampError(root), '');
-  assert.equal(bootTag(html), bootVersion(root));
-  assert.match(html, /<script type="module" src="\/assets\/js\/home\.js\?v=[0-9a-f]{10}"><\/script>/);
-  assert.match(html, /<script type="module" src="\/assets\/js\/site\.js"><\/script>/, 'site.js stays one module instance');
+  assert.equal(stampError(root), '');
+  const v = plan(root).versions;
+  assert.match(html, new RegExp(`<script type="module" src="/assets/js/home\\.js\\?v=${v['/assets/js/home.js']}"></script>`));
+  assert.match(html, new RegExp(`<script type="module" src="/assets/js/site\\.js\\?v=${v['/assets/js/site.js']}"></script>`));
+  const homeJs = read('assets/js/home.js');
+  assert.match(homeJs, new RegExp(`from './site\\.js\\?v=${v['/assets/js/site.js']}'`), 'home.js imports the same site.js URL, so one module instance runs');
 });
 
-test('the boot version moves when any module in the home.js graph changes, and stamping is idempotent', () => {
-  const html = read('index.html');
-  const v = bootVersion(root);
-  assert.equal(stampedHtml(html, v), html);
-  assert.equal(stampedHtml(stampedHtml(html, 'abc123'), v), html);
-  assert.equal(stampedHtml(html.replace('home.js?v=' + v, 'home.js'), v), html);
-  assert.notEqual(v, 'abc123');
-});
-
-test('every module in the boot graph, and only that graph, feeds the version', async (t) => {
+test('every module in the home graph, and only that graph, feeds the home version', async (t) => {
   const copy = await mkdtemp(join(tmpdir(), 'home-graph-'));
   t.after(() => rm(copy, { recursive: true, force: true }));
-  await cp(join(root, 'assets/js'), join(copy, 'assets/js'), { recursive: true });
-  await cp(join(root, 'backtest/strategies'), join(copy, 'backtest/strategies'), { recursive: true });
-  const base = bootVersion(copy);
-  assert.equal(base, bootVersion(root));
+  for (const dir of ['assets', 'backtest/strategies', 'movers']) await cp(join(root, dir), join(copy, dir), { recursive: true });
+  for (const page of ['index.html', 'movers/index.html']) await cp(join(root, page), join(copy, page));
+  const base = homeVersion(copy);
+  assert.equal(base, homeVersion(root));
   for (const file of ['assets/js/home.js', 'assets/js/site.js', 'assets/js/latest.js', 'assets/js/member-photo.js', 'assets/js/newsletter.js', 'backtest/strategies/td-sequential.js']) {
     const original = await readFile(join(copy, file), 'utf8');
     await writeFile(join(copy, file), `${original}\n// edit`);
-    assert.notEqual(bootVersion(copy), base, `${file} must change the boot version`);
+    assert.notEqual(homeVersion(copy), base, `${file} must change the home version`);
     await writeFile(join(copy, file), original);
   }
   await writeFile(join(copy, 'assets/js/unrelated.js'), 'export {};');
-  assert.equal(bootVersion(copy), base, 'a module outside the graph must not change it');
+  assert.equal(homeVersion(copy), base, 'a module outside the graph must not change it');
 });
 
 test('_headers revalidates modules and stylesheets on the registry horizon and keeps HTML revalidating', () => {
@@ -92,7 +87,7 @@ function serve(state, requests) {
     try {
       if (url.pathname === '/' || url.pathname === '/index.html') {
         let html = await readFile(join(root, 'index.html'), 'utf8');
-        if (state.html === 'pre-fix') html = html.replace(/home\.js\?v=[0-9a-f]+/, 'home.js');
+        if (state.html === 'pre-fix') html = html.replace(/\?v=[0-9a-f]{10}/g, '');
         return send(html, 'x.html', 'no-cache');
       }
       if (url.pathname === '/assets/tools.json') {
@@ -213,7 +208,7 @@ test('warm cached modules and registries from either side of the Movers rename s
   state.html = 'fixed';
   const fixed = await visit();
   assert.deepEqual(fixed.doors, FOUR);
-  assert.ok(fixed.requests.includes(`/assets/js/home.js?v=${bootVersion(root)}`), fixed.requests.join(' '));
+  assert.ok(fixed.requests.includes(`/assets/js/home.js?v=${homeVersion()}`), fixed.requests.join(' '));
   assert.ok(!fixed.requests.includes('/assets/js/home.js'), 'the warm old module is bypassed');
 
   // Revisit: the versioned module and registry are both consistent.

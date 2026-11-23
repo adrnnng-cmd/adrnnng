@@ -1,7 +1,7 @@
 // Background refresh controller for /movers/. No DOM, no timers of its own: the page calls tick()
 // from one interval and recover() on focus / visibility / online events, so node --test can drive it.
 
-import { POLL_MS, acceptRefresh, pollDelayMs } from './lib.js';
+import { POLL_MS, acceptRefresh, pollDelayMs } from './lib.js?v=a02e146830';
 
 /**
  * @param {object} o
@@ -59,11 +59,20 @@ export function createRefresher({ load, getCurrent, onData, onStatus, now = Date
     return inFlight;
   }
 
-  /** The first load happened outside the controller; start the polling clock from it. */
-  function seed() {
+  /**
+   * The first load happened outside the controller; start the polling clock from it. `failed` means that load only
+   * produced the demo fallback, so the next live attempt follows the failure back-off (30 s) instead of waiting
+   * for a full idle interval.
+   */
+  function seed({ failed = false } = {}) {
     lastAttemptAt = now();
     lastCheckedAt = lastAttemptAt;
-    lastSuccessAt = lastAttemptAt;
+    if (failed) {
+      fails = Math.max(fails, 1);
+      lastError = new Error('first load fell back to demo data');
+    } else {
+      lastSuccessAt = lastAttemptAt;
+    }
   }
 
   /** True when the next background fetch is due. */
