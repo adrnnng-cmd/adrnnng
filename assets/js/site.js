@@ -80,7 +80,7 @@ function renderFooter(el, reg) {
       <span>${esc(reg.site.owner)} · Hong Kong · ${esc(reg.site.name)}</span>
       <span>${live.map((t) => `<a href="${esc(t.href)}">${esc(t.title)}</a>`).join(' · ')}</span>
     </div>
-    <div class="fine">Research and education only. Not investment advice. Backtests are hypothetical and do not predict future results.</div>
+    <div class="fine">Research and education only. Not investment advice. Backtests are hypothetical and do not predict future results. <a href="/about/">About</a></div>
   </div>`;
 }
 
