@@ -311,8 +311,12 @@ The two index views also have a full constituents table. No quote vendor is name
   "after" column is the pro-forma result effective 2026-12-07 (implemented after the close of 2026-12-04). HSI stays
   at 95 constituents with weights re-capped; HSTECH grows from 30 to 50. The site uses the current roster and the
   "before" weights until the effective date. `scripts/hk-movers/index-rosters.json` holds both rosters as dated
-  versions; `select_version(index, today_hkt)` switches on the effective date, and the document's `roster`
-  block publishes only the announced roster's date, size and changes, never its member list. The published
+  versions (the announced HSTECH version holds all 50 members with their official weights, cross-checked against an
+  independent parse of the PDF in `test_hk_movers_rosters.py`); `select_version(index, today_hkt)` switches on the
+  effective date, and the document's `roster` block publishes only the announced roster's date, size and how many
+  members are added or removed (counts, no codes, no weights), never its member list. From 2026-12-07 the new
+  version is the roster in force (`status` stays `current`, `weights_stage` becomes `post_review_pro_forma`).
+  Note that the roster file itself is in the repo: if the site assemble uploads `scripts/`, it is fetchable. The published
   weights are as of 2026-11-18, not live: they drift with prices until the next review and the page says so.
   Regenerate after a review with `python3 scripts/hk_movers_rosters.py --pdf-text <pdftotext -layout output>`.
 - **1D / 5D / 1M / YTD.** 1D is the current price against the previous close. The others are the current price against
@@ -321,6 +325,12 @@ The two index views also have a full constituents table. No quote vendor is name
   calendar day one month earlier, YTD the last trading day of the previous calendar year. No bar on or before a
   reference date means `null`, shown as `—`, never an estimate. Public holidays come from the real bar calendar,
   not from a holiday table.
+- **Collapsed by default.** The 成分股一覽 table of both index views shows only the first 10 rows of the current
+  sort and says 顯示 10 / 共 N 隻; 展開全部 N 隻成分股 / 收合 buttons (above and below the table, `aria-expanded` and
+  `aria-controls`, native keyboard activation) switch it. Collapsing only shortens the list: all members are loaded
+  and sortable, sorting while collapsed takes the first 10 of the new order, and expanding keeps the sort and the
+  view. Expansion and sort are kept per view across the 5-minute snapshot refreshes and view switches. The top-10
+  movers lists above are separate and unchanged.
 - **Sorting.** Each numeric header is a button inside a `th` with `aria-sort`; the first click sorts high to low, the
   next flips. Ties keep the official roster order in both directions and missing values always sort last. Sort
   choices are kept per view across refreshes. On phones the table scrolls inside its own region with the stock

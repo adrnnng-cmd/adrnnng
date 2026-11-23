@@ -2,7 +2,8 @@ import {
   BREADTH_COLORS, DEFAULT_MEMBER_SORT, IMPACT_LABEL, INDEX_VIEWS, MEMBER_COLUMNS, NEWS_EMPTY_TEXT, SESSION_LABELS, SORTS, VIEW_ORDER,
   ageMinutes, ariaSort, arrow, breadthSegments, esc, fmtAge, fmtHkd, fmtPct, fmtPoints, fmtPrice, fmtSigned, fmtUpdated,
   heatColor, impactOf, isIndexView, isNum, isStale, layoutGroups, memberStats, newsReference, nextSort, rankStocks, rankSummary,
-  reconcileSelection, returnRefs, rosterNotes, safeUrl, sectorName, shortRefDate, sortAnnouncement, sortMembers, squarify, tone,
+  membersLabels, membersWindow, reconcileSelection, returnRefs, rosterNotes, safeUrl, sectorName, shortRefDate, sortAnnouncement,
+  squarify, tone,
   usableNews, validateSnapshot, weightedChange,
 } from './lib.js';
 import { createRefresher } from './poll.js';
@@ -20,6 +21,7 @@ const state = {
   sort: 'change',
   weight: { hsi: 'market_cap', hk: 'turnover', hstech: 'market_cap' },
   msort: { hsi: { ...DEFAULT_MEMBER_SORT }, hstech: { ...DEFAULT_MEMBER_SORT } },
+  expanded: { hsi: false, hstech: false },
 };
 
 const $ = (sel) => document.querySelector(sel);
@@ -207,31 +209,42 @@ function sortHead(col, sort, refs) {
   return `<th scope="col" class="r" aria-sort="${ariaSort(sort, col.id)}"><button type="button" class="hkm-sortbtn${on ? ' is-on' : ''}" data-msort="${col.id}" data-fk="msort-${col.id}" title="${esc(`${col.label}：${hint}`)}"><span class="lbl">${esc(col.label)}${col.unit ? ` ${esc(col.unit)}` : ''}</span>${sub}<span class="arr" aria-hidden="true">${mark}</span></button></th>`;
 }
 
+function membersToggleHtml(key, win, labels, where) {
+  if (!win.collapsible) return '';
+  const label = win.expanded ? labels.collapse : labels.expand;
+  return `<button type="button" class="btn btn-sm hkm-members-toggle" data-members-toggle data-fk="members-toggle-${where}" aria-expanded="${win.expanded}" aria-controls="hkm-members-panel-${key}">${esc(label)}<span class="arr" aria-hidden="true">${win.expanded ? '▲' : '▼'}</span></button>`;
+}
+
 function membersHtml(key) {
   const block = state.data[key];
   const view = INDEX_VIEWS[key];
   const members = block.members;
   if (!Array.isArray(members) || !members.length) {
-    return `<section class="hkm-members" aria-labelledby="hkm-members-h"><div class="sh"><h2 id="hkm-members-h">全部成分股</h2></div>
+    return `<section class="hkm-members" aria-labelledby="hkm-members-h"><div class="sh"><h2 id="hkm-members-h">成分股一覽</h2></div>
       <div class="hkm-empty"><b>成分股權重表尚未提供</b>目前的快照沒有官方成分股與權重資料，待收集程式更新後會顯示。</div></section>`;
   }
   const sort = state.msort[key];
   const refs = returnRefs(state.data.returns);
   const stats = memberStats(members);
-  const rows = sortMembers(members, sort).map((m) => `<tr class="${m.available === false ? 'is-na' : ''}">
+  const win = membersWindow(members, sort, state.expanded[key]);
+  const labels = membersLabels(win, sort);
+  const rows = win.rows.map((m) => `<tr class="${m.available === false ? 'is-na' : ''}">
       <th scope="row" class="m-stock"><b>${esc(m.name)}</b><span class="code num">${esc(m.code)}</span>${m.available === false ? '<span class="hkm-tag hkm-tag-na">暫無報價</span>' : ''}</th>
       ${MEMBER_COLUMNS.map((col) => `<td class="r num" data-l="${esc(col.label)}">${memberCell(m, col)}</td>`).join('')}
     </tr>`).join('');
   const head = MEMBER_COLUMNS.map((col) => sortHead(col, sort, refs)).join('');
-  const count = `共 ${stats.total} 隻官方成分股 · ${stats.priced} 隻有報價${stats.missing ? ` · ${stats.missing} 隻暫無報價（仍列於表內）` : ''}`;
+  const count = `共 ${stats.total} 隻官方成分股 · ${stats.priced} 隻有報價${stats.missing ? ` · ${stats.missing} 隻暫無報價（仍列入表內）` : ''}`;
   return `<section class="hkm-members" aria-labelledby="hkm-members-h">
-    <div class="sh"><h2 id="hkm-members-h">全部成分股</h2><span class="aux">${esc(count)} · 不受板塊篩選影響</span></div>
-    <p class="hkm-hint hkm-members-hint">點擊欄位標題排序：再按一次由高至低／由低至高切換；沒有數據的成分股一律排在最後，同值時維持官方名單順序。</p>
-    <div class="table-wrap hkm-members-wrap" tabindex="0" role="region" aria-label="${esc(view.name)}全部成分股，可橫向捲動">
-      <table class="hkm-table hkm-members-table"><caption class="sr-only">${esc(view.name)}全部成分股：官方權重、升跌幅、現價與總市值</caption>
+    <div class="sh"><h2 id="hkm-members-h">成分股一覽</h2><span class="aux hkm-members-count">${esc(labels.aux)}</span></div>
+    <p class="hkm-hint hkm-members-hint">${esc(count)} · 不受板塊篩選影響。點擊欄位標題排序：再按一次由高至低／由低至高切換；沒有數據的成分股一律排在最後，同值時維持官方名單順序。</p>
+    <p class="hkm-note hkm-members-window" role="note">${esc(labels.note)}</p>
+    <div class="hkm-members-bar">${membersToggleHtml(key, win, labels, 'top')}</div>
+    <div class="table-wrap hkm-members-wrap" id="hkm-members-panel-${key}" tabindex="0" role="region" aria-label="${esc(view.name)}成分股，${esc(labels.aux)}，可橫向捲動">
+      <table class="hkm-table hkm-members-table"><caption class="sr-only">${esc(view.name)}成分股：官方權重、升跌幅、現價與總市值（${esc(labels.aux)}）</caption>
         <thead><tr><th scope="col" class="m-stock">股票</th>${head}</tr></thead>
         <tbody>${rows}</tbody></table>
     </div>
+    <div class="hkm-members-bar">${membersToggleHtml(key, win, labels, 'bottom')}</div>
     <p class="hkm-note hkm-refnote" role="note">${esc(refs.note)}</p>
   </section>`;
 }
@@ -636,7 +649,18 @@ body.addEventListener('click', (e) => {
   if (t.dataset.msort && isIndexView(state.view)) {
     state.msort[state.view] = nextSort(state.msort[state.view], t.dataset.msort);
     render();
-    $('#hkm-live').textContent = sortAnnouncement(state.msort[state.view]);
+    const block = state.data[state.view];
+    $('#hkm-live').textContent = sortAnnouncement(state.msort[state.view], membersWindow(block.members, state.msort[state.view], state.expanded[state.view]));
+    return;
+  }
+  if (t.dataset.membersToggle !== undefined && isIndexView(state.view)) {
+    const key = state.view;
+    state.expanded[key] = !state.expanded[key];
+    render();
+    const win = membersWindow(state.data[key].members, state.msort[key], state.expanded[key]);
+    const labels = membersLabels(win, state.msort[key]);
+    $('#hkm-live').textContent = state.expanded[key] ? labels.announceExpand : labels.announceCollapse;
+    if (!state.expanded[key]) document.querySelector(`[data-fk="${CSS.escape(t.dataset.fk)}"]`)?.scrollIntoView({ block: 'nearest' });
     return;
   }
   if (t.dataset.weight) state.weight[state.view] = t.dataset.weight;

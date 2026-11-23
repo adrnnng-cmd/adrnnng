@@ -610,9 +610,11 @@ export function nextSort(current, key) {
 
 export const ariaSort = (current, key) => (current?.key === key ? (current.dir === 'asc' ? 'ascending' : 'descending') : 'none');
 
-export function sortAnnouncement(sort) {
+export function sortAnnouncement(sort, win = null) {
   const col = columnOf(sort?.key);
-  return col ? `已按${col.label}由${sort.dir === 'asc' ? '低至高' : '高至低'}排序，沒有數據的成分股排在最後` : '';
+  if (!col) return '';
+  const where = win?.collapsible && !win.expanded ? `，目前顯示前 ${win.shown} 隻（共 ${win.total} 隻）` : '';
+  return `已按${col.label}由${sort.dir === 'asc' ? '低至高' : '高至低'}排序，沒有數據的成分股排在最後${where}`;
 }
 
 /** "2026-11-16" -> "11-16"; a different year keeps the year ("2025-12-31"). */
@@ -644,16 +646,61 @@ export function memberStats(members) {
 export function rosterNotes(roster, label) {
   if (!roster) return { basis: '', upcoming: '' };
   const up = roster.upcoming && roster.upcoming.effective_from ? roster.upcoming : null;
+  const stage = roster.weights_stage === 'post_review_pro_forma' ? '（指數檢討後的備考權重）' : up ? '（指數檢討前）' : '';
   const basis = `${label}官方成分股 ${roster.count} 隻；權重由恒生指數公司公佈，`
-    + `${roster.weights_as_of ? `截至 ${roster.weights_as_of}` : '日期未註明'}${up ? '（指數檢討前）' : ''}。`;
+    + `${roster.weights_as_of ? `截至 ${roster.weights_as_of}` : '日期未註明'}${stage}。`;
   let upcoming = '';
   if (up) {
-    const added = up.added?.length || 0;
-    const removed = up.removed?.length || 0;
+    const added = Number.isFinite(up.added_count) ? up.added_count : 0;
+    const removed = Number.isFinite(up.removed_count) ? up.removed_count : 0;
     const change = added || removed || up.count !== roster.count
       ? `成分股將由 ${roster.count} 隻調整為 ${up.count} 隻${added ? `（新增 ${added} 隻` : '（'}${removed ? `${added ? '、' : ''}剔除 ${removed} 隻` : ''}）`
       : `成分股名單不變（${up.count} 隻），權重按檢討結果重設`;
     upcoming = `已公佈：${up.effective_from} 起${change}。尚未生效，目前仍按現行名單與權重顯示。`;
   }
   return { basis, upcoming };
+}
+
+// ----------------------------------------------- collapsed / expanded table
+
+export const MEMBERS_COLLAPSED_LIMIT = 10;
+
+/**
+ * The rows the constituents table shows. All members are always sorted first, then a collapsed table takes
+ * the first `limit` of that order, so changing the sort changes which members are visible. A roster that
+ * fits in `limit` rows has nothing to collapse.
+ */
+export function membersWindow(members, sort, expanded, limit = MEMBERS_COLLAPSED_LIMIT) {
+  const sorted = sortMembers(Array.isArray(members) ? members : [], sort);
+  const total = sorted.length;
+  const collapsible = total > limit;
+  const isExpanded = !collapsible || Boolean(expanded);
+  const rows = isExpanded ? sorted : sorted.slice(0, limit);
+  return { rows, total, shown: rows.length, hidden: total - rows.length, limit, collapsible, expanded: isExpanded };
+}
+
+const sortPhrase = (sort) => {
+  const col = columnOf(sort?.key) || columnOf(DEFAULT_MEMBER_SORT.key);
+  return `${col.label}由${sort?.dir === 'asc' ? '低至高' : '高至低'}`;
+};
+
+/** Traditional Chinese labels for the table window: what is shown, what the buttons say and what is announced. */
+export function membersLabels(win, sort) {
+  const how = sortPhrase(sort);
+  if (!win.collapsible) {
+    return {
+      aux: `共 ${win.total} 隻，全部顯示`, note: `共 ${win.total} 隻成分股，全部顯示，按${how}排列。`,
+      expand: '', collapse: '', announceExpand: '', announceCollapse: '',
+    };
+  }
+  return {
+    aux: win.expanded ? `顯示全部 ${win.total} 隻` : `顯示 ${win.shown} / 共 ${win.total} 隻`,
+    note: win.expanded
+      ? `已展開：顯示全部 ${win.total} 隻成分股，按${how}排列。`
+      : `目前只顯示按${how}排列的前 ${win.shown} 隻（共 ${win.total} 隻）。收合只是縮短列表，其餘 ${win.hidden} 隻成分股並沒有遺漏，仍在資料內；更改排序會重新取前 ${win.limit} 隻，按「展開全部」可查看全部。`,
+    expand: `展開全部 ${win.total} 隻成分股`,
+    collapse: `收合，只顯示前 ${win.limit} 隻（共 ${win.total} 隻）`,
+    announceExpand: `已展開，顯示全部 ${win.total} 隻成分股`,
+    announceCollapse: `已收合，顯示按${how}排列的前 ${win.limit} 隻（共 ${win.total} 隻）`,
+  };
 }

@@ -7,6 +7,7 @@ import { extname, join, dirname, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { liveDoc } from './movers-fixture.mjs';
+import { sortMembers } from '../../movers/lib.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const types = {
@@ -250,6 +251,14 @@ const TABLE = `(() => {
     roster: document.querySelector('.hkm-roster')?.innerText.replace(/\\s+/g, ' ') || '',
     refnote: document.querySelector('.hkm-refnote')?.innerText || '',
     aux: document.querySelector('.hkm-members .aux')?.innerText || '',
+    hint: document.querySelector('.hkm-members-hint')?.innerText || '',
+    windowNote: document.querySelector('.hkm-members-window')?.innerText || '',
+    panelLabel: document.querySelector('.hkm-members-wrap')?.getAttribute('aria-label') || '',
+    toggles: q('[data-members-toggle]').map((b) => ({
+      text: b.innerText.replace(/\\s+/g, ' ').replace(/[▲▼]/g, '').trim(), expanded: b.getAttribute('aria-expanded'),
+      controls: b.getAttribute('aria-controls'), target: !!document.getElementById(b.getAttribute('aria-controls')), fk: b.dataset.fk,
+      tag: b.tagName, type: b.type, h: b.getBoundingClientRect().height,
+    })),
     heads2: q('.hkm-list-h').map((el) => el.innerText.replace(/\\s+/g, ' ')),
     notes: q('.hkm-note:not(.hkm-refnote)').map((el) => el.innerText),
     criteria: document.querySelector('.hkm-criteria')?.innerText.replace(/\\s+/g, ' ') || '',
@@ -308,33 +317,59 @@ test('HSI and HSTECH views: full constituents table, sorting, accessibility, lay
     };
     const label = width < 800 ? `mobile-${width}` : `desktop-${width}`;
 
+    const press = async (key) => {
+      const code = key === ' ' ? 'Space' : key;
+      const vk = key === ' ' ? 32 : 13;
+      const text = key === ' ' ? ' ' : '\r';
+      await send('Input.dispatchKeyEvent', { type: 'keyDown', key, code, windowsVirtualKeyCode: vk, text });
+      await send('Input.dispatchKeyEvent', { type: 'keyUp', key, code, windowsVirtualKeyCode: vk });
+    };
+    const clickSort = (col) => evaluate(`(() => { const b = document.querySelector('[data-msort="${col}"]'); b.focus(); b.click(); return true; })()`);
+    const clickToggle = (where) => evaluate(`(() => { const b = document.querySelector('[data-fk="members-toggle-${where}"]'); b.focus(); b.click(); return true; })()`);
+
     for (const [view, key, total, priced] of [['hsi', 'hsi', 95, 95], ['hstech', 'hstech', 30, 29]]) {
       const members = sample[key].members;
+      const top = (sort) => sortMembers(members, sort).slice(0, 10).map((m) => m.code);
+      const all = (sort) => sortMembers(members, sort).map((m) => m.code);
       const s0 = await go(view === 'hsi' ? '/movers/' : '/movers/?view=hstech');
       assert.equal(s0.tab, view);
       assert.deepEqual(s0.tabs, ['hsi', 'hk', 'hstech'], 'three views in order');
       assert.match(s0.tabText.join('|'), /HSI 恒生指數 95 隻成分股\|HK 港股全市場.*\|HSTECH 恒生科技指數 30 隻成分股/);
-      assert.equal(s0.rows, total, `${view}: every official member has a row`);
+
+      // collapsed by default: 10 rows, the other members loaded but not drawn.
+      assert.equal(s0.rows, 10, `${view}: collapsed by default`);
+      assert.deepEqual(s0.codes, top(DEFAULT_MEMBER_SORT), 'default order is official weight, high to low, top 10');
+      assert.equal(s0.aux, `顯示 10 / 共 ${total} 隻`);
+      assert.match(s0.hint, new RegExp(`共 ${total} 隻官方成分股 · ${priced} 隻有報價`));
+      assert.match(s0.windowNote, new RegExp(`目前只顯示按權重由高至低排列的前 10 隻（共 ${total} 隻）。收合只是縮短列表，其餘 ${total - 10} 隻成分股並沒有遺漏`));
+      assert.equal(s0.toggles.length, 2, 'one button above and one below the table');
+      for (const tg of s0.toggles) {
+        assert.equal(tg.tag, 'BUTTON');
+        assert.equal(tg.type, 'button');
+        assert.equal(tg.expanded, 'false');
+        assert.equal(tg.controls, `hkm-members-panel-${key}`);
+        assert.equal(tg.target, true, 'aria-controls points at the table region');
+        assert.equal(tg.text, `展開全部 ${total} 隻成分股`);
+        assert.ok(tg.h >= 36, `toggle is tappable (${tg.h}px)`);
+      }
+      assert.match(s0.panelLabel, new RegExp(`顯示 10 / 共 ${total} 隻`));
       assert.equal(s0.sortButtons, 7);
       assert.ok(s0.btnTag, 'headers are real buttons');
       assert.ok(s0.btnH >= 32, `sort buttons are tappable (${s0.btnH}px)`);
       assert.deepEqual(s0.ariaSort, { weight: 'descending', d1: 'none', d5: 'none', m1: 'none', ytd: 'none', last: 'none', cap: 'none' });
-      assert.deepEqual(s0.codes, sortMembers(members, DEFAULT_MEMBER_SORT).map((m) => m.code), 'default order is official weight, high to low');
       assert.match(s0.heads.join('|'), /5日 對比 11-13.*1個月 對比 10-20.*年初至今 對比 2025-12-31/);
       assert.match(s0.refnote, /前復權收市價/);
-      assert.match(s0.aux, new RegExp(`共 ${total} 隻官方成分股 · ${priced} 隻有報價`));
       assert.match(s0.roster, /不套用成交額／市值篩選/);
       assert.match(s0.roster, /截至 2026-11-18/);
       assert.match(s0.roster, /已公佈 · 未生效/);
       assert.match(s0.roster, /尚未生效，目前仍按現行名單與權重顯示/);
       if (view === 'hstech') {
         assert.match(s0.roster, /由 30 隻調整為 50 隻（新增 20 隻）/);
-        assert.equal(s0.naRows.length, 1);
-        assert.match(s0.naRows[0], /騰訊音樂-SW 01698暫無報價 0\.08% — — — — — —/);
-        assert.equal(s0.codes.at(-1), '01698', 'the member without a quote sorts last by weight too');
+        assert.equal(s0.naRows.length, 0, 'the member without a quote has the lowest weight, so it is not in the collapsed top 10');
         assert.ok(s0.heads2.some((h) => /跌幅榜.*實際 5 隻/.test(h)), s0.heads2.join('|'));
         assert.ok(s0.notes.some((n) => /恒生科技指數成分股共 29 隻，只有 5 隻下跌.*不以上升股補位/.test(n)), s0.notes.join('|'));
         assert.match(s0.stats, /恒生科技指數成分股 29 隻合計/);
+        assert.doesNotMatch(s0.text, /09678|02475|03317|02706/, 'no announced-only member is shown before the effective date');
       } else {
         assert.match(s0.roster, /名單不變（95 隻）/);
         assert.equal(s0.codes[0], '00005');
@@ -343,45 +378,105 @@ test('HSI and HSTECH views: full constituents table, sorting, accessibility, lay
       assert.ok(s0.scrollOk, `${label} ${view}: no page-level horizontal overflow`);
       if (width < 800) assert.equal(s0.wrapScrollable, true, 'phone: the table scrolls inside its own region');
       await shotPage(`${label}-${view}`);
-      await shotEl('.hkm-members', `${label}-${view}-table`);
+      await shotEl('.hkm-members', `${label}-${view}-members-collapsed`);
 
-      // every column, both directions: DOM order == the library order, aria-sort follows, unavailable last, focus stays.
+      // sorting while collapsed: the top 10 of the NEW order, every column both ways.
       let sort = { ...DEFAULT_MEMBER_SORT };
       for (const col of ['d5', 'm1', 'ytd', 'd1', 'last', 'cap', 'weight']) {
         for (let i = 0; i < 2; i++) {
           sort = nextSort(sort, col);
-          await evaluate(`(() => { const b = document.querySelector('[data-msort="${col}"]'); b.focus(); b.click(); return true; })()`);
-          const want = sortMembers(members, sort).map((m) => m.code);
+          await clickSort(col);
           const got = await waitFor((s) => s.ariaSort[col] === (sort.dir === 'asc' ? 'ascending' : 'descending'), `${view} ${col} ${sort.dir}`);
-          assert.deepEqual(got.codes, want, `${view} ${col} ${sort.dir}`);
+          assert.deepEqual(got.codes, top(sort), `${view} collapsed ${col} ${sort.dir}: first 10 of that order`);
+          assert.equal(got.rows, 10);
+          assert.equal(got.aux, `顯示 10 / 共 ${total} 隻`);
           assert.equal(Object.values(got.ariaSort).filter((v) => v !== 'none').length, 1, 'exactly one sorted column');
           assert.equal(got.active, `msort-${col}`, 'keyboard focus stays on the header button');
           assert.match(got.live, sort.dir === 'asc' ? /由低至高/ : /由高至低/);
-          assert.equal(got.rows, total, 'sorting never drops a member');
-          if (view === 'hstech' && col !== 'weight') assert.equal(got.codes.at(-1), '01698', `${col} ${sort.dir}: unavailable member stays last`);
+          assert.match(got.live, new RegExp(`目前顯示前 10 隻（共 ${total} 隻）`));
           assert.ok(got.scrollOk);
         }
       }
-      // d5 ascending then descending screenshots
-      await evaluate(`document.querySelector('[data-msort="d5"]').click(); true`);
+      assert.deepEqual(sort, { key: 'weight', dir: 'asc' });
+      assert.notDeepEqual(top(sort), top(DEFAULT_MEMBER_SORT), 'the visible 10 changed with the sort');
+      await clickSort('d5');
+      sort = nextSort(sort, 'd5');
       await waitFor((s) => s.ariaSort.d5 === 'descending', 'd5 desc');
-      await shotEl('.hkm-members', `${label}-${view}-table-sorted-5d-desc`);
-      await evaluate(`document.querySelector('[data-msort="d5"]').click(); true`);
-      await waitFor((s) => s.ariaSort.d5 === 'ascending', 'd5 asc');
-      await shotEl('.hkm-members', `${label}-${view}-table-sorted-5d-asc`);
+      await shotEl('.hkm-members', `${label}-${view}-members-collapsed-sorted-5d-desc`);
+
+      // expand: all members, same sort, same view, focus on the button that was used.
+      await clickToggle('top');
+      const open = await waitFor((s) => s.rows === total, `${view} expanded`);
+      assert.deepEqual(open.codes, all(sort), 'expanding keeps the sort');
+      assert.equal(open.ariaSort.d5, 'descending');
+      assert.equal(open.tab, view);
+      assert.match(open.url, view === 'hsi' ? /^$/ : /view=hstech/);
+      assert.equal(open.aux, `顯示全部 ${total} 隻`);
+      assert.match(open.windowNote, new RegExp(`已展開：顯示全部 ${total} 隻成分股，按5日由高至低排列`));
+      assert.deepEqual(open.toggles.map((tg) => [tg.expanded, tg.text]), Array(2).fill(['true', `收合，只顯示前 10 隻（共 ${total} 隻）`]));
+      assert.equal(open.active, 'members-toggle-top');
+      assert.equal(open.live, `已展開，顯示全部 ${total} 隻成分股`);
+      if (view === 'hstech') {
+        assert.equal(open.naRows.length, 1);
+        assert.match(open.naRows[0], /騰訊音樂-SW 01698暫無報價 0\.08% — — — — — —/);
+        assert.equal(open.codes.at(-1), '01698', 'the member without a quote is in the full table, last in a value sort');
+      }
+      await shotPage(`${label}-${view}-expanded`);
+      await shotEl('.hkm-members', `${label}-${view}-members-expanded`);
+
+      // sorting while expanded: every column both ways over all members.
+      for (const col of ['m1', 'ytd', 'd1', 'last', 'cap', 'weight']) {
+        for (let i = 0; i < 2; i++) {
+          sort = nextSort(sort, col);
+          await clickSort(col);
+          const got = await waitFor((s) => s.ariaSort[col] === (sort.dir === 'asc' ? 'ascending' : 'descending'), `${view} expanded ${col} ${sort.dir}`);
+          assert.deepEqual(got.codes, all(sort), `${view} expanded ${col} ${sort.dir}`);
+          assert.equal(got.rows, total, 'sorting never drops a member');
+          assert.equal(got.toggles[0].expanded, 'true', 'sorting keeps the table expanded');
+          assert.doesNotMatch(got.live, /目前顯示前/);
+          if (view === 'hstech' && col !== 'weight') assert.equal(got.codes.at(-1), '01698', `${col} ${sort.dir}: unavailable member stays last`);
+        }
+      }
+      await clickSort('d5');
+      sort = nextSort(sort, 'd5');
+      await waitFor((s) => s.ariaSort.d5 === 'descending', 'd5 desc expanded');
+      await shotEl('.hkm-members', `${label}-${view}-members-expanded-sorted-5d-desc`);
+
+      // keyboard: Enter collapses, Space expands, both from the bottom button; the sort and the view never move.
+      await evaluate(`document.querySelector('[data-fk="members-toggle-bottom"]').focus(); true`);
+      await press('Enter');
+      const viaEnter = await waitFor((s) => s.rows === 10, `${view} Enter collapses`);
+      assert.deepEqual(viaEnter.codes, top(sort), 'collapsing keeps the sort');
+      assert.equal(viaEnter.toggles[0].expanded, 'false');
+      assert.equal(viaEnter.active, 'members-toggle-bottom', 'focus stays on the toggle after collapsing');
+      assert.match(viaEnter.live, new RegExp(`已收合，顯示按5日由高至低排列的前 10 隻（共 ${total} 隻）`));
+      assert.equal(viaEnter.tab, view);
+      await press(' ');
+      const viaSpace = await waitFor((s) => s.rows === total, `${view} Space expands`);
+      assert.deepEqual(viaSpace.codes, all(sort));
+      assert.equal(viaSpace.active, 'members-toggle-bottom');
+      await clickToggle('bottom');
+      const closed = await waitFor((s) => s.rows === 10, `${view} collapse again`);
+      assert.deepEqual(closed.codes, top(sort));
+      assert.equal(closed.aux, `顯示 10 / 共 ${total} 隻`);
+      assert.ok(closed.scrollOk);
+      await shotEl('.hkm-members', `${label}-${view}-members-collapsed-again`);
 
       if (width < 800) {
         await evaluate(`document.querySelector('.hkm-members-wrap').scrollLeft = 260; true`);
         await new Promise((r) => setTimeout(r, 150));
         const sticky = await evaluate(TABLE);
         assert.ok(Math.abs(sticky.stockLeft - sticky.wrapLeft) <= 1.5, `stock column stays pinned while scrolled (${sticky.stockLeft} vs ${sticky.wrapLeft})`);
-        await shotEl('.hkm-members', `${label}-${view}-table-scrolled`);
+        await shotEl('.hkm-members', `${label}-${view}-members-scrolled`);
       }
     }
 
     // the sort state of a view survives a tab round trip, and HK has no constituents table.
     await go('/movers/?view=hstech');
-    await evaluate(`document.querySelector('[data-msort="ytd"]').click(); document.querySelector('[data-view=hk]').click(); true`);
+    await evaluate(`document.querySelector('[data-msort="ytd"]').click(); true`);
+    await evaluate(`document.querySelector('[data-fk="members-toggle-top"]').click(); true`);
+    await waitFor((s) => s.rows === 30, 'HSTECH expanded before leaving');
+    await evaluate(`document.querySelector('[data-view=hk]').click(); true`);
     const hk = await waitFor((s) => s.tab === 'hk' && s.criteria.includes('篩選條件'), 'HK view');
     assert.equal(hk.members, false, 'the whole-market view has no constituents table');
     assert.match(hk.criteria, /成交額 ≥ HK\$1,000 萬.*總市值 > HK\$10 億/);
@@ -389,11 +484,15 @@ test('HSI and HSTECH views: full constituents table, sorting, accessibility, lay
     await evaluate(`document.querySelector('[data-view=hstech]').click(); true`);
     const back = await waitFor((s) => s.tab === 'hstech' && s.members, 'back to HSTECH');
     assert.equal(back.ariaSort.ytd, 'descending', 'sort choice is kept per view');
+    assert.equal(back.rows, 30, 'expansion is kept per view');
+    assert.equal(back.toggles[0].expanded, 'true');
     assert.match(back.url, /view=hstech/);
     await evaluate(`document.querySelector('[data-view=hsi]').click(); true`);
     const hsi = await waitFor((s) => s.tab === 'hsi' && s.members, 'HSI view');
     assert.doesNotMatch(hsi.url, /view=/);
     assert.equal(hsi.ariaSort.weight, 'descending', 'the HSI table keeps its own sort');
+    assert.equal(hsi.rows, 10, 'HSI stays collapsed: expansion is per view');
+    assert.equal(hsi.toggles[0].expanded, 'false');
     await shotPage(`${label}-hk-view`);
 
     // keyboard: arrow keys walk the three tabs in order and wrap.
@@ -446,6 +545,11 @@ const SNAP = `(() => {
     newsTimes: q('a.news .news-m').map((el) => (el.innerText.match(/\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}/) || [''])[0]),
     newsEmpty: q('.news-empty').map((el) => el.innerText),
     tab: document.querySelector('[role=tab][aria-selected=true]')?.dataset.view,
+    mRows: q('.hkm-members-table tbody tr').length,
+    mCodes: q('.hkm-members-table tbody th.m-stock .code').map((el) => el.innerText),
+    mExpanded: document.querySelector('[data-members-toggle]')?.getAttribute('aria-expanded') || '',
+    mSort: q('[data-msort]').filter((b) => b.closest('th').getAttribute('aria-sort') !== 'none').map((b) => b.dataset.msort + ':' + b.closest('th').getAttribute('aria-sort')),
+    mAux: document.querySelector('.hkm-members .aux')?.innerText || '',
     scroll: document.documentElement.scrollWidth <= document.documentElement.clientWidth,
     skew: window.__skewMs,
     fakeNow: new Date().getTime(),
@@ -526,7 +630,10 @@ test('live page polls, recovers on focus, never overlaps, keeps state, and flags
   await evaluate(`document.querySelector('[data-sort=turnover]').click()`);
   await evaluate(`document.querySelector('.hkm-chip[data-sector]').click()`);
   await evaluate(`document.querySelector('.hm-tile[data-code]:not(.is-dim)').click()`);
-  const chosen = await waitFor((s) => s.sort[0] === 'turnover' && s.sector.length === 1 && s.detailOpen, 'user selections');
+  assert.equal((await evaluate(SNAP)).mRows, 10, 'the HSI table starts collapsed');
+  await evaluate(`document.querySelector('[data-msort="d5"]').click(); true`);
+  await evaluate(`document.querySelector('[data-fk="members-toggle-top"]').click(); true`);
+  const chosen = await waitFor((s) => s.sort[0] === 'turnover' && s.sector.length === 1 && s.detailOpen && s.mRows === 95 && s.mSort[0] === 'd5:descending', 'user selections');
   const picked = { sector: chosen.sector[0], tile: chosen.tile[0] };
 
   // 3. focus after the 10 s guard: one new fetch, the page shows the new update time and keeps the selections.
@@ -544,6 +651,10 @@ test('live page polls, recovers on focus, never overlaps, keeps state, and flags
   assert.deepEqual(refreshed.sector, [picked.sector]);
   assert.equal(refreshed.detailOpen, true);
   assert.equal(refreshed.tab, 'hsi');
+  assert.equal(refreshed.mRows, 95, 'a refresh keeps the table expanded');
+  assert.equal(refreshed.mExpanded, 'true');
+  assert.deepEqual(refreshed.mSort, ['d5:descending']);
+  assert.deepEqual(refreshed.mCodes, sortMembers(next.hsi.members, { key: 'd5', dir: 'desc' }).map((m) => m.code));
   assert.doesNotMatch(refreshed.updated + refreshed.notice, /已過時|更新失敗/);
 
   // 4. a transient failure keeps the last good data and says so prominently.
@@ -560,6 +671,8 @@ test('live page polls, recovers on focus, never overlaps, keeps state, and flags
   assert.equal(failed.upRows > 0, true, 'the data is still on screen');
   assert.deepEqual(failed.sort, ['turnover']);
   assert.deepEqual(failed.sector, [picked.sector]);
+  assert.equal(failed.mRows, 95, 'a failed refresh keeps the expanded table');
+  assert.deepEqual(failed.mSort, ['d5:descending']);
 
   // 5. beyond 10 minutes at the open the snapshot is flagged stale as well.
   await skew(620_000);
@@ -577,6 +690,8 @@ test('live page polls, recovers on focus, never overlaps, keeps state, and flags
   const healthy = await waitFor((s) => !/更新失敗|快照過時/.test(s.notice) && s.sbSegs[0] === '8', 'recovery');
   assert.doesNotMatch(healthy.updated, /已過時/);
   assert.deepEqual(healthy.sort, ['turnover']);
+  assert.equal(healthy.mRows, 95);
+  assert.deepEqual(healthy.mSort, ['d5:descending']);
   assert.equal(script.maxActive, 1, 'still never overlapped');
 
   // 7. HK view: the same honesty for the whole-market lists.
@@ -589,5 +704,27 @@ test('live page polls, recovers on focus, never overlaps, keeps state, and flags
   await shot('desktop-1440-hk', { width: 1440 });
   await shot('mobile-375-hk', { width: 375, height: 812 });
   assert.ok((await evaluate(SNAP)).scroll);
+
+  // 8. HSTECH stays collapsed across a refresh, keeps its sort, and the new data re-ranks the visible 10.
+  await evaluate(`document.querySelector('[data-view=hstech]').click(); true`);
+  const tech = await waitFor((s) => s.tab === 'hstech' && s.mRows === 10, 'HSTECH collapsed');
+  assert.equal(tech.mExpanded, 'false');
+  assert.match(tech.mAux, /顯示 10 \/ 共 30 隻/);
+  await evaluate(`document.querySelector('[data-msort="d1"]').click(); true`);
+  await waitFor((s) => s.mSort[0] === 'd1:descending', 'HSTECH sorted by 1D');
+  const before2 = (await evaluate(SNAP)).updated;
+  const fresh = liveDoc({ now: BASE + 70_000 + 70_000 + 620_000 + 400_000 - 5_000, hsi: { up: 8, down: 86, flat: 1 }, hstech: { up: 9, down: 17, flat: 3 } });
+  script.doc = fresh;
+  await skew(400_000);
+  await evaluate(`window.dispatchEvent(new Event('focus')); true`);
+  const kept = await waitFor((s) => s.updated !== before2 && s.tab === 'hstech', 'HSTECH refresh');
+  assert.equal(kept.mRows, 10, 'a refresh keeps the table collapsed');
+  assert.equal(kept.mExpanded, 'false');
+  assert.deepEqual(kept.mSort, ['d1:descending']);
+  assert.deepEqual(kept.mCodes, sortMembers(fresh.hstech.members, { key: 'd1', dir: 'desc' }).slice(0, 10).map((m) => m.code), 'the new snapshot re-ranks the visible 10');
+  assert.equal(script.maxActive, 1);
+  await evaluate(`document.querySelector('[data-fk="members-toggle-bottom"]').click(); true`);
+  await waitFor((s) => s.mRows === 30, 'HSTECH expanded');
+  await shot('desktop-1440-hstech-expanded-live', { width: 1440 });
   await tab.close();
 });

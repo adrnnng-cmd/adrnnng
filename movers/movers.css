@@ -306,6 +306,11 @@ a.news:hover .news-t { text-decoration: underline; text-underline-offset: 3px; }
 .hkm-sortbtn.is-on .arr { color: #000; }
 .hkm-sortbtn:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 .hkm-refnote { margin-top: 10px; }
+.hkm-members-window { margin-bottom: 8px; }
+.hkm-members-bar { margin: 8px 0; }
+.hkm-members-bar:empty { display: none; }
+.hkm-members-toggle { min-height: 40px; padding: 0 14px; display: inline-flex; align-items: center; gap: 8px; max-width: 100%; text-align: left; white-space: normal; }
+.hkm-members-toggle .arr { font-size: 10px; flex: none; }
 @media (max-width: 759px) {
   .hkm-members-table { min-width: 760px; }
   .hkm-members-table .m-stock { min-width: 128px; max-width: 150px; }

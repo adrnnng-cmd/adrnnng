@@ -307,12 +307,13 @@
       "required": ["status", "count", "weights_as_of", "source"],
       "properties": {
         "status": {
-          "enum": ["current", "announced"],
-          "description": "current = the roster in force before the announced review changes; announced = the review's roster, used only from its effective date."
+          "enum": ["current"],
+          "description": "Always the roster in force today. A later announced roster is only described under upcoming, and replaces this one on its effective date."
         },
         "count": { "type": "integer" },
         "weights_as_of": { "type": "string", "description": "Reference date of the published weights (YYYY-MM-DD), not the snapshot date." },
         "weights_basis": { "type": "string" },
+        "weights_stage": { "enum": ["pre_review", "post_review_pro_forma"], "description": "pre_review: weights of the current constituents before the review's re-capping. post_review_pro_forma: the review's pro-forma weights, in force from the effective date." },
         "effective_from": { "type": ["string", "null"] },
         "source": {
           "type": "object",
@@ -333,19 +334,13 @@
               "properties": {
                 "effective_from": { "type": "string" },
                 "count": { "type": "integer" },
-                "added": {
-                  "type": "array",
-                  "items": { "type": "string" }
-                },
-                "removed": {
-                  "type": "array",
-                  "items": { "type": "string" }
-                },
+                "added_count": { "type": "integer" },
+                "removed_count": { "type": "integer" },
                 "announced": { "type": "string" }
               }
             }
           ],
-          "description": "The announced next roster: date, size and changes only."
+          "description": "The announced next roster: effective date, size and how many members are added or removed. Never its member list or weights."
         }
       }
     }

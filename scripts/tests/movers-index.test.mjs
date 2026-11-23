@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import {
-  DEFAULT_MEMBER_SORT, MEMBER_COLUMNS, ariaSort, memberStats, nextSort, reconcileSelection, returnRefs, rosterNotes,
+  DEFAULT_MEMBER_SORT, MEMBER_COLUMNS, ariaSort, memberStats, membersLabels, membersWindow, nextSort, reconcileSelection, returnRefs, rosterNotes,
   shortRefDate, sortAnnouncement, sortMembers, validateSnapshot,
 } from '../../movers/lib.js';
 import { onRequest as latestNew } from '../../functions/movers/data/latest.js';
@@ -105,6 +105,9 @@ test('rosterNotes: the announced roster is described as not yet in effect', () =
   const hsi = rosterNotes(sample.hsi.roster, '恒生指數');
   assert.match(hsi.upcoming, /名單不變（95 隻）/);
   assert.deepEqual(rosterNotes(null, 'x'), { basis: '', upcoming: '' });
+  const inForce = rosterNotes({ ...sample.hstech.roster, count: 50, weights_stage: 'post_review_pro_forma', effective_from: '2026-12-07', upcoming: null }, '恒生科技指數');
+  assert.match(inForce.basis, /50 隻.*截至 2026-11-18（指數檢討後的備考權重）/);
+  assert.equal(inForce.upcoming, '');
   assert.equal(rosterNotes({ ...sample.hsi.roster, upcoming: null }, 'x').upcoming, '');
 });
 
@@ -131,7 +134,10 @@ test('sample: official rosters, every member present, current weights only', () 
   assert.equal(sample.hsi.members[0].code, '00005', 'HSBC is the largest current HSI weight');
   assert.equal(sample.hsi.members[0].weight_pct, 7.37);
   assert.equal(sample.hstech.members.some((m) => m.code === '09678'), false, 'announced HSTECH additions are not in the current roster');
-  assert.equal(sample.hstech.roster.upcoming.added.includes('09678'), true);
+  assert.equal(sample.hstech.roster.upcoming.added_count, 20);
+  assert.equal(sample.hstech.roster.upcoming.removed_count, 0);
+  assert.doesNotMatch(JSON.stringify(sample.hstech.roster), /09678|02475|03317|02706/, 'the announced additions are not listed in the public document');
+  assert.equal(JSON.stringify(sample.hstech).includes('"added"'), false);
 });
 
 test('sample: the unavailable HSTECH member is listed, null-valued, and absent from the ranked universe', () => {
@@ -274,4 +280,88 @@ test('both feed URLs fall back to the same demo file when KV is empty', async ()
   assert.equal(res.status, 200);
   assert.equal(res.headers.get('x-hk-movers-source'), 'demo');
   assert.equal((await res.json()).data_source, 'demo');
+});
+
+// ------------------------------------------------- collapsed / expanded window
+
+const roster = (n) => Array.from({ length: n }, (_, i) => member(String(i + 1).padStart(5, '0'), {
+  weight_pct: n - i, change_pct: ((i * 7) % 11) - 5, ret_5d: i % 4 === 0 ? null : ((i * 5) % 13) - 6,
+}));
+
+test('membersWindow: collapsed shows the first 10 of the sorted order, expanded shows all, and nothing is lost', () => {
+  const all = roster(95);
+  const collapsed = membersWindow(all, DEFAULT_MEMBER_SORT, false);
+  assert.deepEqual([collapsed.shown, collapsed.total, collapsed.hidden, collapsed.collapsible, collapsed.expanded], [10, 95, 85, true, false]);
+  assert.deepEqual(codes(collapsed.rows), codes(sortMembers(all, DEFAULT_MEMBER_SORT).slice(0, 10)));
+  assert.equal(collapsed.rows[0].code, '00001', 'default: official weight, high to low');
+  const expanded = membersWindow(all, DEFAULT_MEMBER_SORT, true);
+  assert.deepEqual([expanded.shown, expanded.hidden, expanded.expanded], [95, 0, true]);
+  assert.deepEqual(codes(expanded.rows), codes(sortMembers(all, DEFAULT_MEMBER_SORT)));
+  assert.equal(all.length, 95, 'input untouched');
+});
+
+test('membersWindow: sorting while collapsed re-takes the top 10 of the new order, not a fixed 10', () => {
+  const all = roster(30);
+  const byWeight = codes(membersWindow(all, { key: 'weight', dir: 'desc' }, false).rows);
+  for (const sort of [{ key: 'd1', dir: 'desc' }, { key: 'd1', dir: 'asc' }, { key: 'd5', dir: 'desc' }, { key: 'd5', dir: 'asc' }, { key: 'weight', dir: 'asc' }]) {
+    const win = membersWindow(all, sort, false);
+    assert.deepEqual(codes(win.rows), codes(sortMembers(all, sort)).slice(0, 10), JSON.stringify(sort));
+    assert.equal(win.shown, 10);
+  }
+  assert.notDeepEqual(codes(membersWindow(all, { key: 'd1', dir: 'desc' }, false).rows), byWeight);
+  assert.deepEqual(codes(membersWindow(all, { key: 'weight', dir: 'asc' }, false).rows), codes(all).slice(-10).reverse());
+});
+
+test('membersWindow: nulls last in both directions, also inside the collapsed top 10; ties keep official order', () => {
+  const all = roster(14).map((m, i) => (i < 6 ? { ...m, ret_5d: null } : { ...m, ret_5d: i % 3 }));
+  for (const dir of ['asc', 'desc']) {
+    const expanded = membersWindow(all, { key: 'd5', dir }, true).rows;
+    const firstNull = expanded.findIndex((m) => m.ret_5d === null);
+    assert.equal(firstNull, 8, `${dir}: the 8 members with a value come first`);
+    assert.ok(expanded.slice(firstNull).every((m) => m.ret_5d === null), `${dir}: every null after every value`);
+    const collapsed = membersWindow(all, { key: 'd5', dir }, false).rows;
+    assert.deepEqual(codes(collapsed), codes(expanded).slice(0, 10));
+    assert.equal(collapsed.filter((m) => m.ret_5d === null).length, 2, `${dir}: only the nulls that fit after the 8 values`);
+    const ties = expanded.filter((m) => m.ret_5d === 1).map((m) => m.code);
+    assert.deepEqual(ties, [...ties].sort(), `${dir}: ties stay in roster order`);
+  }
+});
+
+test('membersWindow: a roster that fits in 10 rows has nothing to collapse', () => {
+  const win = membersWindow(roster(10), DEFAULT_MEMBER_SORT, false);
+  assert.deepEqual([win.shown, win.total, win.collapsible, win.expanded], [10, 10, false, true]);
+  assert.equal(membersLabels(win, DEFAULT_MEMBER_SORT).expand, '');
+  assert.equal(membersWindow([], DEFAULT_MEMBER_SORT, false).shown, 0);
+  assert.equal(membersWindow(undefined, DEFAULT_MEMBER_SORT, false).total, 0);
+});
+
+test('membersLabels: Traditional Chinese, shown / total, and says collapsing hides nothing', () => {
+  const all = roster(95);
+  const col = membersLabels(membersWindow(all, DEFAULT_MEMBER_SORT, false), DEFAULT_MEMBER_SORT);
+  assert.equal(col.aux, '顯示 10 / 共 95 隻');
+  assert.equal(col.expand, '展開全部 95 隻成分股');
+  assert.equal(col.collapse, '收合，只顯示前 10 隻（共 95 隻）');
+  assert.match(col.note, /目前只顯示按權重由高至低排列的前 10 隻（共 95 隻）/);
+  assert.match(col.note, /收合只是縮短列表，其餘 85 隻成分股並沒有遺漏/);
+  assert.match(col.note, /更改排序會重新取前 10 隻/);
+  const sorted = membersLabels(membersWindow(all, { key: 'ytd', dir: 'asc' }, false), { key: 'ytd', dir: 'asc' });
+  assert.match(sorted.note, /按年初至今由低至高排列的前 10 隻/);
+  const exp = membersLabels(membersWindow(all, DEFAULT_MEMBER_SORT, true), DEFAULT_MEMBER_SORT);
+  assert.equal(exp.aux, '顯示全部 95 隻');
+  assert.match(exp.note, /已展開：顯示全部 95 隻成分股/);
+  assert.equal(exp.announceExpand, '已展開，顯示全部 95 隻成分股');
+  assert.match(exp.announceCollapse, /已收合，顯示按權重由高至低排列的前 10 隻（共 95 隻）/);
+  assert.match(sortAnnouncement({ key: 'd1', dir: 'desc' }, membersWindow(all, { key: 'd1', dir: 'desc' }, false)), /目前顯示前 10 隻（共 95 隻）/);
+  assert.doesNotMatch(sortAnnouncement({ key: 'd1', dir: 'desc' }, membersWindow(all, { key: 'd1', dir: 'desc' }, true)), /目前顯示前/);
+});
+
+test('sample: HSI 95 and HSTECH 30 both collapse to 10 and keep every member behind the button', () => {
+  for (const [key, total] of [['hsi', 95], ['hstech', 30]]) {
+    const win = membersWindow(sample[key].members, DEFAULT_MEMBER_SORT, false);
+    assert.deepEqual([win.shown, win.total], [10, total], key);
+    assert.equal(membersWindow(sample[key].members, DEFAULT_MEMBER_SORT, true).shown, total, key);
+  }
+  const app = read('movers/app.js');
+  assert.match(app, /expanded: \{ hsi: false, hstech: false \}/, 'both views start collapsed');
+  assert.match(app, /aria-expanded="\$\{win\.expanded\}" aria-controls="hkm-members-panel-\$\{key\}"/);
 });

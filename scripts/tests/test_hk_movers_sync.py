@@ -1045,10 +1045,13 @@ class CollectLive(unittest.TestCase):
         handle.close()
         return handle.name
 
-    def run_collect(self, listed=LISTED, extra=()):
+    def run_collect(self, listed=LISTED, extra=(), now=None, real_rosters=False):
         fake, calls = self.make_sdk(listed)
-        roster_path = self.roster_file()
-        self.addCleanup(os.unlink, roster_path)
+        if real_rosters:
+            roster_path = str(ROOT / "scripts" / "hk-movers" / "index-rosters.json")
+        else:
+            roster_path = self.roster_file()
+            self.addCleanup(os.unlink, roster_path)
         fetched = []
 
         def fake_news(code, name, **kw):
@@ -1061,7 +1064,7 @@ class CollectLive(unittest.TestCase):
         with mock.patch.dict(sys.modules, {"futu": fake}), \
                 mock.patch.object(names_mod, "load_names", return_value=self.NAMES), \
                 mock.patch.object(news_mod, "fetch_news", side_effect=fake_news):
-            doc = sync.collect_live(args, now=datetime(2026, 11, 23, 15, 0, tzinfo=HKT))
+            doc = sync.collect_live(args, now=now or datetime(2026, 11, 23, 15, 0, tzinfo=HKT))
         return doc, calls, fetched
 
     def test_collect_live_end_to_end(self):
@@ -1155,7 +1158,9 @@ class CollectLive(unittest.TestCase):
 
         meta = tech["roster"]
         self.assertEqual((meta["status"], meta["count"], meta["weights_as_of"]), ("current", 3, "2026-11-18"))
-        self.assertEqual(meta["upcoming"], {"effective_from": "2999-01-01", "count": 4, "added": ["00999"], "removed": [], "announced": "2026-11-20"})
+        self.assertEqual(meta["upcoming"], {"effective_from": "2999-01-01", "count": 4, "added_count": 1, "removed_count": 0, "announced": "2026-11-20"})
+        self.assertEqual(meta["weights_stage"], "pre_review")
+        self.assertNotIn("00999", json.dumps(meta), "the future member's code is not published before it takes effect")
         self.assertNotIn("members", json.dumps(meta))
 
         hsi = doc["hsi"]
@@ -1175,6 +1180,44 @@ class CollectLive(unittest.TestCase):
             doc, _, _ = self.run_collect(extra=("--history-batch", "50", "--history-cache", str(Path(tmp) / "h.json"), "--history-delay", "0"))
         relaxed_validator.validate(json.loads(json.dumps(doc)))
         validator.validate(json.loads((ROOT / "movers" / "data" / "sample.json").read_text(encoding="utf-8")))
+
+    FUTURE_ONLY_HSTECH = ["00148", "00522", "01729", "01888", "02018", "02475", "02476", "02525", "02577", "02706",
+                          "03308", "03317", "03750", "03896", "06082", "06809", "06869", "09678", "09698", "09880"]
+
+    def test_real_rosters_before_the_effective_date_publish_only_the_current_30_and_95(self):
+        for day in (datetime(2026, 11, 23, 15, 0, tzinfo=HKT), datetime(2026, 12, 4, 15, 0, tzinfo=HKT), datetime(2026, 12, 6, 23, 59, tzinfo=HKT)):
+            doc, _, _ = self.run_collect(real_rosters=True, now=day)
+            self.assertEqual((len(doc["hstech"]["members"]), len(doc["hsi"]["members"])), (30, 95), day)
+            self.assertEqual(doc["hstech"]["roster"]["count"], 30)
+            self.assertEqual(doc["hstech"]["roster"]["weights_stage"], "pre_review")
+            self.assertEqual(doc["hstech"]["roster"]["upcoming"], {"effective_from": "2026-12-07", "count": 50, "added_count": 20,
+                                                                    "removed_count": 0, "announced": "2026-11-20"})
+            text = json.dumps(doc["hstech"], ensure_ascii=False)
+            for code in self.FUTURE_ONLY_HSTECH:
+                self.assertNotIn(code, text, f"{code} is an announced HSTECH inclusion and must not appear in the HSTECH block before 2026-12-07 ({day})")
+            self.assertEqual({m["code"] for m in doc["hstech"]["members"]} & set(self.FUTURE_ONLY_HSTECH), set())
+            self.assertEqual({r["code"] for r in doc["hstech"]["constituents"]} & set(self.FUTURE_ONLY_HSTECH), set())
+            self.assertEqual(doc["hsi"]["members"][0]["code"], "00005")
+            self.assertEqual(doc["hsi"]["members"][0]["weight_pct"], 7.37)
+
+    def test_real_rosters_switch_to_the_announced_50_and_re_capped_weights_on_the_effective_date(self):
+        doc, _, _ = self.run_collect(real_rosters=True, now=datetime(2026, 12, 7, 9, 0, tzinfo=HKT))
+        members = doc["hstech"]["members"]
+        self.assertEqual(len(members), 50)
+        self.assertEqual(set(self.FUTURE_ONLY_HSTECH) <= {m["code"] for m in members}, True)
+        self.assertEqual([m["weight_pct"] for m in members][:5], [8.0, 8.0, 8.0, 8.0, 8.0], "five names re-capped to 8%")
+        self.assertAlmostEqual(sum(m["weight_pct"] for m in members), 100, delta=0.6)
+        self.assertEqual([m["weight_pct"] for m in members], sorted((m["weight_pct"] for m in members), reverse=True))
+        self.assertEqual(sum(1 for m in members if m["available"]), len(doc["hstech"]["constituents"]),
+                         "only members the fake gateway prices are available; the rest stay in the table as unavailable")
+        self.assertLess(len(doc["hstech"]["constituents"]), 10)
+        self.assertTrue(all(m["last"] is None for m in members if not m["available"]))
+        meta = doc["hstech"]["roster"]
+        self.assertEqual((meta["status"], meta["count"], meta["effective_from"], meta["weights_stage"]), ("current", 50, "2026-12-07", "post_review_pro_forma"))
+        self.assertIsNone(meta["upcoming"])
+        self.assertEqual(len(doc["hsi"]["members"]), 95)
+        self.assertEqual(doc["hsi"]["members"][0]["weight_pct"], 8.0, "HSI re-capped weights apply from the same day")
+        self.assertEqual(doc["hsi"]["roster"]["weights_stage"], "post_review_pro_forma")
 
     def test_members_include_every_roster_code_even_when_the_filters_would_drop_them(self):
         doc, _, _ = self.run_collect()

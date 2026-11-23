@@ -119,6 +119,75 @@ class CommittedRosters(unittest.TestCase):
         self.assertIsNone(re.search(r"futu|富途|moomoo|yahoo|雅虎", json.dumps(DOC, ensure_ascii=False), re.I))
 
 
+# Written out from the PDF's "After" column (Appendix 3, pages 8-9) by a separate parse of the PDF itself, so the
+# committed roster file is checked against an independent copy and not only against its own parser.
+HSTECH_AFTER = {
+    "00700": 8.0, "01810": 8.0, "03690": 8.0, "09988": 8.0, "09999": 8.0, "00981": 7.12, "01211": 6.67, "09888": 4.38,
+    "09618": 4.28, "00992": 3.74, "09961": 3.35, "01024": 2.2, "03750": 2.17, "09868": 1.82, "00300": 1.79, "01347": 1.75,
+    "02015": 1.59, "06690": 1.5, "02382": 1.21, "09660": 1.17, "06618": 1.1, "00020": 1.07, "02513": 0.96, "06869": 0.94,
+    "01888": 0.91, "09626": 0.89, "00522": 0.87, "00148": 0.86, "02018": 0.71, "09880": 0.67, "00100": 0.66, "09863": 0.57,
+    "03308": 0.54, "00241": 0.5, "06082": 0.43, "00285": 0.42, "09866": 0.4, "02525": 0.38, "02577": 0.34, "09903": 0.32,
+    "06809": 0.3, "03896": 0.27, "02475": 0.26, "01729": 0.25, "02476": 0.21, "09698": 0.15, "01698": 0.1, "03317": 0.06,
+    "09678": 0.05, "02706": 0.03,
+}
+
+
+class FutureHstechRoster(unittest.TestCase):
+    """The announced 50-member HSTECH roster is stored in full, with its official weights, ready for 2026-12-07."""
+
+    def future(self):
+        return next(v for v in DOC["indices"]["hstech"]["versions"] if v["status"] == "announced")
+
+    def test_all_50_constituents_and_weights_match_the_independent_copy(self):
+        members = self.future()["members"]
+        self.assertEqual(len(members), 50)
+        self.assertEqual(len(HSTECH_AFTER), 50)
+        self.assertEqual({m["code"]: m["weight_pct"] for m in members}, HSTECH_AFTER)
+
+    def test_future_roster_carries_names_groups_pages_and_group_totals(self):
+        members = self.future()["members"]
+        groups = {}
+        for m in members:
+            self.assertTrue(m["name"] and m["name_en"], m["code"])
+            self.assertIn(m["page"], (8, 9))
+            groups.setdefault(m["group"], []).append(m["weight_pct"])
+        self.assertEqual({g: len(w) for g, w in groups.items()},
+                         {"Information Technology": 29, "Consumer Discretionary": 15, "Industrials": 4, "Healthcare": 2})
+        # The PDF prints group totals of 48.69 / 45.56 / 4.15 / 1.60 (rounded separately), so allow rounding slack.
+        for group, printed in {"Information Technology": 48.69, "Consumer Discretionary": 45.56, "Industrials": 4.15, "Healthcare": 1.60}.items():
+            self.assertAlmostEqual(sum(groups[group]), printed, delta=0.06, msg=group)
+        self.assertEqual(sorted(m["code"] for m in members if m["weight_pct"] == 8.0), ["00700", "01810", "03690", "09988", "09999"])
+
+    def test_the_20_additions_are_exactly_the_pdf_change_list_with_weights(self):
+        v = self.future()
+        current = {m["code"] for m in next(x for x in DOC["indices"]["hstech"]["versions"] if x["status"] == "current")["members"]}
+        added = sorted(m["code"] for m in v["members"] if m["code"] not in current)
+        self.assertEqual(added, v["added"])
+        self.assertEqual(added, ["00148", "00522", "01729", "01888", "02018", "02475", "02476", "02525", "02577", "02706",
+                                 "03308", "03317", "03750", "03896", "06082", "06809", "06869", "09678", "09698", "09880"])
+        self.assertTrue(all(HSTECH_AFTER[c] > 0 for c in added))
+        self.assertEqual(v["effective_from"], "2026-12-07")
+        self.assertEqual(v["implemented_after_close"], "2026-12-04")
+
+    def test_roster_meta_never_publishes_the_future_members_or_weights(self):
+        index = DOC["indices"]["hstech"]
+        for day in (date(2026, 11, 23), date(2026, 12, 4), date(2026, 12, 6)):
+            version, upcoming = rosters.select_version(index, day)
+            meta = rosters.roster_meta(version, upcoming, DOC["source"])
+            text = json.dumps(meta, ensure_ascii=False)
+            self.assertEqual((meta["status"], meta["count"], meta["weights_stage"]), ("current", 30, "pre_review"))
+            self.assertEqual(meta["upcoming"], {"effective_from": "2026-12-07", "count": 50, "added_count": 20, "removed_count": 0, "announced": "2026-11-20"})
+            for code in self.future()["added"]:
+                self.assertNotIn(code, text, day)
+            self.assertNotIn("members", text)
+
+    def test_meta_after_the_effective_date_describes_the_new_roster_as_in_force(self):
+        version, upcoming = rosters.select_version(DOC["indices"]["hstech"], date(2026, 12, 7))
+        meta = rosters.roster_meta(version, upcoming, DOC["source"])
+        self.assertEqual((meta["status"], meta["count"], meta["effective_from"], meta["weights_stage"]), ("current", 50, "2026-12-07", "post_review_pro_forma"))
+        self.assertIsNone(meta["upcoming"])
+
+
 class DateAwareSelection(unittest.TestCase):
     def test_current_roster_until_the_effective_date(self):
         hstech = DOC["indices"]["hstech"]
@@ -129,7 +198,7 @@ class DateAwareSelection(unittest.TestCase):
 
     def test_announced_roster_from_the_effective_date(self):
         hstech = DOC["indices"]["hstech"]
-        for day in (date(2026, 12, 7), date(2027, 1, 4)):
+        for day in (date(2026, 12, 7), date(2026, 12, 8), date(2027, 1, 4)):
             active, upcoming = rosters.select_version(hstech, day)
             self.assertEqual((active["status"], active["count"]), ("announced", 50), day)
             self.assertIsNone(upcoming)

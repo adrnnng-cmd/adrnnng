@@ -228,12 +228,17 @@ def select_version(index: dict, today: date) -> tuple[dict, dict | None]:
 
 
 def roster_meta(version: dict, upcoming: dict | None, source: dict) -> dict:
-    """Small public description of the roster in use. Never contains the full future roster."""
+    """Small public description of the roster in use. Never contains the future roster's members.
+
+    `status` describes the roster in force: a version that has taken effect is "current" even though it
+    was announced earlier. `weights_stage` says which published column the weights come from.
+    """
     meta = {
-        "status": version["status"],
+        "status": "current",
         "count": version["count"],
         "weights_as_of": version["weights_as_of"],
         "weights_basis": version["weights_note"],
+        "weights_stage": "pre_review" if version.get("weights_column") == "Before" else "post_review_pro_forma",
         "effective_from": version.get("effective_from"),
         "source": {
             "publisher": source["publisher"],
@@ -247,8 +252,8 @@ def roster_meta(version: dict, upcoming: dict | None, source: dict) -> dict:
         meta["upcoming"] = {
             "effective_from": upcoming["effective_from"],
             "count": upcoming["count"],
-            "added": upcoming.get("added", []),
-            "removed": upcoming.get("removed", []),
+            "added_count": len(upcoming.get("added", [])),
+            "removed_count": len(upcoming.get("removed", [])),
             "announced": source["announced"],
         }
     return meta
