@@ -5,6 +5,7 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { writeAll as writeStaticChrome } from './static-chrome.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
@@ -65,6 +66,9 @@ const entry = {
 const soon = reg.tools.findIndex((t) => !t.href);
 reg.tools.splice(soon < 0 ? reg.tools.length : soon, 0, entry);
 writeFileSync(regPath, JSON.stringify(reg, null, 2) + '\n');
+// Homepage footer (and cover doors) are committed links. Other pages stay on the live shells.
+const restamped = writeStaticChrome(ROOT);
 
 console.log(`created /${slug}/ (index.html, app.js, style.css) and registered it in assets/tools.json.
+static links added to: ${restamped.join(', ') || 'no page'}.
 next: build the tool in ${slug}/app.js, then npm run check && npm run serve → http://127.0.0.1:8788/${slug}/`);

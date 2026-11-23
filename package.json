@@ -9,6 +9,7 @@
   "scripts": {
     "test": "node --test \"backtest/tests/*.test.mjs\" \"scripts/tests/*.test.mjs\" && PYTHONPATH=.github/backtest python3 -m unittest discover -s .github/backtest/tests && PYTHONPATH=.github/politician-tracker python3 -m unittest discover -s .github/politician-tracker/tests && python3 -m unittest discover -s scripts/tests -p 'test_*.py'",
     "check": "node scripts/check-site.mjs",
+    "static-chrome": "node scripts/static-chrome.mjs",
     "sitemap": "node scripts/build-sitemap.mjs --site .",
     "serve": "python3 -m http.server 8788",
     "new-tool": "node scripts/new-tool.mjs",

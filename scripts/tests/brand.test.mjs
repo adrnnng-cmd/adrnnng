@@ -76,7 +76,7 @@ test('current pages use the News Chart wordmark and keep the live host', () => {
 });
 
 test('shared chrome reads the registry name and does not draw the old wordmark', () => {
-  const site = read('assets/js/site.js');
+  const site = read('assets/js/site.js') + read('assets/js/chrome-html.js');
   const home = read('assets/js/home.js');
   const card = read('assets/js/newsletter.js');
   assert.match(site, /news-chart-white\.svg/);

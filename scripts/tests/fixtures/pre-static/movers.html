@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-Hant-HK">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Movers｜港股異動與板塊熱力圖 · News Chart</title>
+  <meta name="description" content="恒生指數、恒生科技指數成分股與港股全市場的升跌幅榜、板塊熱力圖及全部成分股權重與升跌幅表，並附每隻異動股的最新相關新聞預覽。News Chart by ADRRR。">
+  <link rel="canonical" href="https://news-chart.com/movers/">
+  <meta name="theme-color" content="#000000">
+  <meta property="og:site_name" content="News Chart">
+  <meta property="og:title" content="Movers｜港股異動與板塊熱力圖 · News Chart">
+  <meta property="og:description" content="恒生指數、恒生科技指數成分股與港股全市場的升跌幅榜、板塊熱力圖及全部成分股權重與升跌幅表，並附每隻異動股的最新相關新聞預覽。News Chart by ADRRR。">
+  <meta property="og:url" content="https://news-chart.com/movers/">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="https://news-chart.com/assets/brand/og-image.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Movers｜港股異動與板塊熱力圖 · News Chart">
+  <meta name="twitter:description" content="恒生指數、恒生科技指數成分股與港股全市場的升跌幅榜、板塊熱力圖及全部成分股權重與升跌幅表，並附每隻異動股的最新相關新聞預覽。News Chart by ADRRR。">
+  <meta name="twitter:image" content="https://news-chart.com/assets/brand/og-image.png">
+  <link rel="icon" href="/assets/brand/favicon.svg?v=nc-2026-11-13" type="image/svg+xml">
+  <link rel="icon" href="/assets/brand/favicon.ico?v=nc-2026-11-13" sizes="any">
+  <link rel="apple-touch-icon" href="/assets/brand/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;700&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap">
+  <link rel="stylesheet" href="/assets/css/theme.css">
+  <link rel="stylesheet" href="/movers/movers.css">
+  <link rel="stylesheet" href="/assets/css/newsletter.css">
+<meta property="og:locale" content="zh_HK">
+<meta name="twitter:site" content="@adrnnng">
+<script type="application/ld+json" id="adrnnng-breadcrumb">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://news-chart.com/"},{"@type":"ListItem","position":2,"name":"Movers","item":"https://news-chart.com/movers/"}]}</script>
+<script type="application/ld+json" id="adrnnng-site">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://news-chart.com/#organization","name":"News Chart","url":"https://news-chart.com/","logo":{"@type":"ImageObject","url":"https://news-chart.com/assets/brand/apple-touch-icon.png","width":180,"height":180}},{"@type":"WebSite","@id":"https://news-chart.com/#website","name":"News Chart","url":"https://news-chart.com/","inLanguage":"zh-Hant-HK","publisher":{"@id":"https://news-chart.com/#organization"},"author":{"@type":"Organization","name":"ADRRR"}}]}</script>
+</head>
+<body class="hkm-page">
+  <header class="mast" data-site-header>
+    <div class="wrap mast-in"><a class="logo" href="/" aria-label="News Chart home"><img class="mark" src="/assets/brand/news-chart-white.svg" alt="News Chart" height="17"></a></div>
+  </header>
+
+  <main class="wrap hkm">
+    <section class="page-head">
+      <p class="kicker">市場工具 <span class="sep">/</span> 港股</p>
+      <h1>Movers</h1>
+      <p class="subtitle">港股異動與板塊熱力圖</p>
+      <p class="lede">一頁看清恒生指數、恒生科技指數與港股全市場的強弱分佈：板塊熱力圖、升幅榜與跌幅榜，指數視圖另附全部成分股的官方權重與 1日／5日／1個月／年初至今升跌幅；每隻異動股附最新相關新聞。</p>
+      <p class="byline"><span>作者：ADRRR</span><span id="hkm-updated" role="status">資料載入中…</span><button type="button" class="btn btn-sm btn-ghost" id="hkm-refresh" data-refresh>立即更新</button></p>
+    </section>
+
+    <div id="hkm-notice" class="hkm-notices" aria-live="polite"></div>
+
+    <div class="hkm-switch" role="tablist" aria-label="市場視圖">
+      <button type="button" role="tab" id="tab-hsi" data-view="hsi" aria-selected="true" aria-controls="hkm-body"><b>HSI 恒生指數</b><small>95 隻成分股</small></button>
+      <button type="button" role="tab" id="tab-hk" data-view="hk" aria-selected="false" aria-controls="hkm-body"><b>HK 港股全市場</b><small>成交額與市值篩選</small></button>
+      <button type="button" role="tab" id="tab-hstech" data-view="hstech" aria-selected="false" aria-controls="hkm-body"><b>HSTECH 恒生科技指數</b><small>30 隻成分股</small></button>
+    </div>
+
+    <p class="sr-only" id="hkm-live" role="status" aria-live="polite"></p>
+
+    <div id="hkm-body" role="tabpanel">
+      <p class="hkm-loading">資料載入中…</p>
+    </div>
+
+    <section class="hkm-method" aria-labelledby="hkm-method-h">
+      <h2 id="hkm-method-h">資料與計算說明</h2>
+      <ul>
+        <li><b>近似影響度（漲跌幅 × 總市值）</b>：以個股漲跌幅乘以總市值，估算當日市值變動，用作排序與板塊權重的近似指標。這不是恒生指數官方公佈的貢獻點數，亦不計入指數的流通調整與封頂因子。</li>
+        <li><b>港股全市場篩選</b>：只計成交額不少於 HK$1,000 萬、總市值高於 HK$10 億的股票，避免低流動性小型股佔據榜單。</li>
+        <li><b>指數視圖不套用上述篩選</b>：恒生指數與恒生科技指數視圖以官方成分股名單為準，榜單、升跌家數與熱力圖計算全部有報價的成分股；下方「成分股一覽」表預設收合，只顯示按所選排序的前 10 隻（並標示「顯示 10 / 共 N 隻」），按「展開全部」可查看每一隻官方成分股；收合只是縮短列表，所有成分股都已載入、都可排序。即使成交額或市值低於篩選門檻，或暫時沒有報價或新聞，成分股也不會被剔除，沒有數據的欄位顯示為「—」。</li>
+        <li><b>官方權重與名單</b>：成分股與權重來自恒生指數公司 2026 年 11 月 20 日公佈的季度檢討結果（附錄一與附錄三），權重為截至 2026-11-18 的檢討前比重，不是本站計算。檢討結果將於 2026-12-07 生效（2026-12-04 收市後實施）：恒生科技指數由 30 隻增至 50 隻，恒生指數維持 95 隻但權重重設。生效日前，頁面一律使用現行名單與權重，已公佈的新名單不會提前套用。</li>
+        <li><b>1日／5日／1個月／年初至今</b>：1日為現價相對前收市價；其餘三項為現價相對參考日「前復權收市價」的變動（5日＝5 個交易日前；1個月＝一個月前或之前最近的交易日；年初至今＝上年最後一個交易日），參考日會標示在欄位標題與表下說明。歷史資料不足的欄位顯示「—」，不會估算。</li>
+        <li><b>板塊分類</b>：市場約 113 個細分行業，彙整為 12 個大類板塊，對照表由專案維護。板塊漲跌幅按市值加權。</li>
+        <li><b>顏色</b>：綠色代表上升，紅色代表下跌，與本站其他頁面一致；顏色深淺代表升跌幅度，數字與箭頭同時標示。</li>
+        <li><b>榜單數量</b>：升幅榜只列出實際上升的股票，跌幅榜只列出實際下跌的股票，各最多 10 隻。某一方向不足 10 隻時，標題會標示實際數量並說明原因，不會用相反方向的股票補位。</li>
+        <li><b>新聞預覽</b>：每隻股票最多顯示一則相關新聞，只採用發佈時間可辨識且在近 3 日（72 小時）內的報道，同日新聞優先；沒有符合的新聞時顯示「暫無近3日相關新聞」，不會改用較舊的報道。連結會在新分頁開啟原文。</li>
+        <li><b>資料更新</b>：本頁顯示的是「更新快照」，不是即時串流。收集程式約每 5 至 6 分鐘寫入一份新快照，頁面每 60 秒檢查一次（休市時 5 分鐘），切回此分頁時也會立即檢查；「快照更新」時間是該次收集開始的時間，並非個別股票的報價時間。交易時段內快照超過 10 分鐘未更新，或更新失敗時，頁面會標示「已過時」並保留上一份有效快照，而不會宣稱是最新資料。12:00–13:00 午間休市及 16:10 收市後沒有新成交，舊快照會顯示為「午間休市」或「已收市」並保留其時間，13:00 重開後仍未更新才會警告；時段按平日時間表判斷，未計公眾假期及半日市。</li>
+      </ul>
+      <p class="hkm-disc">本頁資料僅供參考，不構成投資建議。報價可能有延遲，請以交易所及券商資料為準。</p>
+    </section>
+    <noscript><p class="hkm-noscript">此頁需要啟用 JavaScript 才能顯示熱力圖與榜單。</p></noscript>
+  </main>
+
+  <footer data-site-footer></footer>
+  <script type="module" src="/assets/js/site.js"></script>
+  <script type="module" src="/movers/app.js"></script>
+</body>
+</html>

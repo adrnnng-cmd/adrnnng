@@ -26,18 +26,20 @@ test('registry names the page Movers and keeps its URL, order and other function
 });
 
 test('home door order is Backtest, Movers, Politician Tracker, Morning Report and the Movers door has no data fetch', () => {
-  const js = read('assets/js/home.js');
+  const js = read('assets/js/chrome-html.js');
   assert.match(js, /const DOORS = \[\s*\{ id: 'backtest' \},\s*\{ id: 'movers', legacy: \['hk-movers'\] \},\s*\{ id: 'politician-tracker' \},\s*\{ id: 'news' \},\s*\];/);
-  const block = js.slice(js.indexOf("t.id === 'movers') {"), js.indexOf("t.id === 'politician-tracker' && filing"));
+  const block = js.slice(js.indexOf("t.id === 'movers') {"), js.indexOf("t.id === 'news') {"));
   assert.match(block, /HSI · 升跌榜 · 板塊熱力圖/);
   assert.match(block, /約 5–6 分鐘更新快照/);
   assert.doesNotMatch(block, /fetch|getJson|latest|\/data\//, 'the Movers door must not load quote data');
   assert.doesNotMatch(block, /即時|串流|LIVE|live/i, 'the Movers door must not claim live data');
   assert.match(js, /id === 'movers' \? '港股異動'/);
+  const home = read('assets/js/home.js');
+  assert.doesNotMatch(home, /fetch\([^)]*movers/i, 'home.js does not fetch Movers data');
 });
 
 test('Movers thumbnail is a static grid with no text or numbers (its colours are checked in home-door-hover.test.mjs)', () => {
-  const src = /src: '(\/assets\/img\/doors\/[^']+\.svg)'/.exec(read('assets/js/home.js'))?.[1];
+  const src = /src: '(\/assets\/img\/doors\/[^']+\.svg)'/.exec(read('assets/js/chrome-html.js'))?.[1];
   const svg = read(src.slice(1));
   assert.doesNotMatch(svg, /<text|<script|https?:\/\/(?!www\.w3\.org)/);
 });
