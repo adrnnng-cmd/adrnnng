@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Builds hk-movers/data/sample.json, the clearly labelled demo document.
+"""Builds movers/data/sample.json, the clearly labelled demo document.
 
 The numbers are synthetic and seeded, so the file is reproducible:
 
-    python3 scripts/hk_movers_demo.py --out hk-movers/data/sample.json
+    python3 scripts/hk_movers_demo.py --out movers/data/sample.json
 
 Company names are real listings, but prices, market caps, turnover, moves and
 headlines are made up. The page and the API both mark this data as a demo.

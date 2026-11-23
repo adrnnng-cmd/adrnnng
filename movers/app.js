@@ -6,8 +6,8 @@ import {
 } from './lib.js';
 import { createRefresher } from './poll.js';
 
-const LIVE_URL = '/hk-movers/data/latest';
-const SAMPLE_URL = '/hk-movers/data/sample.json';
+const LIVE_URL = '/movers/data/latest';
+const SAMPLE_URL = '/movers/data/sample.json';
 const params = new URLSearchParams(location.search);
 
 const state = {
@@ -505,7 +505,7 @@ async function start() {
   } catch (e) {
     startFailedAt = Date.now();
     renderError('請稍後再試，或重新整理此頁。');
-    console.warn('hk-movers:', e);
+    console.warn('movers:', e);
   } finally {
     starting = false;
   }

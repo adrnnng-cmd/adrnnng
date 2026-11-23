@@ -1,4 +1,4 @@
-// Background refresh controller for /hk-movers/. No DOM, no timers of its own: the page calls tick()
+// Background refresh controller for /movers/. No DOM, no timers of its own: the page calls tick()
 // from one interval and recover() on focus / visibility / online events, so node --test can drive it.
 
 import { POLL_MS, acceptRefresh, pollDelayMs } from './lib.js';

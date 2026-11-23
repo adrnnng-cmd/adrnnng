@@ -1,4 +1,4 @@
-// Pure helpers for /hk-movers/: formatting, ranking, validation and treemap layout.
+// Pure helpers for /movers/: formatting, ranking, validation and treemap layout.
 // No DOM access, so node --test can import this file.
 
 export const SCHEMA_VERSION = 1;
@@ -347,7 +347,7 @@ function checkStock(row, where, errors, sectorIds) {
   if (sectorIds && !sectorIds.has(row.sector)) errors.push(`${where}: unknown sector ${row.sector}`);
 }
 
-/** Shape check for the document served by /hk-movers/data/latest. */
+/** Shape check for the document served by /movers/data/latest. */
 export function validateSnapshot(d) {
   const errors = [];
   if (!d || typeof d !== 'object') return { ok: false, errors: ['document is not an object'] };

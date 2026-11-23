@@ -4,7 +4,7 @@
 Runs on a machine that already has a local OpenD gateway. It builds the JSON
 document described in scripts/hk-movers/schema.json and either writes it to a
 file or pushes it to the Cloudflare KV key read by
-functions/hk-movers/data/latest.js.
+functions/movers/data/latest.js.
 
     python3 scripts/hk_movers_sync.py --out /tmp/hk-movers-latest.json
     python3 scripts/hk_movers_sync.py --push-kv          # needs HK_MOVERS_KV_NAMESPACE_ID

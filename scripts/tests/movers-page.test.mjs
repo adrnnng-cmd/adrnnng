@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { extname, join, dirname, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-import { liveDoc } from './hk-movers-fixture.mjs';
+import { liveDoc } from './movers-fixture.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const types = {
@@ -26,12 +26,12 @@ async function chromePath() {
   return '';
 }
 
-// A plain static server: like `python3 -m http.server`, so /hk-movers/data/latest is a 404
+// A plain static server: like `python3 -m http.server`, so /movers/data/latest is a 404
 // and the page has to fall back to the demo document, exactly as the offline preview does.
 function serve({ latest } = {}) {
   const server = createServer(async (req, res) => {
     const url = new URL(req.url, 'http://127.0.0.1');
-    if (latest && url.pathname === '/hk-movers/data/latest') return void latest(req, res);
+    if (latest && url.pathname === '/movers/data/latest') return void latest(req, res);
     let rel = decodeURIComponent(url.pathname);
     if (rel.endsWith('/')) rel += 'index.html';
     const abs = normalize(join(root, rel));
@@ -147,7 +147,7 @@ test('HK Movers renders both views without horizontal overflow at phone and desk
   const debugPort = await startChrome(t, server);
 
   for (const width of [320, 375, 390, 768, 1440]) {
-    const created = await fetch(`http://127.0.0.1:${debugPort}/json/new?${encodeURIComponent(`http://127.0.0.1:${port}/hk-movers/`)}`, { method: 'PUT' });
+    const created = await fetch(`http://127.0.0.1:${debugPort}/json/new?${encodeURIComponent(`http://127.0.0.1:${port}/movers/`)}`, { method: 'PUT' });
     const target = await created.json();
     const ws = new WebSocket(target.webSocketDebuggerUrl);
     await new Promise((resolve, reject) => {
@@ -284,7 +284,7 @@ test('live page polls, recovers on focus, never overlaps, keeps state, and flags
   await send('Page.enable');
   await send('Page.addScriptToEvaluateOnNewDocument', { source: CLOCK });
   await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
-  await send('Page.navigate', { url: `http://127.0.0.1:${port}/hk-movers/` });
+  await send('Page.navigate', { url: `http://127.0.0.1:${port}/movers/` });
 
   const waitFor = async (predicate, label, ms = 12000) => {
     const until = Date.now() + ms;

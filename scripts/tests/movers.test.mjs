@@ -4,12 +4,12 @@ import test from 'node:test';
 import {
   ageMinutes, arrow, breadth, esc, fmtHkd, fmtPct, fmtPrice, heatColor, impactOf, isStale, layoutGroups,
   qualifies, rankStocks, safeUrl, squarify, tone, validateSnapshot, weightedChange,
-} from '../../hk-movers/lib.js';
-import { KV_KEY, onRequest, pickBinding, serveLatest } from '../../functions/hk-movers/data/latest.js';
+} from '../../movers/lib.js';
+import { KV_KEY, onRequest, pickBinding, serveLatest } from '../../functions/movers/data/latest.js';
 import { PUBLIC_DETACH, JSON_NOINDEX, indexingHeaderErrors } from '../headers.mjs';
 
 const read = (rel) => readFileSync(new URL(`../../${rel}`, import.meta.url), 'utf8');
-const sample = JSON.parse(read('hk-movers/data/sample.json'));
+const sample = JSON.parse(read('movers/data/sample.json'));
 
 const row = (code, pct, extra = {}) => ({
   code, name: `股${code}`, sector: 'tech', industry: '軟件服務', last: 10, prev_close: 10, change_pct: pct,
@@ -257,7 +257,7 @@ test('schema.json lists the keys the document and validator require', () => {
 
 // --------------------------------------------------------------- public copy
 
-const PUBLIC_FILES = ['hk-movers/index.html', 'hk-movers/app.js', 'hk-movers/lib.js', 'hk-movers/poll.js', 'hk-movers/hk-movers.css', 'hk-movers/data/sample.json', 'functions/hk-movers/data/latest.js'];
+const PUBLIC_FILES = ['movers/index.html', 'movers/app.js', 'movers/lib.js', 'movers/poll.js', 'movers/movers.css', 'movers/data/sample.json', 'functions/movers/data/latest.js'];
 
 test('public HK Movers files name no quote vendor', () => {
   for (const file of PUBLIC_FILES) {
@@ -268,17 +268,17 @@ test('public HK Movers files name no quote vendor', () => {
 
 test('page copy is Traditional Chinese: no simplified-only characters', () => {
   const simplified = /[价涨额汇资业医药网专这们两东车银证债险类盘场营续]/;
-  for (const file of ['hk-movers/index.html', 'hk-movers/app.js', 'hk-movers/data/sample.json']) {
+  for (const file of ['movers/index.html', 'movers/app.js', 'movers/data/sample.json']) {
     const hit = read(file).match(simplified);
     assert.equal(hit, null, `${file} has ${hit}`);
   }
 });
 
 test('page markup carries the shared chrome, brand mark, author and required labels', () => {
-  const html = read('hk-movers/index.html');
+  const html = read('movers/index.html');
   assert.match(html, /<title>Movers｜港股異動與板塊熱力圖 · News Chart<\/title>/);
-  assert.match(html, /rel="canonical" href="https:\/\/news-chart\.com\/hk-movers\/"/);
-  assert.match(html, /property="og:url" content="https:\/\/news-chart\.com\/hk-movers\/"/);
+  assert.match(html, /rel="canonical" href="https:\/\/news-chart\.com\/movers\/"/);
+  assert.match(html, /property="og:url" content="https:\/\/news-chart\.com\/movers\/"/);
   assert.match(html, /src="\/assets\/brand\/news-chart-white\.svg"/);
   assert.match(html, /data-site-header/);
   assert.match(html, /data-site-footer/);
@@ -296,7 +296,7 @@ test('page markup carries the shared chrome, brand mark, author and required lab
 });
 
 test('app renders the required news link attributes and empty state', () => {
-  const app = read('hk-movers/app.js');
+  const app = read('movers/app.js');
   assert.match(app, /target="_blank" rel="noopener noreferrer"/);
   assert.match(app, /NEWS_EMPTY_TEXT/);
   assert.match(app, /safeUrl\(item\.url\)/);
@@ -318,12 +318,12 @@ function kvOf(values, { fail = false } = {}) {
 }
 const assetsOf = () => ({
   async fetch(url) {
-    assert.equal(new URL(url).pathname, '/hk-movers/data/sample.json');
+    assert.equal(new URL(url).pathname, '/movers/data/sample.json');
     return new Response(JSON.stringify(sample), { status: 200 });
   },
 });
 const LIVE = JSON.stringify({ ...sample, data_source: 'live', updated_at_hkt: '2026-11-20 11:00:00' });
-const URL_ = 'https://news-chart.com/hk-movers/data/latest';
+const URL_ = 'https://news-chart.com/movers/data/latest';
 
 test('Function prefers HK_MOVERS and falls back to HSI_BARS for the same key', async () => {
   assert.equal(KV_KEY, 'hk-movers:latest.json');
@@ -390,27 +390,27 @@ test('Function answers 404 JSON without a demo source, 405 for writes, and no bo
 
 test('_routes.json sends only the Function path through Functions', () => {
   const routes = JSON.parse(read('_routes.json'));
-  assert.deepEqual(routes.include, ['/backtest/data/hsi/*', '/hk-movers/data/latest']);
+  assert.deepEqual(routes.include, ['/backtest/data/hsi/*', '/movers/data/latest', '/hk-movers/data/latest']);
 });
 
 test('registry, sitemap, headers and llms.txt know the page', () => {
   const reg = JSON.parse(read('assets/tools.json'));
-  const tool = reg.tools.find((t) => t.id === 'hk-movers');
-  assert.equal(tool.href, '/hk-movers/');
+  const tool = reg.tools.find((t) => t.id === 'movers');
+  assert.equal(tool.href, '/movers/');
   assert.equal(tool.chrome, 'shared');
   assert.equal(tool.nav, true);
   assert.equal(tool.owner, 'repo');
-  assert.match(read('sitemap-pages.xml'), /<loc>https:\/\/news-chart\.com\/hk-movers\/<\/loc>/);
-  assert.match(read('llms.txt'), /hk-movers/);
-  for (const path of ['/hk-movers', '/hk-movers/', '/hk-movers/*']) assert.ok(PUBLIC_DETACH.includes(path), path);
-  for (const path of ['/hk-movers/data/latest', '/hk-movers/data/sample.json']) assert.ok(JSON_NOINDEX.includes(path), path);
+  assert.match(read('sitemap-pages.xml'), /<loc>https:\/\/news-chart\.com\/movers\/<\/loc>/);
+  assert.match(read('llms.txt'), /news-chart\.com\/movers\//);
+  for (const path of ['/movers', '/movers/', '/movers/*']) assert.ok(PUBLIC_DETACH.includes(path), path);
+  for (const path of ['/movers/data/latest', '/movers/data/sample.json', '/hk-movers/data/latest']) assert.ok(JSON_NOINDEX.includes(path), path);
   assert.deepEqual(indexingHeaderErrors(read('_headers')), []);
 });
 
 test('every file the page ships stays plain static: no build step, no external scripts', () => {
-  const files = readdirSync(new URL('../../hk-movers/', import.meta.url), { recursive: true });
+  const files = readdirSync(new URL('../../movers/', import.meta.url), { recursive: true });
   assert.ok(files.includes('index.html') && files.includes('app.js') && files.includes('lib.js'));
-  assert.doesNotMatch(read('hk-movers/index.html'), /<script[^>]+src="https?:/);
+  assert.doesNotMatch(read('movers/index.html'), /<script[^>]+src="https?:/);
 });
 
 // ------------------------------------------------------- freshness, breadth, short lists
@@ -418,7 +418,7 @@ test('every file the page ships stays plain static: no build step, no external s
 import {
   BREADTH_COLORS, NEWS_EMPTY_TEXT, STALE_AFTER_MIN, acceptRefresh, breadthSegments, fmtAge, hktDay, newsFreshness,
   newsReference, parseHktStamp, pollDelayMs, rankSummary, reconcileSelection, sessionAt, usableNews,
-} from '../../hk-movers/lib.js';
+} from '../../movers/lib.js';
 
 const NOW = new Date('2026-11-20T16:00:00+08:00');
 const hkt = (offsetMs) => {
@@ -508,7 +508,7 @@ test('breadth colours match the morning report and stay readable with white text
   };
   const contrast = (a, b) => (Math.max(lum(a), lum(b)) + 0.05) / (Math.min(lum(a), lum(b)) + 0.05);
   for (const hex of Object.values(BREADTH_COLORS)) assert.ok(contrast('#ffffff', hex) >= 4.5, `${hex} on white text`);
-  const css = read('hk-movers/hk-movers.css');
+  const css = read('movers/movers.css');
   assert.match(css, /\.hkm-list-h\.is-up\s*\{\s*background:\s*#008259/);
   assert.match(css, /\.hkm-list-h\.is-down\s*\{\s*background:\s*#A50034/);
 });
@@ -567,7 +567,7 @@ test('both universes in the sample use the honest headings', () => {
   const hsi = rankSummary(sample.hsi.constituents, { dir: 'up', universeLabel: '恒指成分股' });
   const hk = rankSummary(sample.hk_market.stocks, { dir: 'down', universeLabel: '合資格股票' });
   for (const s of [hsi, hk]) assert.ok(s.shown <= 10 && s.shown === Math.min(s.matching, 10));
-  const app = read('hk-movers/app.js');
+  const app = read('movers/app.js');
   assert.match(app, /moversHtml\(rows, [^\n]*'恒指成分股'\)/);
   assert.match(app, /'合資格股票'\)\}`;/);
 });
@@ -626,8 +626,8 @@ test('a refresh keeps the sector and stock only while they still exist', () => {
 });
 
 test('source: no streaming claims, snapshot wording, honest stale labels', () => {
-  const app = read('hk-movers/app.js');
-  const html = read('hk-movers/index.html');
+  const app = read('movers/app.js');
+  const html = read('movers/index.html');
   assert.match(app, /快照更新/);
   assert.match(app, /更新失敗/);
   assert.match(app, /快照過時/);

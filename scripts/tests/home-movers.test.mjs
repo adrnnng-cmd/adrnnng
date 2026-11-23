@@ -17,23 +17,23 @@ const SHOT_DIR = process.env.HOME_SHOT_DIR || '';
 
 test('registry names the page Movers and keeps its URL, order and other functions', () => {
   const live = registry.tools.filter((t) => t.href);
-  assert.deepEqual(live.map((t) => t.id), ['backtest', 'hk-movers', 'politician-tracker', 'news']);
-  assert.deepEqual(live.map((t) => t.href), ['/backtest/', '/hk-movers/', '/politician-tracker/', '/news/']);
+  assert.deepEqual(live.map((t) => t.id), ['backtest', 'movers', 'politician-tracker', 'news']);
+  assert.deepEqual(live.map((t) => t.href), ['/backtest/', '/movers/', '/politician-tracker/', '/news/']);
   assert.deepEqual(live.map((t) => t.title), ['Backtest', 'Movers', 'Politician Tracker', 'Morning Report']);
-  const movers = registry.tools.find((t) => t.id === 'hk-movers');
+  const movers = registry.tools.find((t) => t.id === 'movers');
   assert.equal(movers.category, 'Markets');
   assert.equal(registry.site.name, 'News Chart');
 });
 
 test('home door order is Backtest, Movers, Politician Tracker, Morning Report and the Movers door has no data fetch', () => {
   const js = read('assets/js/home.js');
-  assert.match(js, /\['backtest', 'hk-movers', 'politician-tracker', 'news'\]/);
-  const block = js.slice(js.indexOf("t.id === 'hk-movers') {"), js.indexOf("t.id === 'politician-tracker' && filing"));
+  assert.match(js, /\['backtest', 'movers', 'politician-tracker', 'news'\]/);
+  const block = js.slice(js.indexOf("t.id === 'movers') {"), js.indexOf("t.id === 'politician-tracker' && filing"));
   assert.match(block, /HSI · 升跌榜 · 板塊熱力圖/);
   assert.match(block, /約 5–6 分鐘更新快照/);
   assert.doesNotMatch(block, /fetch|getJson|latest|\/data\//, 'the Movers door must not load quote data');
   assert.doesNotMatch(block, /即時|串流|LIVE|live/i, 'the Movers door must not claim live data');
-  assert.match(js, /id === 'hk-movers' \? '港股異動'/);
+  assert.match(js, /id === 'movers' \? '港股異動'/);
 });
 
 test('Movers thumbnail is a static, colourless grid with no text or numbers', () => {
@@ -48,11 +48,11 @@ test('Movers thumbnail is a static, colourless grid with no text or numbers', ()
 });
 
 test('subpage heading is Movers with the 港股異動與板塊熱力圖 subtitle; URL and canonical unchanged', () => {
-  const html = read('hk-movers/index.html');
+  const html = read('movers/index.html');
   assert.match(html, /<h1>Movers<\/h1>\s*<p class="subtitle">港股異動與板塊熱力圖<\/p>/);
   assert.match(html, /<title>Movers｜港股異動與板塊熱力圖 · News Chart<\/title>/);
-  assert.match(html, /rel="canonical" href="https:\/\/news-chart\.com\/hk-movers\/"/);
-  assert.match(html, /"name":"Movers","item":"https:\/\/news-chart\.com\/hk-movers\/"/);
+  assert.match(html, /rel="canonical" href="https:\/\/news-chart\.com\/movers\/"/);
+  assert.match(html, /"name":"Movers","item":"https:\/\/news-chart\.com\/movers\/"/);
   assert.match(html, /HSI 恒生指數/);
 });
 
@@ -216,7 +216,7 @@ test('home doors lay out 2x2 at 1280 and one column at 390 with no overflow, cli
       await settle(250);
     }
     const label = `${width}px`;
-    assert.deepEqual(doors.map((d) => d.href), ['/backtest/', '/hk-movers/', '/politician-tracker/', '/news/'], label);
+    assert.deepEqual(doors.map((d) => d.href), ['/backtest/', '/movers/', '/politician-tracker/', '/news/'], label);
     const movers = doors[1];
     assert.equal(movers.ey, 'Markets', label);
     assert.equal(movers.h2, 'Movers', label);
@@ -271,7 +271,7 @@ test('home doors lay out 2x2 at 1280 and one column at 390 with no overflow, cli
         const hit = await tab.evaluate(`(() => { const a = document.activeElement; return a?.classList.contains('door') ? { href: a.getAttribute('href'), outline: getComputedStyle(a).outlineStyle, ow: getComputedStyle(a).outlineWidth } : null; })()`);
         if (hit) focused.push(hit);
       }
-      assert.deepEqual(focused.map((f) => f.href), ['/backtest/', '/hk-movers/', '/politician-tracker/', '/news/'], `${label} Tab order`);
+      assert.deepEqual(focused.map((f) => f.href), ['/backtest/', '/movers/', '/politician-tracker/', '/news/'], `${label} Tab order`);
       for (const f of focused) {
         assert.notEqual(f.outline, 'none', `${label} ${f.href} has no focus outline`);
         assert.equal(f.ow, '2px', `${label} ${f.href} focus ring width`);
@@ -281,9 +281,9 @@ test('home doors lay out 2x2 at 1280 and one column at 390 with no overflow, cli
     await tab.close();
   }
 
-  assert.ok(!requests.some((p) => p.startsWith('/hk-movers/data')), 'the home page must not request HK Movers data');
+  assert.ok(!requests.some((p) => p.startsWith('/movers/data')), 'the home page must not request HK Movers data');
 
-  const sub = await open(`http://127.0.0.1:${port}/hk-movers/`, 1280, 900, false);
+  const sub = await open(`http://127.0.0.1:${port}/movers/`, 1280, 900, false);
   let head = null;
   for (let i = 0; i < 40; i++) {
     head = await sub.evaluate(`({ h1: document.querySelector('h1')?.textContent, sub: document.querySelector('.page-head .subtitle')?.textContent, footer: [...document.querySelectorAll('.site-footer .row span:last-child a')].map((a) => a.textContent + '>' + a.getAttribute('href')), nav: [...document.querySelectorAll('.mast-r a')].map((a) => a.textContent + '>' + a.getAttribute('href')), tiles: document.querySelectorAll('.hm-tile').length })`);
@@ -292,12 +292,12 @@ test('home doors lay out 2x2 at 1280 and one column at 390 with no overflow, cli
   }
   assert.equal(head.h1, 'Movers');
   assert.equal(head.sub, '港股異動與板塊熱力圖');
-  assert.deepEqual(head.footer, ['Backtest>/backtest/', 'Movers>/hk-movers/', 'Politician Tracker>/politician-tracker/', 'Morning Report>/news/']);
-  assert.ok(head.nav.includes('Movers>/hk-movers/') && !head.nav.some((n) => n.startsWith('港股異動')));
+  assert.deepEqual(head.footer, ['Backtest>/backtest/', 'Movers>/movers/', 'Politician Tracker>/politician-tracker/', 'Morning Report>/news/']);
+  assert.ok(head.nav.includes('Movers>/movers/') && !head.nav.some((n) => n.startsWith('港股異動')));
   await shot(sub, 'movers-subpage-1280.png', 'top');
   await sub.close();
 
-  const mob = await open(`http://127.0.0.1:${port}/hk-movers/`, 390, 844, true);
+  const mob = await open(`http://127.0.0.1:${port}/movers/`, 390, 844, true);
   let menu = null;
   for (let i = 0; i < 40; i++) {
     menu = await mob.evaluate(`({ toggle: !!document.querySelector('.nav-toggle'), tiles: document.querySelectorAll('.hm-tile').length, scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth })`);
@@ -307,7 +307,7 @@ test('home doors lay out 2x2 at 1280 and one column at 390 with no overflow, cli
   assert.ok(menu.scroll <= menu.client, 'subpage has no horizontal overflow at 390');
   await mob.evaluate(`document.querySelector('.nav-toggle').click()`);
   const links = await mob.evaluate(`[...document.querySelectorAll('.mast-r a')].map((a) => a.textContent.trim() + '>' + a.getAttribute('href') + '>' + (getComputedStyle(a).display !== 'none'))`);
-  assert.ok(links.includes('Movers>/hk-movers/>true'), links.join(' | '));
+  assert.ok(links.includes('Movers>/movers/>true'), links.join(' | '));
   await settle(300);
   await shot(mob, 'movers-subpage-390-menu.png', 'top');
   await mob.close();

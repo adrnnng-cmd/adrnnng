@@ -27,10 +27,10 @@
       "chrome": "shared"
     },
     {
-      "id": "hk-movers",
+      "id": "movers",
       "title": "Movers",
       "zh": "港股異動與板塊熱力圖",
-      "href": "/hk-movers/",
+      "href": "/movers/",
       "status": "new",
       "category": "Markets",
       "icon": "heatmap",

@@ -2,9 +2,9 @@
 // document, re-timed to "now" and reshaped so ranking and breadth edge cases are easy to produce.
 
 import { readFileSync } from 'node:fs';
-import { breadth, tone } from '../../hk-movers/lib.js';
+import { breadth, tone } from '../../movers/lib.js';
 
-const sample = JSON.parse(readFileSync(new URL('../../hk-movers/data/sample.json', import.meta.url), 'utf8'));
+const sample = JSON.parse(readFileSync(new URL('../../movers/data/sample.json', import.meta.url), 'utf8'));
 
 export const hktString = (ms, withSeconds = true) => {
   const iso = new Date(ms + 8 * 3600e3).toISOString();
