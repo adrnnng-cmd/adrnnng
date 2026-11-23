@@ -64,6 +64,15 @@
 /movers/*
   ! X-Robots-Tag
 
+/about
+  ! X-Robots-Tag
+
+/about/
+  ! X-Robots-Tag
+
+/about/*
+  ! X-Robots-Tag
+
 /hsi-lab
   ! X-Robots-Tag
 
