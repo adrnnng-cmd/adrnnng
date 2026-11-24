@@ -47,7 +47,7 @@ test('Movers thumbnail is a static grid with no text or numbers (its colours are
 test('subpage heading is Movers with the 港股異動與板塊熱力圖 subtitle; URL and canonical unchanged', () => {
   const html = read('movers/index.html');
   assert.match(html, /<h1>Movers<\/h1>\s*<p class="subtitle">港股異動與板塊熱力圖<\/p>/);
-  assert.match(html, /<title>Movers｜港股異動與板塊熱力圖 · News Chart<\/title>/);
+  assert.match(html, /<title>港股異動｜升跌幅與近似影響度觀察 — News Chart<\/title>/);
   assert.match(html, /rel="canonical" href="https:\/\/news-chart\.com\/movers\/"/);
   assert.match(html, /"name":"Movers","item":"https:\/\/news-chart\.com\/movers\/"/);
   assert.match(html, /HSI 恒生指數/);
