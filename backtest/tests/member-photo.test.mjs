@@ -52,8 +52,15 @@ test('every bioguide currently in the tracker data has a committed JPEG', () => 
     if (row.bioguide) ids.add(row.bioguide);
   }
   assert.ok(ids.has('R000619'));
-  // Appointed March 2026. theunitedstates.io 404s and bioguide.congress.gov/photo/A000383.jpg 404s.
-  const noOfficialPortrait = new Set(['A000383']);
+  // Exemption ids must still be in vip/trades, and only when the official
+  // portrait URLs 404. A000383 (Alan Armstrong) left on the 2026-11-19
+  // refresh: filings dated 2026-07-21, retention_days 120, window_start
+  // 2026-07-22. No JPEG was ever committed. bioguide.congress.gov/photo/A000383.jpg
+  // still returns 404, so there is no official file to add for a member
+  // outside this payload. Every current bioguide has a JPEG.
+  const noOfficialPortrait = new Set();
+  const exemptedButAbsent = [...noOfficialPortrait].filter((id) => !ids.has(id)).sort();
+  assert.deepEqual(exemptedButAbsent, []);
   const missing = [...ids].filter((id) => !existsSync(join(ROOT, 'politician-tracker/img', `${id}.jpg`))).sort();
   assert.deepEqual(missing, [...noOfficialPortrait].sort());
   for (const id of ids) {
