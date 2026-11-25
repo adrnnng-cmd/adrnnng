@@ -41,6 +41,7 @@ STOP_DO_NOT_RELAUNCH = "stop_do_not_relaunch"
 STOP_OPERATOR_VERIFICATION = "stop_operator_verification"
 STOP_DO_NOT_RETRY = "stop_do_not_retry"
 SEND_ACCOUNT_ON_TELNET = "send_account_on_telnet"
+WAIT_FOR_ACCOUNT_PROMPT = "wait_for_account_prompt"
 DO_NOT_SEND_PASSWORD = "do_not_send_password"
 SEND_REMEMBER_Y = "send_remember_y"
 START_SUPERVISOR_ONCE = "start_supervisor_once"
@@ -94,8 +95,8 @@ def classify_banner(text: str) -> str:
         return AWAITING_ACCOUNT
     if "remember" in blob:
         return AWAITING_REMEMBER
-    # OpenD 10.11.7108 sends this instead of "Please enter account".
-    # The line also says Type "help"; that word is not a command to send.
+    # Version line only. A fresh 10.11.7108 also prints "Please enter account".
+    # The line says Type "help"; that word is not a command to send.
     if "opend version info" in blob or "futu opend version" in blob:
         return VERSION_BANNER
     return STARTUP_NOT_READY
@@ -152,7 +153,7 @@ def _action(kind: str) -> str:
     return {
         OK: START_SUPERVISOR_ONCE,
         AWAITING_ACCOUNT: SEND_ACCOUNT_ON_TELNET,
-        VERSION_BANNER: SEND_ACCOUNT_ON_TELNET,
+        VERSION_BANNER: WAIT_FOR_ACCOUNT_PROMPT,
         AWAITING_PASSWORD: DO_NOT_SEND_PASSWORD,
         ACCOUNT_CONSUMED: DO_NOT_SEND_PASSWORD,
         AWAITING_REMEMBER: DO_NOT_SEND_PASSWORD,

@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
 """One telnet login against an OpenD that is already listening.
 
-OpenD 10.11.7108 (probed 2026-11-25 14:31 HKT) sends only this line on connect:
-
-    Futu OpenD version info: 10.11.7108(...), Type "help" for more information.
-
-It does not print "Please enter account". The first line written on that
-connection is taken as the account: a probe that sent ``help`` received
-``Please enter password`` and sent nothing further. This program therefore
-never sends ``help``, never pkills, and never starts a second OpenD.
+A fresh OpenD 10.11.7108 prints the version line and then
+``Please enter account``. One ``account\\r\\n`` is one line; the next prompt
+is ``Please enter password``. A version banner with no account prompt is not
+a send. This program never sends ``help``, never pkills, and never starts a
+second OpenD.
 
 After ``login successful``, a quote check runs in a child process with a hard
 timeout. On this host ``OpenQuoteContext`` hung for 15s and 20s before any
@@ -114,7 +111,10 @@ def _credential(env, name):
 
 
 def _ready(text):
-    return bool(text) and lr.classify_banner(text) != lr.STARTUP_NOT_READY
+    kind = lr.classify_banner(text)
+    if kind in (lr.STARTUP_NOT_READY, lr.VERSION_BANNER):
+        return False
+    return bool(text)
 
 
 def _advance_if_stuck(clock, start, timeout):
@@ -168,13 +168,14 @@ def _decide(text, account_sent, password_sent, remember_sent):
     """Choose the next telnet line.
 
     Official interactive order is account, then password, then whether to
-    remember (Futu API Doc v10.12 command-line OpenD). A 10.10.7008 console
-    transcript uses that order with this exact question after the password
-    line: ``Please choose whether to remember the password (Y to remember,
-    N not to remember)``. Y is sent only after the password line. The 14:45
-    telnet read showed that question before any ``Please enter password``;
-    the helper answered Y and OpenD reported an account/password mismatch.
-    The stored password had not been sent. Answering Y there is not repeated.
+    remember (Futu API Doc v10.12 command-line OpenD). A fresh 10.11.7108
+    prints ``Please enter account`` before it accepts a line. One
+    ``payload + \\r\\n`` is that line: the same binary answers it with
+    ``Please enter password``, and a second ``\\r\\n`` repeats that prompt
+    instead of jumping to the remember question. A version banner alone
+    therefore sends nothing. Y is sent only after the password line. The
+    14:45 telnet read showed the remember question before any
+    ``Please enter password``; answering Y there is not repeated.
     """
     kind = lr.classify_banner(text)
     if not (text or "").strip() or kind == lr.STARTUP_NOT_READY:
@@ -187,7 +188,9 @@ def _decide(text, account_sent, password_sent, remember_sent):
         if not password_sent:
             return "stop", lr.PASSWORD_NOT_SENT
         return "stop", lr.AUTH_FAILED
-    if kind in (lr.VERSION_BANNER, lr.AWAITING_ACCOUNT):
+    if kind == lr.VERSION_BANNER:
+        return "stop", "account_prompt_missing"
+    if kind == lr.AWAITING_ACCOUNT:
         if account_sent:
             return "stop", "protocol_unexpected"
         return "send_account", kind

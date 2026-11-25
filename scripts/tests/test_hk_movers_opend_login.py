@@ -9,6 +9,7 @@ sys.path.insert(0, str(ROOT / "scripts" / "hk-movers" / "runtime"))
 import opend_login as ol  # noqa: E402
 
 BANNER = b'Futu OpenD version info: 10.11.7108(20260916134500), Type "help" for more information.\n'
+ACCOUNT_PROMPT = BANNER + b"Please enter account\n"
 ACCOUNT = "acct-not-a-real-login"
 PASSWORD = "pw-not-a-real-secret"
 
@@ -63,7 +64,7 @@ class Transcripts(unittest.TestCase):
     def test_banner_then_password_then_success_redacts_and_never_sends_help(self):
         self.assertEqual(len(BANNER), 87)
         script, result = _run([
-            BANNER, None,
+            ACCOUNT_PROMPT, None,
             b"Please enter password\n", None,
             b"Login successful\n", None,
         ])
@@ -84,12 +85,15 @@ class Transcripts(unittest.TestCase):
 
     def test_split_banner_is_still_one_account_line(self):
         script, result = _run([
-            BANNER[:40], BANNER[40:], None,
+            BANNER, b"Please enter account\n", None,
             b"Please enter password\n", None,
             b"Login successful\n", None,
         ])
         self.assertEqual(result["kind"], "ok")
         self.assertEqual(script.sent[0], (ACCOUNT + "\r\n").encode())
+        self.assertEqual(script.sent[0].splitlines(), [ACCOUNT.encode()])
+        self.assertEqual(script.sent[0].count(b"\r\n"), 1)
+        self.assertNotIn(b"\xff", script.sent[0])
 
     def test_password_before_account_sends_nothing(self):
         # Probe B: first input was consumed as the account. A connection that
@@ -102,7 +106,7 @@ class Transcripts(unittest.TestCase):
 
     def test_challenge_before_password_does_not_send_the_password(self):
         script, result = _run([
-            BANNER, None,
+            ACCOUNT_PROMPT, None,
             b"Input_phone_verify_code -code=\n", None,
         ])
         self.assertEqual(result["kind"], "auth_challenge")
@@ -112,7 +116,7 @@ class Transcripts(unittest.TestCase):
 
     def test_challenge_after_password_sends_no_code(self):
         script, result = _run([
-            BANNER, None,
+            ACCOUNT_PROMPT, None,
             b"Please enter password\n", None,
             b"req_pic_verify_code\n", None,
         ])
@@ -123,7 +127,7 @@ class Transcripts(unittest.TestCase):
 
     def test_login_failed_is_not_retried_and_echoed_secret_is_redacted(self):
         script, result = _run([
-            BANNER, None,
+            ACCOUNT_PROMPT, None,
             b"Please enter password\n", None,
             ("Login failed " + PASSWORD + "\n").encode(), None,
         ])
@@ -134,7 +138,7 @@ class Transcripts(unittest.TestCase):
 
     def test_remember_after_password_sends_one_y(self):
         script, result = _run([
-            BANNER, None,
+            ACCOUNT_PROMPT, None,
             b"Please enter password\n", None,
             b"Remember the password? (Y/N)\n", None,
             b"Login successful\n", None,
@@ -146,7 +150,7 @@ class Transcripts(unittest.TestCase):
     def test_documented_order_sends_password_before_y(self):
         question = b"Please choose whether to remember the password (Y to remember, N not to remember)\n"
         script, result = _run([
-            BANNER, None,
+            ACCOUNT_PROMPT, None,
             b"Please enter password\n", None,
             question, None,
             b"Login successful\n", None,
@@ -163,7 +167,7 @@ class Transcripts(unittest.TestCase):
         # and OpenD answered with an account/password mismatch. 9 chances remained.
         question = b"Please choose whether to remember the password (Y to remember, N not to remember)\n"
         failure = b"Login failed,The account and password you've entered don't match. 9 chances remained.\nPlease enter account\n"
-        script, result = _run([BANNER, None, question, None, failure, None])
+        script, result = _run([ACCOUNT_PROMPT, None, question, None, failure, None])
         self.assertEqual(result["kind"], "remember_before_password")
         self.assertFalse(result["password_sent"])
         self.assertFalse(result["retry"])
@@ -171,10 +175,11 @@ class Transcripts(unittest.TestCase):
         self.assertNotIn(b"Y\r\n", script.sent)
         self.assertNotIn(PASSWORD.encode(), b"".join(script.sent))
 
-    def test_banner_with_no_follow_up_does_not_retry(self):
+    def test_banner_alone_sends_nothing(self):
         script, result = _run([BANNER, None, None])
-        self.assertEqual(result["kind"], "protocol_timeout")
-        self.assertEqual(script.sent, [(ACCOUNT + "\r\n").encode()])
+        self.assertEqual(result["kind"], "account_prompt_missing")
+        self.assertEqual(script.sent, [])
+        self.assertFalse(result["password_sent"])
         self.assertFalse(result["retry"])
 
 
@@ -200,7 +205,7 @@ class Cli(unittest.TestCase):
         return {"FUTU_LOGIN_ACCOUNT": ACCOUNT, "FUTU_LOGIN_PWD": PASSWORD, "HK_MOVERS_PYTHON": "/tmp/no-such-venv/bin/python"}
 
     def test_success_path_exits_0_only_when_qot_is_true(self):
-        script = Script([BANNER, None, b"Please enter password\n", None, b"Login successful\n", None])
+        script = Script([ACCOUNT_PROMPT, None, b"Please enter password\n", None, b"Login successful\n", None])
         calls = {"qot": 0}
 
         def qot_runner(argv, cwd, timeout):
@@ -230,7 +235,7 @@ class Cli(unittest.TestCase):
         self.assertNotIn(ACCOUNT, _text({"transcript": []}))
 
     def test_constructor_timeout_exits_8_and_does_not_login_again(self):
-        script = Script([BANNER, None, b"Please enter password\n", None, b"Login successful\n", None])
+        script = Script([ACCOUNT_PROMPT, None, b"Please enter password\n", None, b"Login successful\n", None])
         connects = {"n": 0}
 
         def connect(host, port):
@@ -254,7 +259,7 @@ class Cli(unittest.TestCase):
         self.assertNotIn(PASSWORD, buf.getvalue())
 
     def test_challenge_does_not_call_qot(self):
-        script = Script([BANNER, None, b"Input_phone_verify_code -code=\n", None])
+        script = Script([ACCOUNT_PROMPT, None, b"Input_phone_verify_code -code=\n", None])
         called = {"qot": 0}
 
         def qot_runner(argv, cwd, timeout):

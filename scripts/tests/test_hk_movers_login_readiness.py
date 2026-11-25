@@ -120,14 +120,17 @@ class BoundedRead(unittest.TestCase):
         self.assertEqual(got["kind"], lr.STARTUP_NOT_READY)
         self.assertTrue(got["exhausted"])
 
-    def test_version_banner_is_the_account_signal(self):
+    def test_version_banner_alone_does_not_send_the_account(self):
         banner = 'Futu OpenD version info: 10.11.7108(20260916134500), Type "help" for more information.\n'
         self.assertEqual(len(banner.encode()), 87)
         got = lr.readiness_from_chunks([(0.2, banner)], wait_s=12)
         self.assertEqual(got["kind"], lr.VERSION_BANNER)
-        self.assertEqual(got["action"], lr.SEND_ACCOUNT_ON_TELNET)
+        self.assertEqual(got["action"], lr.WAIT_FOR_ACCOUNT_PROMPT)
         self.assertFalse(got["exhausted"])
         self.assertFalse(got["retry"])
+        prompted = lr.readiness_from_chunks([(0.2, banner + "Please enter account\n")], wait_s=12)
+        self.assertEqual(prompted["kind"], lr.AWAITING_ACCOUNT)
+        self.assertEqual(prompted["action"], lr.SEND_ACCOUNT_ON_TELNET)
         classified = lr.classify_launcher_result(
             "needs_relogin", "Login failed (no account prompt)", banner=banner,
         )

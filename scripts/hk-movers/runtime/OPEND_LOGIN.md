@@ -1,17 +1,35 @@
 # OpenD login helper (already-running process)
 
-OpenD 10.11.7108 on telnet `127.0.0.1:22222` sends 87 bytes and then waits:
+A fresh OpenD 10.11.7108 on telnet prints two lines, then waits:
 
 ```
 Futu OpenD version info: 10.11.7108(20260916134500), Type "help" for more information.
+Please enter account
 ```
 
-That line is the signal to send the account. It is not a request to type `help`.
-A connection that sent `help` as its first line was answered `Please enter password`.
-`start_opend.sh` exits first because it requires the phrase `Please enter account`,
-which this build does not print. `needs_relogin` from that script is not an auth result.
+`Type "help"` is not a command. The account is one `account\r\n`. The next
+prompt on that fresh process is `Please enter password`. A second `\r\n`
+repeats the password prompt. A bare `\n` does not submit the account. The
+helper sends one `payload + \r\n` and does not send telnet IAC bytes.
+
+A version banner with no `Please enter account` is not a send. The helper
+waits, then stops with `account_prompt_missing` and writes no credential.
+The 14:45 live read was banner, then an account line, then the remember
+question, with no `Please enter password`. A fresh copy of this same build
+does not do that. Do not point this helper at that process.
 
 Do not run `start_opend.sh` while parent 75819 / child 75823 are alive. It pkills OpenD.
+`needs_relogin` from that script is the launcher's own empty-prompt branch, not an auth result.
+
+To use the normal order, the current OpenD has to be stopped first. That needs
+permission to stop those two pids and exclusive use of ports 11111 and 22222.
+Then start one `./FutuOpenD` with the existing flags in a terminal, and answer
+only the prompt on screen: account at `Please enter account`, password at
+`Please enter password`, `Y` only at the remember question. Stop if a
+verify-code command appears. A read-only telnet (connect, write zero bytes)
+can show whether the current process is still sitting on a prompt. If that
+prompt is `Please enter password`, a password is already pending for whatever
+line was sent earlier (`help` at 14:32). Do not type the real password there.
 
 ## One login
 
@@ -33,7 +51,7 @@ with `<redacted:account>` and `<redacted:password>`.
 
 What it does, once:
 
-1. Connect. Read up to 12s. On the version banner, or on `Please enter account`, send the account.
+1. Connect. Read up to 12s. Send the account only when the buffer contains `Please enter account`. A version banner alone sends nothing (`account_prompt_missing`, exit 4).
 2. If the first text is already `Please enter password`, send nothing and stop (`account_consumed`).
 3. On `Please enter password`, send the password.
 4. Send `Y` only after the password line, and only when the next text is the remember question. If that question arrives before `Please enter password`, send nothing else and stop (`remember_before_password`). The word password inside the remember question is not the password prompt.
