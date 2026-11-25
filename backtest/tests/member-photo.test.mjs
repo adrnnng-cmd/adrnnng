@@ -45,6 +45,41 @@ test('tracker page portraits use the local file and a placeholder onerror', () =
   }
 });
 
+const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0x00]);
+
+/** ids present in the payload; files is id → bytes, or null when the JPEG is absent. */
+export function portraitProblems(ids, files, exemptions) {
+  const problems = [];
+  const idSet = new Set(ids);
+  for (const id of [...exemptions].sort()) {
+    if (!idSet.has(id)) problems.push(`invalid exemption ${id}`);
+    else if (files.get(id)) problems.push(`stale exemption ${id}`);
+  }
+  for (const id of [...idSet].sort()) {
+    const bytes = files.get(id);
+    if (!bytes) {
+      if (!exemptions.has(id)) problems.push(`missing ${id}`);
+      continue;
+    }
+    if (exemptions.has(id)) continue;
+    if (bytes.subarray(0, 3).toString('hex') !== 'ffd8ff') problems.push(`invalid jpeg ${id}`);
+  }
+  return problems;
+}
+
+test('portrait exemptions stay inside the payload and cannot hide a real file', () => {
+  const ids = ['R000619', 'P000197'];
+  const files = new Map([['R000619', JPEG], ['P000197', null]]);
+  assert.deepEqual(portraitProblems(ids, files, new Set()), ['missing P000197']);
+  assert.deepEqual(portraitProblems(ids, files, new Set(['P000197'])), []);
+  const both = new Map([['R000619', JPEG], ['P000197', JPEG]]);
+  assert.deepEqual(portraitProblems(ids, both, new Set(['R000619'])), ['stale exemption R000619']);
+  assert.deepEqual(portraitProblems(ids, files, new Set(['A000383'])), ['invalid exemption A000383', 'missing P000197']);
+  const bad = new Map([['R000619', Buffer.from('not-a-jpeg')], ['P000197', JPEG]]);
+  assert.deepEqual(portraitProblems(ids, bad, new Set()), ['invalid jpeg R000619']);
+  assert.deepEqual(portraitProblems(ids, new Map([['R000619', JPEG], ['P000197', JPEG]]), new Set()), []);
+});
+
 test('every bioguide currently in the tracker data has a committed JPEG', () => {
   const data = JSON.parse(readFileSync(join(ROOT, 'politician-tracker/data.json'), 'utf8'));
   const ids = new Set();
@@ -52,13 +87,12 @@ test('every bioguide currently in the tracker data has a committed JPEG', () => 
     if (row.bioguide) ids.add(row.bioguide);
   }
   assert.ok(ids.has('R000619'));
-  // Appointed March 2026. theunitedstates.io 404s and bioguide.congress.gov/photo/A000383.jpg 404s.
-  const noOfficialPortrait = new Set(['A000383']);
-  const missing = [...ids].filter((id) => !existsSync(join(ROOT, 'politician-tracker/img', `${id}.jpg`))).sort();
-  assert.deepEqual(missing, [...noOfficialPortrait].sort());
-  for (const id of ids) {
-    if (noOfficialPortrait.has(id)) continue;
-    const bytes = readFileSync(join(ROOT, 'politician-tracker/img', `${id}.jpg`));
-    assert.equal(bytes.subarray(0, 3).toString('hex'), 'ffd8ff', id);
-  }
+  // A000383 is not in this payload and has no committed JPEG. An exemption is
+  // valid only while that id is still in vip/trades and the file is still absent.
+  const noOfficialPortrait = new Set();
+  const files = new Map([...ids].map((id) => {
+    const path = join(ROOT, 'politician-tracker/img', `${id}.jpg`);
+    return [id, existsSync(path) ? readFileSync(path) : null];
+  }));
+  assert.deepEqual(portraitProblems(ids, files, noOfficialPortrait), []);
 });
