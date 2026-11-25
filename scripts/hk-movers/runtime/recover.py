@@ -109,7 +109,10 @@ def decide(obs):
         return _stop("alert_auth_challenge", kind, fresh)
     if kind in ("auth_failed",):
         return _stop("alert_auth_failed", kind, fresh)
-    if kind in ("account_consumed", "protocol_timeout", "protocol_unexpected", "telnet_down"):
+    if kind in (
+        "account_consumed", "protocol_timeout", "protocol_unexpected", "telnet_down",
+        "account_prompt_missing", "remember_before_password", "password_not_sent",
+    ):
         return _stop("alert_login_protocol", kind, fresh)
     delay = backoff_delay(obs.get("fails") or 0)
     last = obs.get("last_attempt_at")
@@ -117,7 +120,9 @@ def decide(obs):
         return _stop("noop_backoff", "backoff", fresh)
     qot = obs.get("qot_logined")
     if kind is None and qot is not True:
-        return _stop("run_login_once", "login_not_verified", fresh, commands=["opend_login.py"])
+        # A PTY OpenD prints the account prompt on the console. Telnet stays the
+        # version banner, so the one login is the console helper.
+        return _stop("run_login_once", "login_not_verified", fresh, commands=["opend_console_login.py"])
     if not obs.get("interpreter_ready"):
         return _stop("alert_interpreter", "interpreter_not_ready", fresh)
     if qot is None:

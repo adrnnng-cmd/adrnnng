@@ -54,6 +54,12 @@ class Recovery(unittest.TestCase):
         self.assertEqual(decided["freshness"]["state"], "fresh")
         self.assertEqual(decided["commands"], [])
 
+    def test_unverified_login_uses_the_console_helper(self):
+        decided = recover.decide(obs(login_kind=None, qot_logined=None))
+        self.assertEqual(decided["action"], "run_login_once")
+        self.assertEqual(decided["commands"], ["opend_console_login.py"])
+        self.assertNotIn("opend_login.py", decided["commands"])
+
     def test_auth_failure_and_challenge_do_not_retry_or_start_supervisor(self):
         for kind, action in (("auth_failed", "alert_auth_failed"), ("auth_challenge", "alert_auth_challenge")):
             decided = recover.decide(obs(login_kind=kind, qot_logined=None))

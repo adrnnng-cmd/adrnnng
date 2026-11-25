@@ -1,41 +1,69 @@
-# OpenD login helper (already-running process)
+# OpenD login
 
-A fresh OpenD 10.11.7108 on telnet prints two lines, then waits:
+The running gateway is already in tmux session `opend`. Its console shows
+`Please enter account`. Telnet on that process stays the version banner.
+Do not send the account on telnet. Do not restart the process. Do not run
+`start_opend.sh`.
+
+`opend_console_login.py` reads `tmux capture-pane` and pastes one line only
+when the current console line is the matching prompt. `load-buffer` takes the
+line on stdin. `paste-buffer -d` deletes the buffer. The line is not a tmux
+argument, not `send-keys`, and not a file. The line ending is one CR. A CR LF
+pair is two breaks on this tty. OpenD echoes the account and masks the
+password with asterisks. The transcript stores the prompt and
+`<redacted:...>` only. Scrollback is cleared at the end. One account, one
+password, one `Y`. A verify-code line, a login failure, or any other line
+stops the sequence.
+
+The process environment must already contain `FUTU_LOGIN_ACCOUNT` and
+`FUTU_LOGIN_PWD`. Nothing in this command is a secret:
+
+```bash
+HISTFILE= python3 opend_console_login.py \
+  --session opend \
+  --api-port 11111 \
+  --python /workspace/futu/.venv/bin/python \
+  --transcript /workspace/futu/login-transcript.txt \
+  --outcome /workspace/futu/last_login_outcome.txt \
+  --qot-timeout 20
+```
+
+Exit 0 only when telnet is not involved and `qot_logined` is true. The quote
+check is a child process with cwd `/tmp`. Exit 2 is a verify-code prompt.
+Exit 3 is a login failure after the password line. Exit 4 means the account
+prompt was not the current console line, so nothing was pasted.
+
+## Why telnet is the wrong transport here
+
+A PTY-backed 10.11.7108 prints `Please enter account` on the console and
+answers a later telnet connect with only:
 
 ```
 Futu OpenD version info: 10.11.7108(20260916134500), Type "help" for more information.
-Please enter account
 ```
 
-`Type "help"` is not a command. The account is one `account\r\n`. The next
-prompt on that fresh process is `Please enter password`. A second `\r\n`
-repeats the password prompt. A bare `\n` does not submit the account. The
-helper sends one `payload + \r\n` and does not send telnet IAC bytes.
+Writing the account to `/dev/pts/N` displays it and does not submit it. tmux
+holds the PTY master. `paste-buffer` is the input path.
 
-A version banner with no `Please enter account` is not a send. The helper
-waits, then stops with `account_prompt_missing` and writes no credential.
-The 14:45 live read was banner, then an account line, then the remember
-question, with no `Please enter password`. A fresh copy of this same build
-does not do that. Do not point this helper at that process.
+A no-TTY start is different and is not this process. With stdin `/dev/null`
+and stdout a file, the console file does not grow a prompt, and telnet shows
+`Please enter account` only when the client is already connected within about
+two seconds of listen. A client that connects later sees the banner alone.
+`opend_login.py` is that no-TTY telnet helper. Do not point it at session `opend`.
 
-Do not run `start_opend.sh` while parent 75819 / child 75823 are alive. It pkills OpenD.
-`needs_relogin` from that script is the launcher's own empty-prompt branch, not an auth result.
+## No-TTY telnet helper
 
-To use the normal order, the current OpenD has to be stopped first. That needs
-permission to stop those two pids and exclusive use of ports 11111 and 22222.
-Then start one `./FutuOpenD` with the existing flags in a terminal, and answer
-only the prompt on screen: account at `Please enter account`, password at
-`Please enter password`, `Y` only at the remember question. Stop if a
-verify-code command appears. A read-only telnet (connect, write zero bytes)
-can show whether the current process is still sitting on a prompt. If that
-prompt is `Please enter password`, a password is already pending for whatever
-line was sent earlier (`help` at 14:32). Do not type the real password there.
+`opend_login.py` talks only to telnet. It sends the account only after
+`Please enter account` is in the telnet read, then the password only after
+`Please enter password`, then `Y` only after that. One `payload + \r\n` is one
+telnet line. A version banner alone is `account_prompt_missing`.
 
-## One login
+## No-TTY command
 
-The process environment must already contain `FUTU_LOGIN_ACCOUNT` and `FUTU_LOGIN_PWD`.
-The helper reads them and does not print them. Run from a directory that contains
-this file and `login_readiness.py`:
+Do not run this against session `opend`. It opens telnet. Use it only for a
+process whose stdin is not a PTY and whose telnet read contains
+`Please enter account`. The environment must already contain
+`FUTU_LOGIN_ACCOUNT` and `FUTU_LOGIN_PWD`:
 
 ```bash
 python3 opend_login.py \
@@ -92,7 +120,8 @@ cd /tmp && /workspace/futu/.venv/bin/python -c 'import futu; assert "site-packag
 ## Gate
 
 `recover.py` is the decision for a later external timer. It does not execute
-commands. It will not ask for `start_opend.sh` or a pkill. A second pass while
+commands. The login command it names is `opend_console_login.py`. It will not
+ask for `start_opend.sh` or a pkill. A second pass while
 the supervisor is running does not start another daemon; the installed
 supervisor is what publishes the next snapshot after 300s. Two afternoon
 snapshots are that loop, after exit 0 from this helper. This tree cannot
