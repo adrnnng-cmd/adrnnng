@@ -127,6 +127,10 @@ class Recovery(unittest.TestCase):
         self.assertTrue(second["duplicate"])
         self.assertEqual(second["repeat"], 2)
         self.assertNotIn("password", second["fingerprint"])
+        self.assertNotIn("11:49:25", first["fingerprint"])
+        advanced = recover.next_alert(first, decided, at(14, 50), "2026-11-25 15:26:11")
+        self.assertTrue(advanced["duplicate"])
+        self.assertNotIn("15:26:11", advanced["fingerprint"])
 
 
 if __name__ == "__main__":

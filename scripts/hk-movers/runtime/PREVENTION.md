@@ -4,23 +4,29 @@
 installed. This tree does not create the caller. Nothing here publishes,
 kills OpenD, or runs `start_opend.sh`.
 
-The public afternoon snapshot from the console login is already on the
-site: `updated_at_hkt` 2026-11-25 15:19:16, sha256
-`2ae6142610720a44dddfc8c2d81bfd7065b81803c194e223655ebe45dd71e90f`,
-278880 bytes, `market_session` afternoon. The supervisor that produced it
-is the existing `daemon.sh`. This pass only starts that daemon when
-`qot_logined` is true. `publish_gate` inside the existing sync still
-rejects a stale file. `updated_at_hkt` stays the collector start time.
+Two afternoon collector starts are already confirmed: 2026-11-25 15:19:16,
+then 2026-11-25 15:26:11 (sha256 prefix `8918f1a7`). The 15:19:16 file is
+not the current public snapshot. A later public read of both latest URLs,
+which this pass did not collect, returned `updated_at_hkt` 2026-11-25
+15:36:06, sha256
+`5eb1e5c3bfa49b4f2c30a6ea3095d4a23df33d337037978671d9bd6806422c18`,
+281996 bytes, `market_session` afternoon. That stamp is the collector
+start. `quote_as_of` is unknown. This pass starts `daemon.sh` only when
+`qot_logined` is true, and appends that process to the existing
+`daemon.log`. `publish_gate` still rejects a stale file.
 
 ## What one pass does
 
 1. Take `.recover.lock`. A second pass exits as a duplicate.
-2. If ports 11111 and 22222 are closed and no `FutuOpenD` process exists,
-   start one tmux session `opend` with `recover-tmux.conf` (`history-limit 0`,
-   no pipe-pane) and `sleep 0.4; exec ./FutuOpenD` using the existing flags.
-   No account or password is in that command.
-3. If a process exists and a port does not, write an alert and stop. Do not
-   kill it.
+2. Start one tmux session `opend` only when both 11111 and 22222 are closed
+   and no owned `FutuOpenD` process exists. The session uses
+   `recover-tmux.conf` (`history-limit 0`, no pipe-pane) and
+   `sleep 0.4; exec ./FutuOpenD` with the existing flags. The tmux process
+   does not inherit `FUTU_LOGIN_ACCOUNT` or `FUTU_LOGIN_PWD`. No account or
+   password is in the command.
+3. If either port is open and no owned `FutuOpenD` exists, write
+   `alert_port_busy` and do not start a session. If an owned process exists
+   and a port does not, write `alert_opend_stuck` and do not kill it.
 4. If `/workspace/futu/.venv/bin/python` is absent, do not log in and do not
    start the daemon. Append `alert_missing_deps` with reason `venv_missing`
    and pin `futu-api==10.12.7208` from `requirements-futu.txt`. This still
@@ -30,7 +36,8 @@ rejects a stale file. `updated_at_hkt` stays the collector start time.
    and a closed session are not trading-stale. `quote_as_of` is unknown.
    `updated_at_hkt` is the collector start, not an exchange as-of time.
 6. If the quote check is true and the daemon is down, start
-   `setsid nohup bash daemon.sh` once. This pass does not collect.
+   `setsid nohup bash daemon.sh` once. Its stdout and stderr append to the
+   existing `daemon.log`. This pass does not collect.
 7. Login runs only when the SDK interpreter exists, both environment
    variables are already set, the pane's current line is `Please enter account`,
    and the quote check is not logged in. The helper process is
@@ -38,8 +45,14 @@ rejects a stale file. `updated_at_hkt` stays the collector start time.
    argument. Exit 2 and exit 3 stick. Three other failures stick as
    `login_stopped`. A missing variable sticks as `authmaterialmissing`.
    Exit 0 then starts the daemon. A `bad_output` quote check does not log in.
-8. Alerts append to `recover-events.log` only when the fingerprint changes.
-   Each line says `quote_as_of=unknown` and `collected_at=collector_start`.
+8. A failure, a sticky stop, or `alert_recovered` is appended to
+   `recover-events.log` when its fingerprint is new. The fingerprint is
+   action, reason, freshness state, and session. It does not include
+   `updated_at_hkt`. A healthy stamp that advances does not append and does
+   not notify. `alert_recovered` is written only for stale or missing
+   becoming fresh, or a newer collector stamp that is no longer stale or
+   missing. Each line says `quote_as_of=unknown`,
+   `collected_at=collector_start`, and `notify=1` only for those events.
 
 ## External routine
 
@@ -50,14 +63,16 @@ the box: one saved GrokBot routine, weekdays, every 5 minutes.
 The routine does four things and nothing else:
 
 1. Read the public snapshot at `/movers/data/latest` and
-   `/hk-movers/data/latest`. Compare `updated_at_hkt` with the previous
-   observation. That field is the collector start. It is not an exchange
-   as-of time. `quote_as_of` is unknown and the routine must not invent one.
-2. When the box answers, read `recover-events.log` and `recover-state.json`.
-   Notify only when the event fingerprint changes, when the public
-   `updated_at_hkt` changes, or when a previously stale or missing collector
-   stamp is replaced by a newer one. A repeat of the same fingerprint is
-   not a notification.
+   `/hk-movers/data/latest` only to know the collector start. That field is
+   not an exchange as-of time. `quote_as_of` is unknown. Do not notify
+   because `updated_at_hkt` advanced. A newer healthy stamp is not a page.
+2. When the box answers, read `recover-events.log`. Notify only when a new
+   line has `notify=1`: a new failure, a sticky stop
+   (`auth_failed`, `auth_challenge`, `login_stopped`, `authmaterialmissing`),
+   or `alert_recovered`. Do not notify because the fingerprint in
+   `recover-state.json` changed by itself, and do not notify on a repeated
+   fingerprint. `alert_recovered` is the stale or missing to fresh or newer
+   transition. The pass writes it once. A later healthy cycle writes nothing.
 3. Invoke the pass only when `sticky` is empty or is not one of
    `auth_failed`, `auth_challenge`, `login_stopped`, `authmaterialmissing`.
    The command is exactly:
@@ -87,6 +102,7 @@ guess again.
 - Allow one tmux session and one `FutuOpenD` only when no OpenD process exists and both ports are closed.
 - Do not grant a standing permission to kill a process, to run `start_opend.sh`, to create the venv, or to log in again after `auth_failed`, `auth_challenge`, `login_stopped`, or `authmaterialmissing`.
 - Run `install_recover.sh --apply /workspace/futu/hk-movers` only after those are accepted. The default is a dry-run. Rollback is `rollback_recover.sh --apply` and it does not stop the gateway or the daemon.
+- `recover-state.json` does not survive a replace that wipes the workspace. This pass does not claim the box comes back by itself. Missing SDK stays an alert. Missing login variables stay one sticky `authmaterialmissing` event.
 
 ## Quote record
 

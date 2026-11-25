@@ -104,6 +104,55 @@ def supervisor_command():
     return ["setsid", "nohup", "bash", DAEMON]
 
 
+LOGIN_ENV_KEYS = ("FUTU_LOGIN_ACCOUNT", "FUTU_LOGIN_PWD")
+
+
+def spawn_env(argv, env):
+    """The OpenD process does not need the login variables. The helper does."""
+    if argv[:1] == ["tmux"]:
+        return {key: value for key, value in env.items() if key not in LOGIN_ENV_KEYS}
+    return dict(env)
+
+
+def daemon_log_path(runtime_dir):
+    """Append daemon output here. This is not ``/dev/null``."""
+    return Path(runtime_dir) / "daemon.log"
+
+
+def port_flags(world):
+    """Individual ports. A combined listening flag hides one busy port."""
+    if "api_open" in world or "telnet_open" in world:
+        return bool(world.get("api_open")), bool(world.get("telnet_open"))
+    both = bool(world.get("opend_listening"))
+    return both, both
+
+
+def port_busy_reason(api_open, telnet_open):
+    if api_open and telnet_open:
+        return "ports_busy_unowned"
+    if api_open:
+        return "api_busy"
+    return "telnet_busy"
+
+
+def recovery_decision(previous_state, previous_collected_at, fresh):
+    """One event when stale or missing becomes fresh, or a newer non-stale stamp.
+
+    A healthy stamp that was already fresh returns nothing.
+    """
+    if previous_state not in ("stale_trading", "missing"):
+        return None
+    collected = fresh.get("collected_at") or ""
+    newer = bool(previous_collected_at and collected and collected > previous_collected_at)
+    if fresh["state"] == "fresh":
+        reason = "stale_to_fresh" if previous_state == "stale_trading" else "missing_to_fresh"
+    elif newer and fresh["state"] not in ("stale_trading", "missing"):
+        reason = previous_state + "_to_newer"
+    else:
+        return None
+    return {"action": "alert_recovered", "reason": reason, "freshness": fresh}
+
+
 def plan(world):
     """Choose at most one process action. ``world`` is already observed."""
     now = world["now"]
@@ -130,14 +179,19 @@ def plan(world):
 
     if world.get("lock_held"):
         return stop("noop_duplicate", "recover_lock_held")
-    listening = bool(world.get("opend_listening"))
+    api_open, telnet_open = port_flags(world)
     pids = list(world.get("opend_pids") or [])
-    if not listening and pids:
+    both_closed = not api_open and not telnet_open
+    if both_closed and pids:
         return stop("alert_opend_stuck", "process_without_port")
-    if not listening and not world.get("binary_ready"):
+    if both_closed and not world.get("binary_ready"):
         return stop("alert_opend_binary_missing", "binary_missing")
-    if not listening:
+    if both_closed:
         return stop("start_opend_pty", "opend_absent", opend_pty_command(world["runtime_dir"]))
+    if not pids:
+        return stop("alert_port_busy", port_busy_reason(api_open, telnet_open))
+    if api_open != telnet_open:
+        return stop("alert_opend_stuck", "process_without_port")
     if qot is True and world.get("supervisor_running"):
         if fresh["state"] == "stale_trading":
             return stop("alert_stale_while_supervisor_running", "supervisor_already_running")
@@ -209,8 +263,9 @@ def _annotate(event, world, reason):
 def format_event_line(event):
     pin = event.get("pin") or ""
     pin_bit = (" pin=" + pin) if pin else ""
-    return "%s %s %s quote_as_of=unknown collected_at=collector_start%s\n" % (
-        event.get("at") or "", event.get("action") or "", event.get("reason") or "", pin_bit,
+    notify = "1" if event.get("notify") else "0"
+    return "%s %s %s quote_as_of=unknown collected_at=collector_start notify=%s%s\n" % (
+        event.get("at") or "", event.get("action") or "", event.get("reason") or "", notify, pin_bit,
     )
 
 
@@ -223,6 +278,9 @@ def state_payload(state):
         "sticky": state.get("sticky") or "",
         "alert": state.get("alert"),
         "deps_alert": state.get("deps_alert"),
+        "recovery_alert": state.get("recovery_alert"),
+        "freshness_state": state.get("freshness_state") or "",
+        "collected_at": state.get("collected_at") or "",
         "last_attempt_at": last or "",
     }
 
@@ -255,8 +313,23 @@ def execute(world, effects):
         world.get("previous_alert"), decision, world["now"],
         world.get("stamp_text") or "",
     ), world, decision["reason"])
-    if not event["duplicate"] and decision["action"].startswith("alert_"):
+    event["notify"] = decision["action"].startswith("alert_")
+    if not event["duplicate"] and event["notify"]:
         effects.write_event(event)
+    recovered = recovery_decision(
+        world.get("previous_freshness_state") or "",
+        world.get("previous_collected_at") or "",
+        decision["freshness"],
+    )
+    recovery_saved = world.get("previous_recovery_alert")
+    if recovered:
+        recovery_saved = _annotate(emit_event(
+            world.get("previous_recovery_alert"), recovered, world["now"],
+            world.get("stamp_text") or "",
+        ), world, recovered["reason"])
+        recovery_saved["notify"] = True
+        if not recovery_saved["duplicate"]:
+            effects.write_event(recovery_saved)
     deps_saved = None
     if not world.get("interpreter_ready") and decision["action"] != "alert_missing_deps":
         deps = _annotate(emit_event(
@@ -266,6 +339,7 @@ def execute(world, effects):
                 "freshness": decision["freshness"],
             }, world["now"], world.get("stamp_text") or "",
         ), world, "venv_missing")
+        deps["notify"] = True
         deps_saved = deps
         if not deps["duplicate"]:
             effects.write_event(deps)
@@ -276,6 +350,9 @@ def execute(world, effects):
         "sticky": remembered.get("sticky") or "",
         "alert": event,
         "deps_alert": deps_saved,
+        "recovery_alert": recovery_saved,
+        "freshness_state": decision["freshness"]["state"],
+        "collected_at": decision["freshness"].get("collected_at") or "",
         "last_attempt_at": remembered.get("last_attempt_at"),
     }))
     return decision, event
@@ -304,7 +381,12 @@ def assemble(parts):
         "now": parts["now"],
         "stamp": parts.get("stamp"),
         "stamp_text": parts.get("stamp_text") or "",
+        "api_open": bool(parts.get("api_open")),
+        "telnet_open": bool(parts.get("telnet_open")),
         "opend_listening": bool(parts.get("api_open")) and bool(parts.get("telnet_open")),
+        "previous_freshness_state": parts.get("previous_freshness_state") or "",
+        "previous_collected_at": parts.get("previous_collected_at") or "",
+        "previous_recovery_alert": parts.get("previous_recovery_alert"),
         "opend_pids": list(parts.get("pids") or []),
         "supervisor_running": bool(parts.get("supervisor_running")),
         "binary_ready": bool(parts.get("binary_ready")),
@@ -434,6 +516,9 @@ def collect_host(runtime_dir, python):
         "fails": state.get("fails") or 0,
         "last_attempt_at": last,
         "previous_alert": state.get("alert"),
+        "previous_freshness_state": state.get("freshness_state") or "",
+        "previous_collected_at": state.get("collected_at") or "",
+        "previous_recovery_alert": state.get("recovery_alert"),
         "python": python,
         "helper_python": SYSTEM_PYTHON,
         "pin": read_pin(Path(__file__).with_name("requirements-futu.txt").read_text()) if Path(__file__).with_name("requirements-futu.txt").is_file() else "",
@@ -465,9 +550,20 @@ class HostEffects:
     def spawn(self, argv):
         self.spawned.append(list(argv))
         if argv[:1] == ["setsid"]:
-            subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+            log_handle = daemon_log_path(self.runtime_dir).open("a")
+            try:
+                subprocess.Popen(
+                    argv,
+                    stdin=subprocess.DEVNULL,
+                    stdout=log_handle,
+                    stderr=subprocess.STDOUT,
+                    start_new_session=True,
+                    close_fds=True,
+                )
+            finally:
+                log_handle.close()
             return 0
-        done = subprocess.run(argv, check=False)
+        done = subprocess.run(argv, check=False, env=spawn_env(argv, os.environ))
         return done.returncode
 
     def write_event(self, event):
@@ -523,6 +619,10 @@ def load_world(path, runtime_dir):
         world["previous_alert"] = saved["alert"]
     if saved.get("deps_alert"):
         world["previous_deps_alert"] = saved["deps_alert"]
+    if saved.get("recovery_alert"):
+        world["previous_recovery_alert"] = saved["recovery_alert"]
+    world["previous_freshness_state"] = saved.get("freshness_state") or ""
+    world["previous_collected_at"] = saved.get("collected_at") or ""
     if saved.get("fails"):
         world["fails"] = saved["fails"]
     if saved.get("last_attempt_at"):

@@ -146,13 +146,19 @@ def decide(obs):
 
 
 def alert_fingerprint(decision, stamp_text):
+    """Identity of one alert. The collector stamp is not part of it.
+
+    ``stamp_text`` is accepted so callers can keep passing the collector
+    start. A newer healthy ``updated_at_hkt`` must not change this value.
+    ``quote_as_of`` stays unknown and is not included.
+    """
     fresh = decision["freshness"]
+    del stamp_text
     return "|".join([
         decision["action"],
         decision["reason"],
         fresh["state"],
         fresh["session"],
-        stamp_text or "",
     ])
 
 

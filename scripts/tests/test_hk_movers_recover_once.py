@@ -47,6 +47,48 @@ def world(**kwargs):
 
 
 class Plan(unittest.TestCase):
+    def test_a_busy_port_without_an_owned_process_does_not_start(self):
+        cases = (
+            (True, False, [], "api_busy"),
+            (False, True, [], "telnet_busy"),
+            (True, True, [], "ports_busy_unowned"),
+        )
+        for api_open, telnet_open, pids, reason in cases:
+            decided = once.plan(world(
+                api_open=api_open, telnet_open=telnet_open, opend_pids=pids,
+                opend_listening=api_open and telnet_open, pane_prompt="",
+            ))
+            self.assertEqual(decided["action"], "alert_port_busy", reason)
+            self.assertEqual(decided["reason"], reason)
+            self.assertEqual(decided["exec"], [])
+        owned = once.plan(world(
+            api_open=False, telnet_open=False, opend_listening=False, opend_pids=[103847], pane_prompt="",
+        ))
+        self.assertEqual(owned["action"], "alert_opend_stuck")
+        self.assertEqual(owned["exec"], [])
+        start = once.plan(world(
+            api_open=False, telnet_open=False, opend_listening=False, opend_pids=[], pane_prompt="",
+        ))
+        self.assertEqual(start["action"], "start_opend_pty")
+        self.assertTrue(start["exec"])
+        self.assertNotIn("FUTU_LOGIN", " ".join(start["exec"]))
+
+    def test_healthy_stamp_advance_is_not_a_new_fingerprint(self):
+        first = once.plan(world(
+            qot_logined=True, qot_reason="qot_logined", supervisor_running=True,
+            stamp=at(15, 19, 16), stamp_text="2026-11-25 15:19:16", now=at(15, 24),
+        ))
+        second = once.plan(world(
+            qot_logined=True, qot_reason="qot_logined", supervisor_running=True,
+            stamp=at(15, 26, 11), stamp_text="2026-11-25 15:26:11", now=at(15, 31),
+        ))
+        self.assertEqual(first["action"], "noop_supervisor_running")
+        left = once.recover.alert_fingerprint(first, "2026-11-25 15:19:16")
+        right = once.recover.alert_fingerprint(second, "2026-11-25 15:26:11")
+        self.assertEqual(left, right)
+        self.assertNotIn("15:19:16", left)
+        self.assertNotIn("15:26:11", right)
+
     def test_reboot_starts_one_pty_and_does_not_use_the_old_launcher(self):
         decided = once.plan(world(
             opend_listening=False, opend_pids=[], supervisor_running=False, pane_prompt="",
@@ -322,6 +364,91 @@ class Executable(unittest.TestCase):
             spawned = json.loads((Path(tmp) / "spawned.json").read_text())
             self.assertEqual(spawned, [["setsid", "nohup", "bash", "/workspace/futu/hk-movers/daemon.sh"]])
             self.assertIn("action=start_supervisor_once", done.stdout)
+
+    def test_ports_and_healthy_stamps_do_not_spawn_or_page(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            for api_open, telnet_open in ((True, False), (False, True), (True, True)):
+                done = run_script(tmp, self.observation(
+                    api_open=api_open, telnet_open=telnet_open, pids=[], pane_prompt="",
+                ))
+                self.assertIn("action=alert_port_busy", done.stdout, done.stdout)
+                self.assertNotIn("start_opend_pty", done.stdout)
+            self.assertFalse((Path(tmp) / "spawned.json").exists())
+            owned = run_script(tmp, self.observation(
+                api_open=False, telnet_open=False, pids=[103847], pane_prompt="",
+            ))
+            self.assertIn("action=alert_opend_stuck", owned.stdout)
+            start = run_script(tmp, self.observation(
+                api_open=False, telnet_open=False, pids=[], pane_prompt="", binary_ready=True,
+                interpreter_ready=True,
+            ))
+            self.assertIn("action=start_opend_pty", start.stdout)
+            spawned = json.loads((Path(tmp) / "spawned.json").read_text())
+            self.assertEqual(spawned[0][0], "tmux")
+        env = {
+            "PATH": "/usr/bin",
+            "FUTU_LOGIN_ACCOUNT": "not-used",
+            "FUTU_LOGIN_PWD": "not-used",
+        }
+        opened = once.spawn_env(["tmux", "new-session"], env)
+        self.assertNotIn("FUTU_LOGIN_ACCOUNT", opened)
+        self.assertNotIn("FUTU_LOGIN_PWD", opened)
+        helper = once.spawn_env(["/usr/bin/python3", "opend_console_login.py"], env)
+        self.assertEqual(helper["FUTU_LOGIN_ACCOUNT"], "not-used")
+        self.assertTrue(str(once.daemon_log_path("/workspace/futu/hk-movers")).endswith("daemon.log"))
+        self.assertNotIn("null", once.daemon_log_path("/workspace/futu/hk-movers").name)
+
+    def test_healthy_advance_is_silent_and_recovery_is_one_event(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            first = run_script(tmp, self.observation(
+                qot_logined=True, qot_reason="qot_logined", supervisor_running=True,
+                now="2026-11-25 15:24:00", stamp="2026-11-25 15:19:16",
+                stamp_text="2026-11-25 15:19:16",
+            ))
+            self.assertIn("action=noop_supervisor_running", first.stdout)
+            self.assertIn("freshness=fresh", first.stdout)
+            self.assertFalse((Path(tmp) / "recover-events.log").exists())
+            second = run_script(tmp, self.observation(
+                qot_logined=True, qot_reason="qot_logined", supervisor_running=True,
+                now="2026-11-25 15:31:00", stamp="2026-11-25 15:26:11",
+                stamp_text="2026-11-25 15:26:11",
+            ))
+            self.assertIn("action=noop_supervisor_running", second.stdout)
+            self.assertFalse((Path(tmp) / "recover-events.log").exists())
+            state = json.loads((Path(tmp) / "recover-state.json").read_text())
+            self.assertNotIn("15:26:11", state["alert"]["fingerprint"])
+            self.assertNotIn("15:19:16", state["alert"]["fingerprint"])
+        with tempfile.TemporaryDirectory() as tmp:
+            stale = run_script(tmp, self.observation(
+                qot_logined=True, qot_reason="qot_logined", supervisor_running=True,
+                now="2026-11-25 14:40:00", stamp="2026-11-25 11:49:25",
+                stamp_text="2026-11-25 11:49:25",
+            ))
+            self.assertIn("action=alert_stale_while_supervisor_running", stale.stdout)
+            still = run_script(tmp, self.observation(
+                qot_logined=True, qot_reason="qot_logined", supervisor_running=True,
+                now="2026-11-25 14:45:00", stamp="2026-11-25 11:50:00",
+                stamp_text="2026-11-25 11:50:00",
+            ))
+            self.assertIn("duplicate=true", still.stdout)
+            recovered = run_script(tmp, self.observation(
+                qot_logined=True, qot_reason="qot_logined", supervisor_running=True,
+                now="2026-11-25 15:31:00", stamp="2026-11-25 15:26:11",
+                stamp_text="2026-11-25 15:26:11",
+            ))
+            self.assertIn("action=noop_supervisor_running", recovered.stdout)
+            log = (Path(tmp) / "recover-events.log").read_text()
+            self.assertEqual(1, log.count("alert_recovered"))
+            self.assertIn("stale_to_fresh", log)
+            self.assertIn("notify=1", log)
+            later = run_script(tmp, self.observation(
+                qot_logined=True, qot_reason="qot_logined", supervisor_running=True,
+                now="2026-11-25 15:40:00", stamp="2026-11-25 15:36:06",
+                stamp_text="2026-11-25 15:36:06",
+            ))
+            self.assertIn("action=noop_supervisor_running", later.stdout)
+            self.assertEqual(log, (Path(tmp) / "recover-events.log").read_text())
+            self.assertFalse((Path(tmp) / "spawned.json").exists())
 
     def test_caller_contract_is_system_python(self):
         self.assertTrue(SCRIPT.read_text().startswith("#!/usr/bin/python3\n"))
