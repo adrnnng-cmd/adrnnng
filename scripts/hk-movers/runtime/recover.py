@@ -46,7 +46,11 @@ def market_session(moment):
 
 
 def freshness(now, stamp):
-    """How to read a collector stamp. Does not rewrite it."""
+    """How to read a collector stamp. Does not rewrite it.
+
+    ``collected_at`` is when the collector started. It is not an exchange
+    as-of time. ``quote_as_of`` stays unknown.
+    """
     session = market_session(now)
     window = in_collect_window(now)
     if stamp is None:
@@ -69,6 +73,7 @@ def freshness(now, stamp):
         "age_s": age,
         "collected_at": stamp.astimezone(HKT).strftime("%Y-%m-%d %H:%M:%S") if stamp else None,
         "quote_as_of": "unknown",
+        "collected_at_role": "collector_start",
     }
 
 

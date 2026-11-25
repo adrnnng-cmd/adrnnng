@@ -24,6 +24,8 @@ PREVENTION.md
 OPEND_LOGIN.md
 "
 echo "dest $DEST"
+echo "caller /usr/bin/python3"
+echo "wake external GrokBot routine; this script does not install cron"
 for name in $FILES; do
   echo "file $name"
 done

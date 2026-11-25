@@ -1,8 +1,12 @@
 import io
+import json
+import os
+import subprocess
+import sys
+import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts" / "hk-movers" / "runtime"))
@@ -139,9 +143,18 @@ class Plan(unittest.TestCase):
         self.assertEqual(decided["exec"], [])
 
     def test_missing_sdk_does_not_login_or_start_the_daemon(self):
-        decided = once.plan(world(interpreter_ready=False, qot_logined=None, qot_reason=""))
-        self.assertEqual(decided["action"], "alert_interpreter")
+        current = world(interpreter_ready=False, qot_logined=None, qot_reason="", pin=once.PIN)
+        decided = once.plan(current)
+        self.assertEqual(decided["action"], "alert_missing_deps")
+        self.assertEqual(decided["reason"], "venv_missing")
+        self.assertEqual(decided["pin"], once.PIN)
         self.assertEqual(decided["exec"], [])
+        effects = once.Effects()
+        once.execute(current, effects)
+        self.assertEqual(effects.spawned, [])
+        self.assertIn(once.PIN, effects.events[0]["pin"])
+        self.assertEqual(effects.events[0]["quote_as_of"], "unknown")
+        self.assertEqual(effects.events[0]["collected_at_role"], "collector_start")
 
     def test_banner_only_pane_does_not_login(self):
         decided = once.plan(world(pane_prompt=">>>", qot_reason="constructor_timeout"))
@@ -165,6 +178,162 @@ class Plan(unittest.TestCase):
 
         code = once.main([], stdout=io.StringIO(), observe=observe, effects=once.Effects())
         self.assertEqual(code, 2)
+
+
+SCRIPT = ROOT / "scripts" / "hk-movers" / "runtime" / "recover_once.py"
+PREVENTION = ROOT / "scripts" / "hk-movers" / "runtime" / "PREVENTION.md"
+
+
+def run_script(tmp, body):
+    path = Path(tmp) / "world.json"
+    path.write_text(json.dumps(body))
+    env = {"PATH": os.environ.get("PATH", ""), "HOME": tmp}
+    done = subprocess.run(
+        [sys.executable, str(SCRIPT), "--run", "--dir", tmp, "--world", str(path)],
+        capture_output=True, text=True, env=env, check=False,
+    )
+    return done
+
+
+class Executable(unittest.TestCase):
+    def observation(self, **kwargs):
+        body = {
+            "now": "2026-11-25 14:40:00",
+            "stamp": "2026-11-25 11:49:25",
+            "stamp_text": "2026-11-25 11:49:25",
+            "api_open": True,
+            "telnet_open": True,
+            "pids": [103847, 103857],
+            "supervisor_running": False,
+            "binary_ready": True,
+            "interpreter_ready": True,
+            "pane_prompt": "Please enter account",
+            "sticky": "",
+            "qot_logined": None,
+            "qot_reason": "constructor_timeout",
+            "auth_material": True,
+            "pin": once.PIN,
+            "python": "/workspace/futu/.venv/bin/python",
+        }
+        body.update(kwargs)
+        return body
+
+    def test_system_python_starts_and_alerts_when_the_venv_is_absent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            decoy = Path(tmp) / "secrets.env"
+            decoy.write_text("FUTU_LOGIN_PWD=do-not-read\n")
+            before = decoy.read_text()
+            done = run_script(tmp, self.observation(
+                api_open=False, telnet_open=False, pids=[], interpreter_ready=False, pane_prompt="",
+            ))
+            self.assertEqual(done.returncode, 0, done.stderr)
+            self.assertIn("action=start_opend_pty", done.stdout)
+            self.assertIn("quote_as_of=unknown", done.stdout)
+            log = (Path(tmp) / "recover-events.log").read_text()
+            self.assertIn("alert_missing_deps venv_missing", log)
+            self.assertIn("pin=" + once.PIN, log)
+            self.assertIn("collected_at=collector_start", log)
+            spawned = json.loads((Path(tmp) / "spawned.json").read_text())
+            self.assertIn("tmux", spawned[0][0])
+            self.assertNotIn("pip", json.dumps(spawned))
+            self.assertNotIn(".venv", json.dumps(spawned))
+            self.assertFalse((Path(tmp) / ".venv").exists())
+            self.assertEqual(decoy.read_text(), before)
+            again = run_script(tmp, self.observation(
+                api_open=False, telnet_open=False, pids=[], interpreter_ready=False, pane_prompt="",
+            ))
+            self.assertEqual(again.returncode, 0, again.stderr)
+            self.assertEqual(log, (Path(tmp) / "recover-events.log").read_text())
+
+    def test_console_boot_login_then_daemon_uses_system_python(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            done = run_script(tmp, self.observation())
+            self.assertEqual(done.returncode, 0, done.stderr)
+            spawned = json.loads((Path(tmp) / "spawned.json").read_text())
+            self.assertEqual(spawned[0][0], "/usr/bin/python3")
+            self.assertIn("opend_console_login.py", spawned[0][1])
+            self.assertIn("/workspace/futu/.venv/bin/python", spawned[0][6:])
+            self.assertIn("daemon.sh", " ".join(spawned[1]))
+            self.assertNotIn("FUTU_LOGIN", json.dumps(spawned))
+            self.assertNotIn("start_opend.sh", json.dumps(spawned))
+
+    def test_missing_auth_material_sticks_without_a_second_guess(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            body = self.observation(auth_material=False)
+            first = run_script(tmp, body)
+            self.assertIn("action=alert_authmaterialmissing", first.stdout)
+            self.assertFalse((Path(tmp) / "spawned.json").exists())
+            state = json.loads((Path(tmp) / "recover-state.json").read_text())
+            self.assertEqual(state["sticky"], "authmaterialmissing")
+            second = run_script(tmp, body)
+            self.assertIn("duplicate=true", second.stdout)
+            lines = (Path(tmp) / "recover-events.log").read_text().splitlines()
+            self.assertEqual(1, len(lines))
+            self.assertIn("alert_authmaterialmissing", lines[0])
+            self.assertFalse((Path(tmp) / "spawned.json").exists())
+
+    def test_auth_failure_is_not_attempted_again(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            done = run_script(tmp, self.observation(sticky="auth_failed", qot_logined=False, qot_reason="qot_not_logined"))
+            self.assertIn("action=alert_auth_failed", done.stdout)
+            self.assertFalse((Path(tmp) / "spawned.json").exists())
+
+    def test_dead_process_duplicate_and_healthy_paths(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            dead = run_script(tmp, self.observation(api_open=False, telnet_open=False, pids=[103847]))
+            self.assertIn("action=alert_opend_stuck", dead.stdout)
+            self.assertFalse((Path(tmp) / "spawned.json").exists())
+        with tempfile.TemporaryDirectory() as tmp:
+            locked = run_script(tmp, self.observation(lock_held=True))
+            self.assertIn("action=noop_duplicate", locked.stdout)
+            self.assertFalse((Path(tmp) / "spawned.json").exists())
+        with tempfile.TemporaryDirectory() as tmp:
+            healthy = run_script(tmp, self.observation(
+                qot_logined=True, qot_reason="qot_logined", supervisor_running=True,
+                stamp="2026-11-25 15:19:16",
+            ))
+            self.assertIn("action=noop_supervisor_running", healthy.stdout)
+            self.assertIn("quote_as_of=unknown", healthy.stdout)
+            self.assertFalse((Path(tmp) / "spawned.json").exists())
+
+    def test_lunch_is_expected_and_afternoon_stale_is_deduped(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            lunch = run_script(tmp, self.observation(
+                now="2026-11-25 12:20:00", qot_logined=True, qot_reason="qot_logined",
+                supervisor_running=True,
+            ))
+            self.assertIn("action=noop_supervisor_running", lunch.stdout)
+            self.assertIn("freshness=expected", lunch.stdout)
+        with tempfile.TemporaryDirectory() as tmp:
+            stale = run_script(tmp, self.observation(
+                qot_logined=True, qot_reason="qot_logined", supervisor_running=True,
+            ))
+            self.assertIn("action=alert_stale_while_supervisor_running", stale.stdout)
+            self.assertIn("freshness=stale_trading", stale.stdout)
+            again = run_script(tmp, self.observation(
+                qot_logined=True, qot_reason="qot_logined", supervisor_running=True,
+            ))
+            self.assertIn("duplicate=true", again.stdout)
+            self.assertEqual(1, (Path(tmp) / "recover-events.log").read_text().count("alert_stale"))
+
+    def test_qot_true_records_one_daemon_start(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            done = run_script(tmp, self.observation(qot_logined=True, qot_reason="qot_logined", pane_prompt=""))
+            spawned = json.loads((Path(tmp) / "spawned.json").read_text())
+            self.assertEqual(spawned, [["setsid", "nohup", "bash", "/workspace/futu/hk-movers/daemon.sh"]])
+            self.assertIn("action=start_supervisor_once", done.stdout)
+
+    def test_caller_contract_is_system_python(self):
+        self.assertTrue(SCRIPT.read_text().startswith("#!/usr/bin/python3\n"))
+        text = PREVENTION.read_text()
+        self.assertIn("/usr/bin/python3 /workspace/futu/hk-movers/recover_once.py", text)
+        self.assertNotIn(".venv/bin/python /workspace/futu/hk-movers/recover_once.py", text)
+        command = once.bootstrap_command(
+            "/usr/bin/python3", "/workspace/futu/.venv", "/workspace/futu/hk-movers/requirements-futu.txt",
+        )
+        self.assertEqual(command[0][0], "/usr/bin/python3")
+        self.assertIn("futu-api", Path(ROOT / "scripts/hk-movers/runtime/requirements-futu.txt").read_text())
+        self.assertEqual(once.read_pin("\n# comment\nfutu-api==10.12.7208\n"), once.PIN)
 
 
 if __name__ == "__main__":
