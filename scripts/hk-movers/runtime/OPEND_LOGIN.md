@@ -29,7 +29,10 @@ HISTFILE= python3 opend_console_login.py \
 ```
 
 Exit 0 only when telnet is not involved and `qot_logined` is true. The quote
-check is a child process with cwd `/tmp`. Exit 2 is a verify-code prompt.
+check is a child process with cwd `/tmp`. Its stdout may contain SDK connect
+and disconnect logs. The result is the single line between
+`HKMOVERS_QOT_BEGIN` and `HKMOVERS_QOT_END`. JSON outside those lines is not
+a result, and a non-zero `ret` is not a login. Exit 2 is a verify-code prompt.
 Exit 3 is a login failure after the password line. Exit 4 means the account
 prompt was not the current console line, so nothing was pasted.
 

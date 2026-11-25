@@ -183,6 +183,56 @@ class Transcripts(unittest.TestCase):
         self.assertFalse(result["retry"])
 
 
+class QotRecord(unittest.TestCase):
+    def test_log_prefix_and_suffix_do_not_hide_the_record(self):
+        text = (
+            "2026-11-25 15:18:49 connect 127.0.0.1:11111\n"
+            + ol.format_qot_record(0, True)
+            + "2026-11-25 15:18:49 disconnect\n"
+        )
+        got = ol.parse_qot_stdout(text)
+        self.assertEqual(got, {"qot_logined": True, "reason": "qot_logined"})
+        self.assertTrue(ol.probe_qot("/tmp/no-python", "127.0.0.1", 11111, runner=lambda argv, cwd, timeout: {
+            "code": 0, "stdout": text, "timed_out": False,
+        })["qot_logined"])
+
+    def test_malformed_record_is_bad_output(self):
+        text = ol.QOT_BEGIN + "\n{not-json\n" + ol.QOT_END + "\n"
+        self.assertEqual(ol.parse_qot_stdout(text)["reason"], "bad_output")
+
+    def test_nonzero_ret_is_not_a_login(self):
+        got = ol.parse_qot_stdout(ol.format_qot_record(1, True))
+        self.assertFalse(got["qot_logined"])
+        self.assertEqual(got["reason"], "ret_not_ok")
+
+    def test_ret_zero_and_qot_false_is_not_logged_in(self):
+        got = ol.parse_qot_stdout(ol.format_qot_record(0, False))
+        self.assertFalse(got["qot_logined"])
+        self.assertEqual(got["reason"], "qot_not_logined")
+
+    def test_json_outside_the_markers_is_not_a_result(self):
+        decoy = '{"ret": 0, "qot_logined": true}\n'
+        self.assertEqual(ol.parse_qot_stdout(decoy)["reason"], "bad_output")
+        wrapped = decoy + ol.format_qot_record(0, False) + decoy
+        got = ol.parse_qot_stdout(wrapped)
+        self.assertFalse(got["qot_logined"])
+        self.assertEqual(got["reason"], "qot_not_logined")
+
+    def test_string_boolean_and_extra_keys_are_rejected(self):
+        bad_type = ol.QOT_BEGIN + '\n{"ret": 0, "qot_logined": "true"}\n' + ol.QOT_END + "\n"
+        extra = ol.QOT_BEGIN + '\n{"ret": 0, "qot_logined": true, "extra": 1}\n' + ol.QOT_END + "\n"
+        self.assertEqual(ol.parse_qot_stdout(bad_type)["reason"], "bad_output")
+        self.assertEqual(ol.parse_qot_stdout(extra)["reason"], "bad_output")
+
+    def test_timeout_ignores_a_record_that_arrived_too_late(self):
+        got = ol.probe_qot("/tmp/no-python", "127.0.0.1", 11111, runner=lambda argv, cwd, timeout: {
+            "code": None, "stdout": ol.format_qot_record(0, True), "timed_out": True,
+        })
+        self.assertIsNone(got["qot_logined"])
+        self.assertEqual(got["reason"], "constructor_timeout")
+        self.assertEqual(ol.supervisor_allowed("ok", None)[0], False)
+
+
 class Gate(unittest.TestCase):
     def test_qot_true_allows_supervisor(self):
         allowed, why = ol.supervisor_allowed("ok", True)
@@ -214,7 +264,7 @@ class Cli(unittest.TestCase):
             self.assertEqual(timeout, 20)
             self.assertNotIn(ACCOUNT, " ".join(argv))
             self.assertNotIn(PASSWORD, " ".join(argv))
-            return {"code": 0, "stdout": '{"ret": 0, "qot_logined": true}', "timed_out": False}
+            return {"code": 0, "stdout": ol.format_qot_record(0, True), "timed_out": False}
 
         buf = io.StringIO()
         code = ol.main(

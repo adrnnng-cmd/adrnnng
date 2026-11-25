@@ -48,6 +48,8 @@ if "site-packages" not in path:
 print(json.dumps({"ok": True, "version": str(getattr(futu, "__version__", ""))}))
 """
 
+QOT_BEGIN = "HKMOVERS_QOT_BEGIN"
+QOT_END = "HKMOVERS_QOT_END"
 QOT_SRC = r"""
 import json, sys
 host, port = sys.argv[1], int(sys.argv[2])
@@ -58,11 +60,53 @@ try:
 finally:
     ctx.close()
 logged = None
-if isinstance(data, dict) and "qot_logined" in data:
-    logged = bool(data["qot_logined"])
-code = ret if isinstance(ret, int) else -1
-print(json.dumps({"ret": code, "qot_logined": logged}))
+if isinstance(data, dict) and "qot_logined" in data and type(data["qot_logined"]) is bool:
+    logged = data["qot_logined"]
+code = ret if type(ret) is int else -1
+print("HKMOVERS_QOT_BEGIN")
+print(json.dumps({"ret": code, "qot_logined": logged}, separators=(",", ":")))
+print("HKMOVERS_QOT_END")
 """
+
+
+def format_qot_record(ret, logged):
+    body = json.dumps({"ret": ret, "qot_logined": logged}, separators=(",", ":"))
+    return QOT_BEGIN + "\n" + body + "\n" + QOT_END + "\n"
+
+
+def parse_qot_stdout(text):
+    """Read the one machine record. Log lines around it are not records.
+
+    The SDK writes connect and disconnect text to stdout. A JSON object in
+    that text is not a result. Exactly one begin line, one object line, and
+    one end line are accepted. ``ret`` must be an integer and
+    ``qot_logined`` a boolean or null. A non-zero ``ret`` is not a login.
+    """
+    lines = (text or "").splitlines()
+    if lines.count(QOT_BEGIN) != 1 or lines.count(QOT_END) != 1:
+        return {"qot_logined": None, "reason": "bad_output"}
+    start = lines.index(QOT_BEGIN)
+    end = lines.index(QOT_END)
+    if end != start + 2:
+        return {"qot_logined": None, "reason": "bad_output"}
+    try:
+        payload = json.loads(lines[start + 1])
+    except json.JSONDecodeError:
+        return {"qot_logined": None, "reason": "bad_output"}
+    if not isinstance(payload, dict) or set(payload) != {"ret", "qot_logined"}:
+        return {"qot_logined": None, "reason": "bad_output"}
+    if type(payload["ret"]) is not int:
+        return {"qot_logined": None, "reason": "bad_output"}
+    logged = payload["qot_logined"]
+    if logged is not None and type(logged) is not bool:
+        return {"qot_logined": None, "reason": "bad_output"}
+    if payload["ret"] != 0:
+        return {"qot_logined": False, "reason": "ret_not_ok"}
+    if logged is True:
+        return {"qot_logined": True, "reason": "qot_logined"}
+    if logged is False:
+        return {"qot_logined": False, "reason": "qot_not_logined"}
+    return {"qot_logined": None, "reason": "unexpected_shape"}
 
 
 class SocketTransport:
@@ -305,16 +349,7 @@ def probe_qot(python, host, port, timeout=QOT_TIMEOUT, runner=None):
     done = run([python, "-", host, str(port)], "/tmp", timeout)
     if done.get("timed_out"):
         return {"qot_logined": None, "reason": "constructor_timeout"}
-    try:
-        payload = json.loads(done.get("stdout") or "{}")
-    except json.JSONDecodeError:
-        return {"qot_logined": None, "reason": "bad_output"}
-    logged = payload.get("qot_logined")
-    if logged is True:
-        return {"qot_logined": True, "reason": "qot_logined"}
-    if logged is False:
-        return {"qot_logined": False, "reason": "qot_not_logined"}
-    return {"qot_logined": None, "reason": "unexpected_shape"}
+    return parse_qot_stdout(done.get("stdout") or "")
 
 
 def report_lines(result):

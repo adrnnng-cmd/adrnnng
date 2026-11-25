@@ -7,6 +7,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts" / "hk-movers" / "runtime"))
 
 import opend_console_login as oc  # noqa: E402
+import opend_login as ol  # noqa: E402
 
 ACCOUNT = "acct-not-a-real-login"
 PASSWORD = "pw-not-a-real-secret"
@@ -154,7 +155,7 @@ class Cli(unittest.TestCase):
         def qot_runner(argv, cwd, timeout):
             seen["cwd"] = cwd
             seen["argv"] = argv
-            return {"code": 0, "stdout": '{"ret": 0, "qot_logined": true}', "timed_out": False}
+            return {"code": 0, "stdout": ol.format_qot_record(0, True), "timed_out": False}
 
         buf = io.StringIO()
         code = oc.main(
