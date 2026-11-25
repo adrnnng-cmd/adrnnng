@@ -69,25 +69,25 @@ class PublishWindowTest(unittest.TestCase):
         self.assertIn('echo "WARN: ls-remote failed: $OUT"; exit 0', checker)
         self.assertIn("BUTTONDOWN_SKIP=1", checker)
         self.assertIn("ADRRR_WINDOW_ENTRY=1", checker)
+        self.assertIn("caller is not a successful DAY", checker)
+        self.assertNotIn("wrangler pages deploy . --project-name \"$CF_PROJECT\" --branch main --commit-dirty=true --cwd \"$STAGE\" 2>&1 ) || true", patched)
 
-    def test_invalidated_release_baselines_are_refused(self):
-        import importlib.util
-        spec = importlib.util.spec_from_file_location("publish_window_guard", PKG / "publish_window.py")
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-        for sha in (
-            "e8bd0b27ba23cb9dd5e8eba6c4e0847a7c823b05",
-            "589f30cf" + ("0" * 32),
-        ):
-            with self.assertRaises(mod.WindowStop) as caught:
-                mod.assert_not_invalidated(sha, "baseline")
-            self.assertIn("invalidated", str(caught.exception))
-        mod.assert_not_invalidated("f78a925383e6418159f8a72ad3c929a282d2670c", "tip")
-        text = (PKG / "PROCEDURE.md").read_text()
-        self.assertIn("f78a925383e6418159f8a72ad3c929a282d2670c", text)
-        self.assertIn("invalidated", text)
-        self.assertIn("668", text)
-        self.assertIn("not, by itself, an artifact", text)
+    def test_manifest_drift_is_the_gate_and_no_sha_is_banned(self):
+        src = (PKG / "publish_window.py").read_text()
+        self.assertNotIn("INVALID_RELEASE", src)
+        self.assertNotIn("assert_not_invalidated", src)
+        host = self._installed_host()
+        artifacts = self._artifacts(host)
+        armed = self._arm(host, artifacts)
+        self.assertEqual(armed.returncode, 0, armed.stderr + armed.stdout)
+        pin = json.loads((host / ".publish_window_pin").read_text())
+        self.assertIn("_routes.json", pin["inventory_only"])
+        self.assertNotIn("_routes.json", pin["public_files"])
+        (artifacts / "index.html").write_text("<html>drifted</html>\n")
+        drifted = self._check(host, self._window_env(host))
+        self.assertNotEqual(drifted.returncode, 0, drifted.stdout + drifted.stderr)
+        self.assertIn("drift", (drifted.stderr + drifted.stdout).lower())
+        self.assertFalse((host / "wrangler.log").exists())
 
     def test_default_latest_json_ignores_frozen_root_and_frozen_does_not_refresh(self):
         host = self.tmp / "host"
@@ -99,7 +99,7 @@ class PublishWindowTest(unittest.TestCase):
         host_before = (host / "data" / f"{DATE}.json").stat().st_mtime_ns
         env = {"ADRRR_HOST_ROOT": str(host), "ADRRR_FROZEN_ROOT": str(frozen)}
         normal = run(
-            ["python3", str(PKG / "patched/tools/latest_json.py"), DATE, str(self.tmp / "normal.json"), "--refresh"],
+            ["python3", str(PKG / "patched/tools/latest_json.py"), DATE, str(self.tmp / "normal.json")],
             env=env, check=False,
         )
         self.assertEqual(normal.returncode, 0, normal.stderr)
@@ -262,6 +262,69 @@ class PublishWindowTest(unittest.TestCase):
         self.assertTrue((host / ".publish_window_pin").is_file())
         self.assertFalse((host / "bd.log").exists())
 
+    def test_check_sections_propagates_wrangler_failures_and_does_not_print_day(self):
+        """The stock caller printed DAY and exited 0 after a Functions error.
+
+        Missing binary, non-zero wrangler, no Deployment complete, and a
+        missing Functions bundle must all leave the marker untouched.
+        """
+        modes = {
+            "fail": "marker not written",
+            "nocomplete": "marker not written",
+            "nofunc": "did not upload Functions bundle",
+            "missing": "marker not written",
+        }
+        for mode, needle in modes.items():
+            host = self._installed_host()
+            env = self._open_daily(host)
+            morning = self._publish(host, env)
+            self.assertEqual(morning.returncode, 0, morning.stdout + morning.stderr)
+            self.assertIn("DAY:", morning.stdout)
+            self._advance(host)
+            env = self._env(host)
+            if mode == "missing":
+                binary = host / "tools/cfwrangler/node_modules/.bin/wrangler"
+                binary.unlink()
+            else:
+                env["WRANGLER_MODE"] = mode
+            marker = (host / ".sections_deployed").read_text()
+            (host / "bd.log").unlink(missing_ok=True)
+            (host / "wrangler.log").unlink(missing_ok=True)
+            failed = self._check(host, env)
+            self.assertNotEqual(failed.returncode, 0, mode + "\n" + failed.stdout + failed.stderr)
+            self.assertNotIn("DAY:", failed.stdout)
+            self.assertIn("caller is not a successful DAY", failed.stdout)
+            self.assertIn(needle, failed.stdout + failed.stderr)
+            self.assertEqual((host / ".sections_deployed").read_text(), marker)
+            self.assertFalse((host / "bd.log").exists(), mode)
+
+    def test_partial_upload_readback_restores_once(self):
+        host = self._installed_host()
+        artifacts = self._artifacts(host)
+        rollback = self._rollback_tree(artifacts)
+        env = self._window_env(host)
+        self.assertEqual(self._arm(host, artifacts, rollback).returncode, 0)
+        env["WRANGLER_MODE"] = "partial"
+        failed = self._check(host, env)
+        text = failed.stdout + failed.stderr
+        self.assertNotEqual(failed.returncode, 0, text)
+        self.assertIn("readback mismatch", text)
+        self.assertIn("restore-verified", text)
+        self.assertNotIn("DAY:", failed.stdout)
+        self.assertFalse((host / ".sections_deployed").exists())
+        pin = json.loads((host / ".publish_window_pin").read_text())
+        self.assertEqual(pin["state"], "restore-verified")
+        body = urllib.request.urlopen(
+            env["ADRRR_READBACK_ORIGIN"] + f"/{pin['restored_deployment_id']}/index.html",
+            timeout=5,
+        ).read()
+        self.assertEqual(body, (rollback / "index.html").read_bytes())
+        calls = (host / "wrangler.log").read_text().splitlines()
+        self.assertEqual(calls, ["partial", "partial"])
+        again = self._check(host, env)
+        self.assertNotEqual(again.returncode, 0, again.stdout + again.stderr)
+        self.assertEqual((host / "wrangler.log").read_text().splitlines(), calls)
+
     def test_wrap_gate_and_sha_mismatch_still_fail_closed(self):
         host = self._installed_host()
         self._open_daily(host)
@@ -301,7 +364,7 @@ class PublishWindowTest(unittest.TestCase):
         armed = self._arm(host, artifacts)
         self.assertEqual(armed.returncode, 0, armed.stderr + armed.stdout)
         pin = json.loads((host / ".publish_window_pin").read_text())
-        for rel in ("functions/hello.js", "_redirects", "_headers", ".well-known/security.txt"):
+        for rel in ("functions/hello.js", "_redirects", "_headers", "_routes.json", ".well-known/security.txt"):
             self.assertIn(rel, pin["inventory_only"])
             self.assertIn(rel, pin["artifact_files"])
             self.assertNotIn(rel, pin["public_files"])
@@ -334,12 +397,13 @@ class PublishWindowTest(unittest.TestCase):
         paths = [item.split("/", 1)[1] for item in self.server.requests if "/" in item]
         self.assertIn("news/latest.json", paths)
         self.assertFalse(any(
-            item.startswith("functions/") or item.endswith("_redirects") or item.endswith("_headers")
+            item.startswith("functions/") or item.endswith("_redirects")
+            or item.endswith("_headers") or item.endswith("_routes.json")
             or ".well-known" in item or item.startswith(".")
             for item in paths
         ))
         uploaded = (host / "uploaded-files.txt").read_text()
-        for rel in ("functions/hello.js", "_redirects", "_headers", ".well-known/security.txt"):
+        for rel in ("functions/hello.js", "_redirects", "_headers", "_routes.json", ".well-known/security.txt"):
             self.assertIn(rel, uploaded)
         calls = len((host / "wrangler.log").read_text().splitlines())
         again = self._check(host, env)
@@ -929,6 +993,19 @@ class PublishWindowTest(unittest.TestCase):
               (cd "$cwd" && find . -type f | sed 's|^\\./||' | sort) >> "$WRANGLER_FILES"
             fi
             if [ "$mode" = "fail" ]; then echo "Deployment failed"; exit 1; fi
+            if [ "$mode" = "nocomplete" ]; then echo "Uploaded static files"; exit 0; fi
+            if [ "$mode" = "partial" ]; then
+              echo "Uploading Functions bundle"
+              id=$(python3 -c 'import secrets; print("d"+secrets.token_hex(8))')
+              if [ -n "${WRANGLER_PUBLIC:-}" ]; then
+                dest="${WRANGLER_PUBLIC}/${id}"
+                mkdir -p "$dest"
+                cp -a "$cwd"/. "$dest"/
+                if [ "$count" = "1" ]; then rm -f "$dest/index.html"; fi
+              fi
+              echo "Deployment complete! Take a peek over at https://${id}.fixture.pages.dev"
+              exit 0
+            fi
             if [ -d "$cwd/functions" ] && [ "$mode" != "nofunc" ]; then
               echo "Uploading Functions bundle"
             fi
@@ -985,7 +1062,7 @@ class PublishWindowTest(unittest.TestCase):
                 name = parts[-1] if parts else ""
                 if (
                     rel.startswith("functions/")
-                    or name in ("_redirects", "_headers")
+                    or name in ("_redirects", "_headers", "_routes.json")
                     or any(part.startswith(".") for part in parts)
                 ):
                     self.send_error(404)
@@ -1025,6 +1102,7 @@ class PublishWindowTest(unittest.TestCase):
         (art / "index.html").write_text("<html>approved-home</html>\n")
         (art / "_redirects").write_text("/latest /news/20261125/ 302\n")
         (art / "_headers").write_text("/news/latest.json\n  X-Robots-Tag: noindex\n")
+        (art / "_routes.json").write_text('{"version":1,"include":["/*"],"exclude":[]}\n')
         (art / "favicon.ico").write_bytes(b"ico")
         day = art / "news" / "20261125"
         day.mkdir(parents=True)
@@ -1090,6 +1168,13 @@ class PublishWindowTest(unittest.TestCase):
 
     def _check(self, host, env):
         return run(["bash", str(host / "check_sections.sh")], env=env, check=False)
+
+    def _advance(self, host):
+        src = host / "sections-src"
+        (src / "index.html").write_text("<html>" + os.urandom(4).hex() + "</html>\n")
+        run(["git", "-C", str(src), "add", "index.html"])
+        run(["git", "-C", str(src), "commit", "-m", "advance"])
+        run(["git", "-C", str(src), "push", "-q", "origin", "HEAD:main"])
 
     def _head(self, host):
         return run(["git", "-C", str(host / "sections-src"), "rev-parse", "HEAD"]).stdout.strip()

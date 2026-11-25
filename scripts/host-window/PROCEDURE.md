@@ -1,10 +1,14 @@
 # Frozen artifact publication
 
-## Drift, 2026-11-25 13:03 HKT
+## Production observation, 2026-11-25 13:04 HKT
 
-`e8bd0b27ba23cb9dd5e8eba6c4e0847a7c823b05`, `589f30cf`, and the old `668` artifact are not current release baselines. Do not arm, sync, roll back, or write a marker from them. Do not restore an old artifact. The next artifact and rollback baseline has to be a new production snapshot taken after the publish below. This checkout does not have that snapshot, and it does not install or publish.
+Remote and local `main`, and the SHA-only marker, are `f78a925383e6418159f8a72ad3c929a282d2670c`. The Pages deployment id observed then is `ec186425-6932-46ee-8cff-a400599c902b`. That id is not a git SHA, and this package does not compare a deployment alias to a commit. The artifact listing hash observed then is `63915e6995ca3db70ad31dd84f13024f72cdd677f2cd2eb4a42e104c65ed5cfb` (668 files). 660 of 660 HTTP-served files matched the alias. `_routes.json` is staged and is not GET-verified, same as `_headers`, `_redirects`, and Functions source.
 
-Remote `main` is `f78a925383e6418159f8a72ad3c929a282d2670c`, parent `e8bd0b27`, subject `backtest: price refresh 2026-11-25`, committer `backtest-prices[bot]` at `2026-11-25T04:59:46Z`. The change is `backtest/data/prices/` only. That SHA is the git tip to preserve. It is not, by itself, an artifact or rollback snapshot. PRs 33, 34, and 35 are open and unmerged. Their heads are not in `main`.
+That listing is the observation at 13:04. It is not compiled into the tool as a permanent current pin. Arm, upload, and rollback re-hash the tree captured at that moment and fail closed on drift. A later capture replaces it. Do not restore the morning freeze, and do not write an old artifact back over the 49 price files or the sitemap `lastmod` that this publish carried.
+
+The approved five Movers fields are a source change on top of this tree (`movers/index.html` `2e141a0235aa8b401a711e8716c0cd111a31ff6d59fc6c62536a8451c9b87685`, 10308 B). Production at 13:04 still serves the repo copy `6eb0f17b0149b923370365cf0555a470b1045196576902f4740e4de54ea6e85f`, 10244 B. The public restore is an overlay of that one file onto the new tree. This package does not perform it, and it does not forbid it.
+
+The first host log of that publish assembled 668 files, printed `ERROR: functions/ present but Wrangler did not upload Functions bundle`, printed `DAY:`, and exited 0, with no `Deployment complete`. The patched morning path exits 1 before `DAY:` when the wrangler binary is missing, wrangler is non-zero, `Deployment complete` is absent, or `functions/` was not bundled. `check_sections.sh` returns that status. A missing `node_modules` directory is not treated as a proven cause.
 
 The live entry is `bash /workspace/digest/check_sections.sh`. It compares `git ls-remote` with the first line of `.sections_deployed` and, on a change, runs `publish.sh` with `BUTTONDOWN_SKIP=1`. There is no separate marker program. `publish.sh` is the only writer of `.sections_deployed`.
 
@@ -32,10 +36,10 @@ An earlier host read showed `/workspace/digest/.sections_deployed` = `e8bd0b27ba
 | file | patched sha256 |
 | --- | --- |
 | `patched/publish.sh` | `eb9111f2ffff22ad236583af351a4eec2c16c956d4792fd80adbc8d262883b39` |
-| `patched/check_sections.sh` | `9ea3b8a7ea1c7e5717afb9a5ac859a59a32544ac66e16fec4748319871f8a004` |
+| `patched/check_sections.sh` | `35c51bd938f3453de7b24895d60ebe1c7c145fbd0a9d644ecd8d5c914bfe8d84` |
 | `patched/tools/latest_json.py` | `59c3b90c8905a0461ec7adf37993f1b0136dd2bd3d495f69a67f68606f91a848` |
 | `patched/tools/og_images.py` | `236f0bc028d2adce9776076fc3e8bbde28628402d665ba73e4b188eddc976adb` |
-| `publish_window.py` | `67d6243c8724f1cbbca6d4ac2f201df96bc465798276f25c7267b1ca552965d1` |
+| `publish_window.py` | `3be2879313d644398445cd98cb30cd62eeb68159a9c41172a053dbf6bf9fb27a` |
 
 ## Install writes the hold first
 
@@ -146,7 +150,7 @@ With bootstrap `released`, no pin, no hold, and a SHA-only marker:
 
 - `check_sections.sh` still exits 0 on `ls-remote` failure, on an empty repo URL, on a missing report folder, and when the remote SHA equals the marker.
 - A changed SHA still runs `publish.sh` with `NETLIFY_MIRROR=0` and `BUTTONDOWN_SKIP=1`.
-- The morning marker is written only when Wrangler exits 0, the log contains `Deployment complete`, and a present `functions/` directory also produced `Uploading Functions bundle`. Otherwise the script exits 1 and does not write the marker or send mail.
+- The morning marker is written only when Wrangler exits 0, the log contains `Deployment complete`, and a present `functions/` directory also produced `Uploading Functions bundle`. A missing wrangler binary is the same failure. Otherwise `publish.sh` exits 1 before `DAY:` and does not write the marker or send mail. `check_sections.sh` exits with that status.
 - `latest_json.py` failure still warns and the news tree still deploys.
 - `home-preview`, `seo-meta`, `news-feed`, and `build-sitemap` still warn and continue.
 - IndexNow and Buttondown failures after a verified morning marker still warn.
@@ -155,7 +159,13 @@ With bootstrap `released`, no pin, no hold, and a SHA-only marker:
 
 ## Repository order
 
-PR 34 is the portrait contract. PR 33 is the five Movers names. This package is the publication mechanism. They stay separate reviews. The head that contains all three, with this package's comparison base on the Movers-on-portrait branch, is the tip whose existing `check` job is the remote gate. A local combination is not that gate. The `window-tests` job runs this suite on its own and does not change the `check` job.
+Each pull request is rebased onto `f78a925383e6418159f8a72ad3c929a282d2670c` and stays one scope.
+
+1. PR 34 is the portrait contract. Its existing `check` job passes on its own.
+2. PR 33 is the five Movers source names and the test literals for those names. The next stock assemble then copies `2e141a02…` instead of `6eb0f17b…`.
+3. PR 35 is this publication mechanism.
+
+`cursor/sections-gate-tip-8835` merges those three onto `f78a925` so the existing `check` job and the separate `window-tests` job run on the combination. A local combination is not that gate. The gate branch is not a fourth scope and is not merged ahead of the three reviews.
 
 ## Tests
 
@@ -177,5 +187,5 @@ The script runs `python3 -m unittest scripts.tests.test_publish_window -v` under
 - Full host-tree rehearsal, including the real webhook consumer and the live rollback alias, is still an operator step after this package. This checkout did not install, arm, pause, merge, or publish on the live host.
 - `publish.sh.bak-*` copies were not in the snapshot and are not updated.
 - The morning path does not GET the deployment after Wrangler. Its marker is still the log gate above, not a manifest readback. That was left in place so the daily run does not gain a new success condition.
-- Pages deployment `ec186425` was reported by the operator. It is not in this repository, and this checkout did not read the live host. The GitHub notify job logged HTTP 200 for a ping of `f78a925`; that log is not the Pages deployment id.
-- `589f30cf` is not a commit object in this clone. `668` is not a git SHA. Both stay invalidated as release baselines. No old artifact bytes are stored here.
+- The 13:04 artifact tree is not in this repository. `_routes.json` is inventory-only. Its 404 on GET is expected and is not a readback failure.
+- This checkout did not install, arm, merge, or publish. The five-name overlay on the live tree is an operator action.

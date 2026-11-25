@@ -61,15 +61,8 @@ PAGES_ROLLBACK_URL = (
     "{account_id}/pages/projects/{project_name}/deployments/{deployment_id}/rollback"
 )
 PAGES_URL = re.compile(r"https://([A-Za-z0-9]{8,})\.[A-Za-z0-9.-]+\.pages\.dev\b")
-# These are not current release baselines. e8bd0b27 was the pre-drift main.
-# 589f30cf is invalidated by name; it is not a commit in this clone.
-# "668" is an old artifact label, not a git SHA, and must not be reused as bytes.
-INVALID_RELEASE_SHAS = (
-    "e8bd0b27ba23cb9dd5e8eba6c4e0847a7c823b05",
-)
-INVALID_RELEASE_PREFIXES = (
-    "589f30cf",
-)
+# Pages config is uploaded and hashed, and a GET of it is not the page.
+INVENTORY_ONLY_NAMES = ("_redirects", "_headers", "_routes.json")
 
 
 class WindowStop(Exception):
@@ -87,15 +80,6 @@ class ReadbackMismatch(Exception):
 class ReadbackTransport(WindowStop):
     def __init__(self, message: str):
         super().__init__(message, code=1)
-
-
-def assert_not_invalidated(sha: str, role: str) -> None:
-    """Refuse a git SHA that was retired as a release baseline on 2026-11-25."""
-    if sha in INVALID_RELEASE_SHAS or any(sha.startswith(prefix) for prefix in INVALID_RELEASE_PREFIXES):
-        raise WindowStop(
-            f"STOP: {role} {sha} is an invalidated release baseline; "
-            "do not arm, sync, or roll back onto it"
-        )
 
 
 def sha256(path: Path) -> str:
@@ -122,7 +106,7 @@ def is_public_artifact(rel: str) -> bool:
         return False
     if rel == "functions" or rel.startswith("functions/"):
         return False
-    if name in ("_redirects", "_headers"):
+    if name in INVENTORY_ONLY_NAMES:
         return False
     return True
 
@@ -724,7 +708,6 @@ def write_prearm(host: Path) -> None:
     head = git_head(host)
     if not head or not re.fullmatch(r"[0-9a-f]{40}", head):
         raise WindowStop("STOP: prearm requires the sections-src HEAD")
-    assert_not_invalidated(head, "baseline")
     tree = sections_tree(host)
     pin = _blank_pin(host, head, tree)
     boot = {
@@ -740,7 +723,6 @@ def write_prearm(host: Path) -> None:
 def sync(host: Path, tip: str) -> None:
     if not re.fullmatch(r"[0-9a-f]{40}", tip):
         raise WindowStop("STOP: tip must be a 40-hex SHA")
-    assert_not_invalidated(tip, "tip")
     pin = load_pin(host)
     if pin is None or pin.get("state") != "prearm":
         raise WindowStop("STOP: sync is only available under the prearm hold")
@@ -760,7 +742,6 @@ def sync(host: Path, tip: str) -> None:
     if remote != tip:
         raise WindowStop(f"STOP: remote {remote} is not the requested tip {tip}")
     baseline = pin.get("baseline_sha")
-    assert_not_invalidated(str(baseline), "baseline")
     ancestor = _git(host, "merge-base", "--is-ancestor", str(baseline), tip, check=False)
     if ancestor.returncode != 0:
         raise WindowStop(f"STOP: {tip} is not a descendant of baseline {baseline}")
@@ -814,8 +795,6 @@ def arm(
         raise WindowStop(
             "STOP: arm requires remote == local HEAD == synced tip and the synced tree"
         )
-    assert_not_invalidated(head, "tip")
-    assert_not_invalidated(str(pin.get("baseline_sha")), "baseline")
     artifact_files = collect_tree(artifacts)
     rollback_files = collect_tree(rollback)
     host_files = collect_host(host)

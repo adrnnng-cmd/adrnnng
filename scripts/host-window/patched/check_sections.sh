@@ -63,3 +63,9 @@ env -u ADRRR_PUBLISH_MODE -u ADRRR_FROZEN_ROOT \
   NETLIFY_MIRROR=0 BUTTONDOWN_SKIP=1 \
   ADRRR_HOST_ROOT="$D" \
   bash $D/publish.sh "$LATEST"
+rc=$?
+if [ "$rc" != 0 ]; then
+  echo "FAIL-CLOSED: publish.sh failed ($rc); caller is not a successful DAY"
+  exit "$rc"
+fi
+exit 0
