@@ -46,10 +46,10 @@ test('Movers thumbnail is a static grid with no text or numbers (its colours are
 
 test('subpage heading is Movers with the 港股異動與板塊熱力圖 subtitle; URL and canonical unchanged', () => {
   const html = read('movers/index.html');
-  assert.match(html, /<h1>Movers<\/h1>\s*<p class="subtitle">港股異動與板塊熱力圖<\/p>/);
-  assert.match(html, /<title>Movers｜港股異動與板塊熱力圖 · News Chart<\/title>/);
+  assert.match(html, /<h1>港股異動 <small>Movers<\/small><\/h1>\s*<p class="subtitle">港股異動與板塊熱力圖<\/p>/);
+  assert.match(html, /<title>港股異動｜升跌幅與近似影響度觀察 — News Chart<\/title>/);
   assert.match(html, /rel="canonical" href="https:\/\/news-chart\.com\/movers\/"/);
-  assert.match(html, /"name":"Movers","item":"https:\/\/news-chart\.com\/movers\/"/);
+  assert.match(html, /"name":"港股異動","item":"https:\/\/news-chart\.com\/movers\/"/);
   assert.match(html, /HSI 恒生指數/);
 });
 
@@ -287,7 +287,7 @@ test('home doors lay out 2x2 at 1280 and one column at 390 with no overflow, cli
     if (head.footer.length && head.tiles) break;
     await settle(250);
   }
-  assert.equal(head.h1, 'Movers');
+  assert.equal(head.h1, '港股異動 Movers');
   assert.equal(head.sub, '港股異動與板塊熱力圖');
   assert.deepEqual(head.footer, ['Backtest>/backtest/', 'Movers>/movers/', 'Politician Tracker>/politician-tracker/', 'Morning Report>/news/']);
   assert.ok(head.nav.includes('Movers>/movers/') && !head.nav.some((n) => n.startsWith('港股異動')));

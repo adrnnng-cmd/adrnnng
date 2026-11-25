@@ -276,7 +276,7 @@ test('page copy is Traditional Chinese: no simplified-only characters', () => {
 
 test('page markup carries the shared chrome, brand mark, author and required labels', () => {
   const html = read('movers/index.html');
-  assert.match(html, /<title>Movers｜港股異動與板塊熱力圖 · News Chart<\/title>/);
+  assert.match(html, /<title>港股異動｜升跌幅與近似影響度觀察 — News Chart<\/title>/);
   assert.match(html, /rel="canonical" href="https:\/\/news-chart\.com\/movers\/"/);
   assert.match(html, /property="og:url" content="https:\/\/news-chart\.com\/movers\/"/);
   assert.match(html, /src="\/assets\/brand\/news-chart-white\.svg"/);
