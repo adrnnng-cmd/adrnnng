@@ -26,18 +26,21 @@ OK = "ok"
 AWAITING_ACCOUNT = "awaiting_account"
 AWAITING_PASSWORD = "awaiting_password"
 AWAITING_REMEMBER = "awaiting_remember"
+VERSION_BANNER = "version_banner"
+ACCOUNT_CONSUMED = "account_consumed"
 AUTH_CHALLENGE = "auth_challenge"
 AUTH_FAILED = "auth_failed"
 STARTUP_NOT_READY = "startup_not_ready"
 TELNET_DOWN = "telnet_down"
 
-# What an operator or a later watchdog is allowed to do. None of these
-# relaunch the login script.
+# None of these relaunch start_opend.sh. A password is sent only by
+# opend_login.py after that same connection has sent the account.
 STOP_DO_NOT_RELAUNCH = "stop_do_not_relaunch"
 STOP_OPERATOR_VERIFICATION = "stop_operator_verification"
 STOP_DO_NOT_RETRY = "stop_do_not_retry"
-ANSWER_ON_STDIN = "answer_on_process_stdin"
-ANSWER_ON_TELNET_ONCE = "answer_on_telnet_once"
+SEND_ACCOUNT_ON_TELNET = "send_account_on_telnet"
+DO_NOT_SEND_PASSWORD = "do_not_send_password"
+SEND_REMEMBER_Y = "send_remember_y"
 START_SUPERVISOR_ONCE = "start_supervisor_once"
 BOUNDED_WAIT_EXHAUSTED = "bounded_wait_exhausted"
 
@@ -83,12 +86,16 @@ def classify_banner(text: str) -> str:
         )
     ):
         return AUTH_FAILED
-    if "please enter account" in blob or "请输入账号" in blob or "请输入帐户" in blob:
-        return AWAITING_ACCOUNT
     if "please enter password" in blob or "请输入密码" in blob or "请输入您的密码" in blob:
         return AWAITING_PASSWORD
+    if "please enter account" in blob or "请输入账号" in blob or "请输入帐户" in blob:
+        return AWAITING_ACCOUNT
     if "remember" in blob:
         return AWAITING_REMEMBER
+    # OpenD 10.11.7108 sends this instead of "Please enter account".
+    # The line also says Type "help"; that word is not a command to send.
+    if "opend version info" in blob or "futu opend version" in blob:
+        return VERSION_BANNER
     return STARTUP_NOT_READY
 
 
@@ -103,12 +110,16 @@ def classify_launcher_result(outcome: str, message: str = "", banner: str = "") 
     message_l = _low(message)
     banner_class = classify_banner(banner) if banner else ""
 
-    if "telnet not up" in message_l:
+    if banner_class == AUTH_CHALLENGE:
+        kind = AUTH_CHALLENGE
+    elif banner_class == VERSION_BANNER:
+        kind = VERSION_BANNER
+    elif banner_class == AWAITING_PASSWORD and ("no account prompt" in message_l or outcome_l == "needs_relogin"):
+        kind = ACCOUNT_CONSUMED
+    elif "telnet not up" in message_l:
         kind = TELNET_DOWN
     elif "no account prompt" in message_l:
         kind = STARTUP_NOT_READY
-    elif banner_class == AUTH_CHALLENGE:
-        kind = AUTH_CHALLENGE
     elif banner_class == OK or outcome_l == "ok":
         kind = OK
     elif banner_class in (AWAITING_ACCOUNT, AWAITING_PASSWORD, AWAITING_REMEMBER):
@@ -129,16 +140,20 @@ def classify_launcher_result(outcome: str, message: str = "", banner: str = "") 
         "kind": kind,
         "action": _action(kind),
         "retry": False,
-        "false_needs_relogin": kind == STARTUP_NOT_READY and outcome_l == "needs_relogin",
+        "false_needs_relogin": outcome_l == "needs_relogin" and kind in (
+            STARTUP_NOT_READY, VERSION_BANNER, ACCOUNT_CONSUMED,
+        ),
     }
 
 
 def _action(kind: str) -> str:
     return {
         OK: START_SUPERVISOR_ONCE,
-        AWAITING_ACCOUNT: ANSWER_ON_STDIN,
-        AWAITING_PASSWORD: ANSWER_ON_TELNET_ONCE,
-        AWAITING_REMEMBER: ANSWER_ON_TELNET_ONCE,
+        AWAITING_ACCOUNT: SEND_ACCOUNT_ON_TELNET,
+        VERSION_BANNER: SEND_ACCOUNT_ON_TELNET,
+        AWAITING_PASSWORD: DO_NOT_SEND_PASSWORD,
+        ACCOUNT_CONSUMED: DO_NOT_SEND_PASSWORD,
+        AWAITING_REMEMBER: SEND_REMEMBER_Y,
         AUTH_CHALLENGE: STOP_OPERATOR_VERIFICATION,
         AUTH_FAILED: STOP_DO_NOT_RETRY,
         STARTUP_NOT_READY: STOP_DO_NOT_RELAUNCH,

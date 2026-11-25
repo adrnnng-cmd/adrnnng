@@ -118,10 +118,25 @@ class BoundedRead(unittest.TestCase):
         self.assertEqual(got["kind"], lr.STARTUP_NOT_READY)
         self.assertTrue(got["exhausted"])
 
-    def test_password_prompt_without_account_text_is_the_telnet_stage(self):
+    def test_version_banner_is_the_account_signal(self):
+        banner = 'Futu OpenD version info: 10.11.7108(20260916134500), Type "help" for more information.\n'
+        self.assertEqual(len(banner.encode()), 87)
+        got = lr.readiness_from_chunks([(0.2, banner)], wait_s=12)
+        self.assertEqual(got["kind"], lr.VERSION_BANNER)
+        self.assertEqual(got["action"], lr.SEND_ACCOUNT_ON_TELNET)
+        self.assertFalse(got["exhausted"])
+        self.assertFalse(got["retry"])
+        classified = lr.classify_launcher_result(
+            "needs_relogin", "Login failed (no account prompt)", banner=banner,
+        )
+        self.assertEqual(classified["kind"], lr.VERSION_BANNER)
+        self.assertTrue(classified["false_needs_relogin"])
+        self.assertFalse(classified["retry"])
+
+    def test_password_prompt_without_our_account_does_not_send_a_password(self):
         got = lr.readiness_from_chunks([(0.4, "Please enter password")], wait_s=12)
         self.assertEqual(got["kind"], lr.AWAITING_PASSWORD)
-        self.assertEqual(got["action"], lr.ANSWER_ON_TELNET_ONCE)
+        self.assertEqual(got["action"], lr.DO_NOT_SEND_PASSWORD)
 
 
 if __name__ == "__main__":

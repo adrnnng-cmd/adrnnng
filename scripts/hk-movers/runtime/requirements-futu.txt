@@ -1,0 +1,5 @@
+# Direct pin only. Collector and README were checked against this SDK.
+# Transitive packages are not pinned here: the 2026-11-25 14:35 rebuild
+# resolved a fresh set (see requirements-futu-freeze-20261125.txt) and that
+# freeze is not a historical lock.
+futu-api==10.12.7208
