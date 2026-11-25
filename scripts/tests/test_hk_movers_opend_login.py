@@ -143,16 +143,33 @@ class Transcripts(unittest.TestCase):
         self.assertEqual(script.sent[-1], b"Y\r\n")
         self.assertEqual(script.sent.count(b"Y\r\n"), 1)
 
-    def test_remember_before_password_then_success(self):
+    def test_documented_order_sends_password_before_y(self):
+        question = b"Please choose whether to remember the password (Y to remember, N not to remember)\n"
         script, result = _run([
             BANNER, None,
-            b"Remember the password? (Y/N)\n", None,
             b"Please enter password\n", None,
+            question, None,
             b"Login successful\n", None,
         ])
         self.assertEqual(result["kind"], "ok")
-        self.assertEqual(script.sent[1], b"Y\r\n")
-        self.assertEqual(script.sent[2], (PASSWORD + "\r\n").encode())
+        self.assertEqual(script.sent, [
+            (ACCOUNT + "\r\n").encode(),
+            (PASSWORD + "\r\n").encode(),
+            b"Y\r\n",
+        ])
+
+    def test_live_1445_remember_before_password_sends_neither_y_nor_password(self):
+        # 2026-11-25 14:45 telnet, redacted. Y was the only line after the account,
+        # and OpenD answered with an account/password mismatch. 9 chances remained.
+        question = b"Please choose whether to remember the password (Y to remember, N not to remember)\n"
+        failure = b"Login failed,The account and password you've entered don't match. 9 chances remained.\nPlease enter account\n"
+        script, result = _run([BANNER, None, question, None, failure, None])
+        self.assertEqual(result["kind"], "remember_before_password")
+        self.assertFalse(result["password_sent"])
+        self.assertFalse(result["retry"])
+        self.assertEqual(script.sent, [(ACCOUNT + "\r\n").encode()])
+        self.assertNotIn(b"Y\r\n", script.sent)
+        self.assertNotIn(PASSWORD.encode(), b"".join(script.sent))
 
     def test_banner_with_no_follow_up_does_not_retry(self):
         script, result = _run([BANNER, None, None])

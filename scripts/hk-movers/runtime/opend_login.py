@@ -165,6 +165,17 @@ def _send_secret(transport, value, label, transcript):
 
 
 def _decide(text, account_sent, password_sent, remember_sent):
+    """Choose the next telnet line.
+
+    Official interactive order is account, then password, then whether to
+    remember (Futu API Doc v10.12 command-line OpenD). A 10.10.7008 console
+    transcript uses that order with this exact question after the password
+    line: ``Please choose whether to remember the password (Y to remember,
+    N not to remember)``. Y is sent only after the password line. The 14:45
+    telnet read showed that question before any ``Please enter password``;
+    the helper answered Y and OpenD reported an account/password mismatch.
+    The stored password had not been sent. Answering Y there is not repeated.
+    """
     kind = lr.classify_banner(text)
     if not (text or "").strip() or kind == lr.STARTUP_NOT_READY:
         return "timeout", "protocol_timeout"
@@ -173,6 +184,8 @@ def _decide(text, account_sent, password_sent, remember_sent):
     if kind == lr.OK:
         return "stop", lr.OK
     if kind == lr.AUTH_FAILED:
+        if not password_sent:
+            return "stop", lr.PASSWORD_NOT_SENT
         return "stop", lr.AUTH_FAILED
     if kind in (lr.VERSION_BANNER, lr.AWAITING_ACCOUNT):
         if account_sent:
@@ -185,6 +198,8 @@ def _decide(text, account_sent, password_sent, remember_sent):
             return "stop", "protocol_unexpected"
         return "send_password", kind
     if kind == lr.AWAITING_REMEMBER:
+        if not password_sent:
+            return "stop", lr.REMEMBER_BEFORE_PASSWORD
         if remember_sent or not account_sent:
             return "stop", "protocol_unexpected"
         return "send_remember", kind

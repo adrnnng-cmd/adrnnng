@@ -36,7 +36,7 @@ What it does, once:
 1. Connect. Read up to 12s. On the version banner, or on `Please enter account`, send the account.
 2. If the first text is already `Please enter password`, send nothing and stop (`account_consumed`).
 3. On `Please enter password`, send the password.
-4. If the buffer says remember, send `Y` once. That is the existing launcher's remember step.
+4. Send `Y` only after the password line, and only when the next text is the remember question. If that question arrives before `Please enter password`, send nothing else and stop (`remember_before_password`). The word password inside the remember question is not the password prompt.
 5. On a phone or picture verification command, send nothing further and exit 2.
 6. On `login successful`, run `OpenQuoteContext` in a child with cwd `/tmp` and a 20s kill. The constructor is what hung for 15s and 20s before login, so a timeout is `qot_logined=unknown` (exit 8), not a bad password, and it does not log in again.
 7. Exit 0 only when `qot_logined` is true. Then start the supervisor once:

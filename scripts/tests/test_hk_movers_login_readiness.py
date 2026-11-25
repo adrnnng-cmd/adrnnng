@@ -20,11 +20,13 @@ class Banner(unittest.TestCase):
     def test_password_prompt_is_telnet_stage(self):
         self.assertEqual(lr.classify_banner("Please enter password: "), lr.AWAITING_PASSWORD)
 
-    def test_remember_before_password_is_not_failure(self):
-        # 30 Oct order: remember can arrive before the password prompt.
-        self.assertEqual(lr.classify_banner("Remember the password? (Y/N)"), lr.AWAITING_REMEMBER)
+    def test_remember_question_is_not_the_password_prompt(self):
+        question = "Please choose whether to remember the password (Y to remember, N not to remember)"
+        self.assertEqual(lr.classify_banner(question), lr.AWAITING_REMEMBER)
+        self.assertNotEqual(lr.classify_banner(question), lr.AWAITING_PASSWORD)
+        self.assertEqual(lr.classify_banner("Please enter password"), lr.AWAITING_PASSWORD)
         self.assertEqual(
-            lr.classify_banner("Remember the password? Please enter password:"),
+            lr.classify_banner(question + "\nPlease enter password"),
             lr.AWAITING_PASSWORD,
         )
 
