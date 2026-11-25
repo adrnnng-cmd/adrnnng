@@ -4,7 +4,8 @@
 # Live URL: https://news-chart.com/news/YYYYMMDD/
 # Ownership (2026-10-20, approved by Adrian): repo adrnnng-cmd/adrnnng (main) owns everything except news/
 # (/, section folders, shared assets, _redirects except /latest). We own news/ and /latest.
-# Every run (08:15 report AND check_sections.sh webhook path) assembles ONE full tree -> single wrangler deploy.
+# Every morning run assembles ONE full tree -> single wrangler deploy.
+# An armed window pin does not assemble: it uploads the pinned artifact tree.
 set -euo pipefail
 # Unset ADRRR_HOST_ROOT is the live digest. The lock wait default stays 1200s.
 D=${ADRRR_HOST_ROOT:-/workspace/digest}
@@ -13,37 +14,61 @@ DEPLOY=$D/deploy
 SRC=${1:?dated folder required}; DATE=$(basename "$SRC")
 COMPACT=$(python3 -c "print('$DATE'.replace('-',''))")
 DRY_RUN=${DRY_RUN:-0}
-PIN=$D/.publish_window_pin
-FROZEN=0
-SRC_ROOT=$D
-BUILD=$D/deploy.next
-if [ "${ADRRR_PUBLISH_MODE:-}" = "frozen" ]; then
-  FROZEN=1
-  FROZEN_ROOT=${ADRRR_FROZEN_ROOT:?frozen mode requires ADRRR_FROZEN_ROOT}
-  python3 - "$D" "$FROZEN_ROOT" <<'PY'
-import sys
-from pathlib import Path
-formal, root = Path(sys.argv[1]).resolve(), Path(sys.argv[2]).resolve()
-if root == formal or root == Path("/") or formal in root.parents:
-    raise SystemExit("frozen mode refuses the formal digest root")
-PY
-  SRC_ROOT=$FROZEN_ROOT
-  BUILD=$FROZEN_ROOT/out
-  export ADRRR_DIGEST_DIR=$FROZEN_ROOT/data
-  if [ ! -s "$PIN" ]; then
-    echo "FAIL-CLOSED: frozen mode requires $PIN (write it after install, before the rehearsal)"
+ROUTE=$(python3 "$D/tools/publish_window.py" route --host "$D" --entry "${ADRRR_WINDOW_ENTRY:-0}") || exit $?
+if [ "$ROUTE" = "noop" ]; then
+  echo "WINDOW: pinned source and artifact already match the verified deployment; no-op"
+  exit 0
+fi
+if [ "${ADRRR_PUBLISH_MODE:-}" = "frozen" ] && [ "$ROUTE" = "daily" ]; then
+  echo "FAIL-CLOSED: ADRRR_PUBLISH_MODE=frozen is not a morning run and there is no armed window"
+  exit 3
+fi
+if [ "$ROUTE" = "window" ]; then
+  echo "WINDOW: uploading pinned artifacts (no assemble, no refresh, no mail)"
+  echo "buttondown: skip (window transaction; BUTTONDOWN_SKIP=${BUTTONDOWN_SKIP:-0})"
+  CF=$D/cloudflare_config.json
+  export CLOUDFLARE_ACCOUNT_ID=$(python3 -c "import json;print(json.load(open('$CF'))['account_id'])")
+  CF_PROJECT=$(python3 -c "import json;print(json.load(open('$CF'))['project'])")
+  if [ -s "$D/.cf_token" ]; then export CLOUDFLARE_API_TOKEN=$(cat "$D/.cf_token")
+  else export CLOUDFLARE_API_TOKEN=$(python3 -c "import os,re;t=os.environ.get('CLOUDFLARE_API_TOKEN','');m=re.search(r'Bearer\s+([A-Za-z0-9_-]+)',t);print(m.group(1) if m else t.strip())"); fi
+  export WRANGLER_SEND_METRICS=false
+  STAGE=$(mktemp -d -p "$D/tools/cfwrangler")
+  if ! python3 "$D/tools/publish_window.py" stage --host "$D" --dest "$STAGE"; then
+    rm -rf "$STAGE"
     exit 3
   fi
+  if [ "$DRY_RUN" = "1" ]; then
+    echo "DRY_RUN=1: pinned artifacts staged, not uploading"
+    rm -rf "$STAGE"
+    exit 0
+  fi
+  set +e
+  CF_OUT=$( cd "$D/tools/cfwrangler" && ./node_modules/.bin/wrangler pages deploy . --project-name "$CF_PROJECT" --branch main --commit-dirty=true --cwd "$STAGE" 2>&1 )
+  CF_RC=$?
+  set -e
+  CF_LOG=$(mktemp)
+  printf '%s\n' "$CF_OUT" > "$CF_LOG"
+  echo "$CF_OUT" | grep -Ei 'success|complete|error|✘|Functions bundle|Compiled Worker|skipping' || true
+  set +e
+  python3 "$D/tools/publish_window.py" finalize --host "$D" --stage "$STAGE" --log "$CF_LOG" --wrangler-rc "$CF_RC"
+  FIN=$?
+  set -e
+  rm -rf "$STAGE"
+  rm -f "$CF_LOG"
+  if [ "$FIN" != 0 ]; then
+    echo "FAIL-CLOSED: window deployment not verified; marker not written"
+    exit "$FIN"
+  fi
+  echo "WINDOW: deployed and read back"
+  exit 0
 fi
-if [ -s "$PIN" ]; then
-  LIVE_ARG=()
-  if [ "$FROZEN" = "1" ]; then LIVE_ARG=(--live "$D"); fi
-  python3 "$D/tools/publish_window.py" check --host "$D" --content "$SRC_ROOT" "${LIVE_ARG[@]}" --pin "$PIN" || exit 3
+if [ "$ROUTE" != "daily" ]; then
+  echo "FAIL-CLOSED: unknown publish route $ROUTE"
+  exit 3
 fi
+SRC_ROOT=$D
+BUILD=$D/deploy.next
 CFG=$D/netlify_config.json
-if [ "$FROZEN" = "1" ] && [ -f "$FROZEN_ROOT/netlify_config.json" ]; then
-  CFG=$FROZEN_ROOT/netlify_config.json
-fi
 SITE=$(python3 -c "import json;print(json.load(open('$CFG'))['site_id'])")
 PREFIX=$(python3 -c "import json;c=json.load(open('$CFG'));print(c.get('path_prefix') or c.get('secret') or 'news')")
 BASE=$(python3 -c "import json;print(json.load(open('$CFG'))['base_url'])")
@@ -73,21 +98,6 @@ if [ -n "$SEC_URL" ]; then
     echo "FAIL-CLOSED: cannot read current $SEC_BR of the sections repo; refusing to assemble/deploy with an unverified checkout."
     exit 2
   fi
-  if [ -s "$PIN" ]; then
-    PIN_SHA=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["main_sha"])' "$PIN")
-    if [ "$DESIRED_SHA" != "$PIN_SHA" ]; then
-      echo "FAIL-CLOSED: remote $SEC_BR $DESIRED_SHA drifted from pinned $PIN_SHA"
-      exit 3
-    fi
-  fi
-  if [ "$FROZEN" = "1" ]; then
-    REPO_SHA=$( [ -d "$SEC_DIR/.git" ] && git -C "$SEC_DIR" rev-parse HEAD 2>/dev/null || echo EMPTY )
-    echo "repo: frozen $SEC_BR @ $REPO_SHA (desired $DESIRED_SHA; no fetch/reset)"
-    if [ "$REPO_SHA" != "$DESIRED_SHA" ]; then
-      echo "FAIL-CLOSED: frozen checkout is $REPO_SHA, not pinned $DESIRED_SHA. Refusing to fetch or reset."
-      exit 2
-    fi
-  else
   FETCH_OK=0
   if [ -d "$SEC_DIR/.git" ]; then
     if ( cd "$SEC_DIR" && timeout 60 git fetch -q --depth 1 origin "$SEC_BR" && git reset -q --hard FETCH_HEAD && git clean -qfdx ); then
@@ -111,7 +121,6 @@ if [ -n "$SEC_URL" ]; then
   fi
   if [ "$FETCH_OK" != "1" ]; then
     echo "NOTE: fetch/clone failed, but checkout already matches desired $DESIRED_SHA; continuing with existing tree."
-  fi
   fi
 else
   REPO_SHA=$( [ -d "$SEC_DIR/.git" ] && git -C "$SEC_DIR" rev-parse HEAD 2>/dev/null || echo EMPTY )
@@ -145,12 +154,7 @@ print("news days:", [d.replace("-","") for d in sorted(dashed, reverse=True)])
 PY
 mkdir -p "$BUILD/$PREFIX/img"; [ -d "$SRC_ROOT/cache/img" ] && cp -r "$SRC_ROOT/cache/img/." "$BUILD/$PREFIX/img/" || true
 find "$BUILD/$PREFIX/img" -type d -name orig -prune -exec rm -rf {} + 2>/dev/null || true   # uncropped originals stay local (smartcrop)
-if [ "$FROZEN" = "1" ]; then
-  ADRRR_PUBLISH_MODE=frozen ADRRR_FROZEN_ROOT="$FROZEN_ROOT" ADRRR_HOST_ROOT="$D" \
-    python3 "$D/tools/latest_json.py" "$DATE" "$BUILD/$PREFIX/latest.json" >/dev/null
-else
-  python3 $D/tools/latest_json.py "$DATE" "$BUILD/$PREFIX/latest.json" >/dev/null || echo "WARN: latest.json failed (news still deploys)"
-fi
+python3 $D/tools/latest_json.py "$DATE" "$BUILD/$PREFIX/latest.json" >/dev/null || echo "WARN: latest.json failed (news still deploys)"
 
 # --- (2)(3)(4) Repo paths + root files + merged _redirects/_headers ---
 python3 - "$BUILD" "$SEC_DIR" "$SEC_CFG" "$PREFIX" "$COMPACT" "$CFG" <<'PY'
@@ -237,11 +241,9 @@ export ADRRR_DIGEST_DIR="${ADRRR_DIGEST_DIR:-$D/data}"
 post_step() {
   local warn="$1"; shift
   if "$@"; then return 0; fi
-  if [ "$FROZEN" = "1" ]; then echo "FAIL-CLOSED: $warn"; exit 1; fi
   echo "WARN: $warn"
 }
 post_missing() {
-  if [ "$FROZEN" = "1" ]; then echo "FAIL-CLOSED: $1"; exit 1; fi
   echo "WARN: $1"
 }
 if [ -f "$SEC_DIR/scripts/home-preview.mjs" ]; then
@@ -272,9 +274,6 @@ fi
 if [ -f "$SEC_DIR/scripts/build-sitemap.mjs" ]; then
   post_step "build-sitemap failed (repo sitemap kept)" \
     bash -c 'cd "$1" && node scripts/build-sitemap.mjs --site "$2"' bash "$SEC_DIR" "$BUILD"
-elif [ "$FROZEN" = "1" ]; then
-  echo "FAIL-CLOSED: build-sitemap.mjs missing"
-  exit 1
 fi
 
 # --- (6) Completeness gate: never upload a partial site ---
@@ -286,11 +285,6 @@ if [ -f "$SEC_DIR/scripts/news-feed.mjs" ]; then
   [ -s "$BUILD/$PREFIX/feed.xml" ] || { echo "ERROR: build incomplete, missing $PREFIX/feed.xml — nothing uploaded"; exit 1; }
 fi
 [ -s "$BUILD/favicon.ico" ] || echo "WARN: favicon.ico missing at deploy root"
-if [ "$FROZEN" = "1" ]; then
-  echo "FROZEN: isolated tree $BUILD (no formal deploy swap, no upload, no marker, no mail)"
-  echo "DAY: $BASE/$PREFIX/$COMPACT/"
-  exit 0
-fi
 rm -rf "$DEPLOY.prev"; [ -d "$DEPLOY" ] && mv "$DEPLOY" "$DEPLOY.prev"; mv "$BUILD" "$DEPLOY"
 echo "assembled: $DEPLOY ($(find "$DEPLOY" -type f | wc -l) files)"
 if [ "$DRY_RUN" = "1" ]; then echo "DRY_RUN=1: not uploading"; echo "DAY: $BASE/$PREFIX/$COMPACT/"; exit 0; fi
@@ -319,6 +313,9 @@ if [ -d "$STAGE/functions" ] && ! echo "$CF_OUT" | grep -q 'Uploading Functions 
 fi
 if [ "$CF_RC" = "0" ] && [ "$FUNC_OK" = "1" ] && echo "$CF_OUT" | grep -q 'Deployment complete'; then
   echo "$REPO_SHA" > $D/.sections_deployed
+  if [ -s "$D/.publish_window_pin" ] || [ -s "$D/.publish_window_hold" ]; then
+    python3 "$D/tools/publish_window.py" consume-daily --host "$D"
+  fi
   # IndexNow (PR #8 body), best-effort: never fails the publish
   STATE=$D/state; mkdir -p "$STATE"
   if [ -f "$SEC_DIR/scripts/ping-indexnow.mjs" ]; then

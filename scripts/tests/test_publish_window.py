@@ -8,8 +8,12 @@ import stat
 import subprocess
 import tempfile
 import textwrap
+import threading
 import unittest
+import urllib.request
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import unquote
 
 ROOT = Path(__file__).resolve().parents[1]
 PKG = ROOT / "host-window"
@@ -59,9 +63,16 @@ class PublishWindowTest(unittest.TestCase):
         self.assertIn("ERROR: wrap URL evidence gate failed", patched)
         self.assertIn("FAIL-CLOSED: sections-src is", patched)
         self.assertIn("BUTTONDOWN_SKIP", patched)
+        self.assertIn("consume-daily", patched)
+        self.assertNotIn("no formal deploy swap, no upload", patched)
         self.assertNotIn("ADRRR_DIGEST_DIR/$PREFIX/latest.json", patched)
         deploy = patched.split("set +e", 1)[1].split("CF_RC=$?", 1)[0]
         self.assertNotIn("|| true", deploy)
+        checker = (PKG / "patched" / "check_sections.sh").read_text()
+        self.assertIn("FAIL-CLOSED: ls-remote failed during window", checker)
+        self.assertIn('echo "WARN: ls-remote failed: $OUT"; exit 0', checker)
+        self.assertIn("BUTTONDOWN_SKIP=1", checker)
+        self.assertIn("ADRRR_WINDOW_ENTRY=1", checker)
 
     def test_default_latest_json_ignores_frozen_root_and_frozen_does_not_refresh(self):
         host = self.tmp / "host"
@@ -177,6 +188,17 @@ class PublishWindowTest(unittest.TestCase):
         self.assertEqual(run([str(PKG / "rollback.sh"), str(host3)], check=False).returncode, 0)
         self.assertEqual(sha256(host3 / "publish.sh"), BASELINE["publish.sh"])
         self.assertFalse((host3 / "tools/publish_window.py").exists())
+        held = self._installed_host()
+        artifacts = self._artifacts(held)
+        self.assertEqual(self._arm(held, artifacts).returncode, 0)
+        blocked = run([str(PKG / "rollback.sh"), str(held)], check=False)
+        self.assertNotEqual(blocked.returncode, 0, blocked.stderr)
+        self.assertIn("window pin still present", blocked.stderr)
+        self.assertEqual(sha256(held / "publish.sh"), sha256(PKG / "patched/publish.sh"))
+        self.assertEqual(run([
+            "python3", str(PKG / "publish_window.py"), "abort", "--host", str(held),
+        ], check=False).returncode, 0)
+        self.assertEqual(run([str(PKG / "rollback.sh"), str(held)], check=False).returncode, 0)
 
     def test_morning_deploy_verifies_functions_and_mail_and_generator_warn_continues(self):
         host = self._installed_host()
@@ -229,66 +251,275 @@ class PublishWindowTest(unittest.TestCase):
         self.assertIn("FAIL-CLOSED: sections-src is", mismatched.stdout)
         self.assertFalse((host / ".sections_deployed").exists())
 
-    def test_frozen_is_isolated_and_rerun_lists_mtime_without_content_drift(self):
+    def test_window_uploads_pinned_bytes_and_replay_is_not_sha_alone(self):
         host = self._installed_host()
-        frozen = self.tmp / "frozen-copy"
-        self._copy_content(host, frozen)
-        pin = host / ".publish_window_pin"
-        self.assertEqual(run([
-            "python3", str(PKG / "publish_window.py"), "write",
-            "--host", str(host), "--until", "2099-01-01T00:00:00+08:00", "--out", str(pin),
-        ], check=False).returncode, 0)
+        artifacts = self._artifacts(host)
+        approved = (artifacts / "news/latest.json").read_bytes()
         data = host / "data" / f"{DATE}.json"
-        before = data.stat().st_mtime_ns
-        digest = sha256(data)
-        public = sha256(host / "deploy/news/latest.json")
-        env = self._env(host)
-        env.update({
-            "ADRRR_PUBLISH_MODE": "frozen",
-            "ADRRR_FROZEN_ROOT": str(frozen),
-            "BUTTONDOWN_SKIP": "0",
-        })
-        first = self._publish(host, env, dated=frozen / "site" / DATE)
+        before_ns = data.stat().st_mtime_ns
+        data_bytes = data.read_bytes()
+        deployed_latest = (host / "deploy/news/latest.json").read_bytes()
+        env = self._window_env(host)
+        env["BUILD_SITE_BOOM"] = "1"
+        env["GENERATOR_BOOM"] = "1"
+        env["BUTTONDOWN_SKIP"] = "0"
+        self.assertEqual(self._arm(host, artifacts).returncode, 0)
+        inside = host / "not-outside"
+        self._artifacts(host, inside)
+        refused = self._arm(host, inside)
+        self.assertNotEqual(refused.returncode, 0, refused.stderr)
+        self.assertIn("outside the digest", refused.stderr)
+        first = self._check(host, env)
         self.assertEqual(first.returncode, 0, first.stderr + first.stdout)
-        self.assertIn("FROZEN:", first.stdout)
-        self.assertEqual(data.stat().st_mtime_ns, before)
-        self.assertEqual(sha256(data), digest)
-        self.assertEqual(sha256(host / "deploy/news/latest.json"), public)
+        self.assertIn("BUTTONDOWN_SKIP=1", first.stdout)
+        self.assertIn("WINDOW: deployed and read back", first.stdout)
+        self.assertIn("buttondown: skip (window transaction", first.stdout)
+        self.assertFalse((host / "bd.log").exists())
+        self.assertFalse((host / "build-site.flag").exists())
+        self.assertFalse((host / "deploy.next").exists())
+        self.assertEqual(data.stat().st_mtime_ns, before_ns)
+        self.assertEqual(data.read_bytes(), data_bytes)
+        self.assertEqual((host / "deploy/news/latest.json").read_bytes(), deployed_latest)
+        self.assertEqual(len((host / "wrangler.log").read_text().splitlines()), 1)
+        marker = (host / ".sections_deployed").read_text().splitlines()
+        self.assertEqual(marker[0], self._head(host))
+        self.assertTrue(marker[1].startswith("identity "))
+        deployment_id = marker[1].split()[3]
+        body = urllib.request.urlopen(
+            env["ADRRR_READBACK_ORIGIN"] + f"/{deployment_id}/news/latest.json", timeout=5
+        ).read()
+        self.assertEqual(body, approved)
+        paths = [item.split("/", 1)[1] for item in self.server.requests]
+        self.assertIn("news/latest.json", paths)
+        self.assertFalse(any(item.startswith("functions/") or item.endswith("_redirects") for item in paths))
+        calls = len((host / "wrangler.log").read_text().splitlines())
+        again = self._check(host, env)
+        self.assertEqual(again.returncode, 0, again.stderr + again.stdout)
+        self.assertIn("script+artifact identity", again.stdout)
+        self.assertEqual(len((host / "wrangler.log").read_text().splitlines()), calls)
+        self.assertEqual(data.read_bytes(), data_bytes)
+        (host / "tools/og_images.py").write_bytes((host / "tools/og_images.py").read_bytes() + b"\n")
+        drifted = self._check(host, env)
+        self.assertEqual(drifted.returncode, 3, drifted.stderr + drifted.stdout)
+        self.assertIn("script or functions drift", drifted.stderr)
+        self.assertEqual(len((host / "wrangler.log").read_text().splitlines()), calls)
+        self.assertEqual(data.read_bytes(), data_bytes)
+        self.assertFalse((host / "bd.log").exists())
+
+    def test_readback_must_match_before_marker_and_replay_repairs_public_bytes(self):
+        host = self._installed_host()
+        artifacts = self._artifacts(host)
+        env = self._window_env(host)
+        self.assertEqual(self._arm(host, artifacts).returncode, 0)
+        env["WRANGLER_MODE"] = "lie"
+        lied = self._check(host, env)
+        self.assertNotEqual(lied.returncode, 0, lied.stdout + lied.stderr)
+        self.assertIn("readback mismatch", lied.stdout + lied.stderr)
+        self.assertIn("marker not written", lied.stdout)
+        self.assertFalse((host / ".sections_deployed").exists())
+        self.assertEqual(json.loads((host / ".publish_window_pin").read_text())["state"], "armed")
+        env["WRANGLER_MODE"] = "noid"
+        blind = self._check(host, env)
+        self.assertNotEqual(blind.returncode, 0, blind.stdout + blind.stderr)
+        self.assertIn("no deployment-specific", blind.stderr)
+        self.assertFalse((host / ".sections_deployed").exists())
+        env["WRANGLER_MODE"] = "nofunc"
+        nofunc = self._check(host, env)
+        self.assertNotEqual(nofunc.returncode, 0, nofunc.stdout + nofunc.stderr)
+        self.assertIn("did not upload Functions bundle", nofunc.stderr)
+        self.assertFalse((host / ".sections_deployed").exists())
+        env["WRANGLER_MODE"] = "ok"
+        published = self._check(host, env)
+        self.assertEqual(published.returncode, 0, published.stderr + published.stdout)
+        marker = (host / ".sections_deployed").read_text().splitlines()
+        deployment_id = marker[1].split()[3]
+        public = Path(env["WRANGLER_PUBLIC"]) / deployment_id / "news/latest.json"
+        public.write_bytes(b'{"headline":"tampered"}\n')
+        calls = len((host / "wrangler.log").read_text().splitlines())
+        repaired = self._check(host, env)
+        self.assertEqual(repaired.returncode, 0, repaired.stderr + repaired.stdout)
+        self.assertEqual(len((host / "wrangler.log").read_text().splitlines()), calls + 1)
+        repaired_id = (host / ".sections_deployed").read_text().splitlines()[1].split()[3]
+        self.assertNotEqual(repaired_id, deployment_id)
+        body = urllib.request.urlopen(
+            env["ADRRR_READBACK_ORIGIN"] + f"/{repaired_id}/news/latest.json", timeout=5
+        ).read()
+        self.assertEqual(body, (artifacts / "news/latest.json").read_bytes())
+        env["ADRRR_READBACK_ORIGIN"] = "http://127.0.0.1:1"
+        offline = self._check(host, env)
+        self.assertNotEqual(offline.returncode, 0, offline.stdout + offline.stderr)
+        self.assertIn("readback transport", offline.stderr)
+        self.assertEqual(len((host / "wrangler.log").read_text().splitlines()), calls + 1)
+
+    def test_window_does_not_fall_through_when_pin_is_removed_or_remote_drifts(self):
+        host = self._installed_host()
+        artifacts = self._artifacts(host)
+        env = self._window_env(host)
+        env["BUILD_SITE_BOOM"] = "1"
+        self.assertEqual(self._arm(host, artifacts).returncode, 0)
+        data = host / "data" / f"{DATE}.json"
+        before = data.read_bytes()
+        (artifacts / "news/latest.json").write_bytes(b'{"headline":"other"}\n')
+        drifted = self._publish(host, env)
+        self.assertEqual(drifted.returncode, 3, drifted.stderr + drifted.stdout)
+        self.assertIn("artifact", drifted.stderr)
+        self.assertFalse((host / "wrangler.log").exists())
+        self.assertEqual(data.read_bytes(), before)
+        (artifacts / "news/latest.json").write_bytes(b'{"headline":"approved"}\n')
+        src = host / "sections-src"
+        head = self._head(host)
+        (src / "extra.txt").write_text("next\n")
+        run(["git", "-C", str(src), "add", "extra.txt"])
+        run(["git", "-C", str(src), "commit", "-m", "advance"])
+        run(["git", "-C", str(src), "push", "-q", "origin", "HEAD:main"])
+        run(["git", "-C", str(src), "reset", "--hard", "HEAD~1"])
+        self.assertEqual(self._head(host), head)
+        ahead = self._check(host, env)
+        self.assertEqual(ahead.returncode, 3, ahead.stderr + ahead.stdout)
+        self.assertIn("drifted from pinned", ahead.stderr)
+        self.assertEqual(self._head(host), head)
+        self.assertFalse((host / "deploy.next").exists())
+        run(["git", "-C", str(src), "push", "-q", "origin", "HEAD:main", "--force"])
+        (host / ".publish_window_pin").unlink()
+        held = self._publish(host, env)
+        self.assertEqual(held.returncode, 3, held.stderr + held.stdout)
+        self.assertIn("pin and hold", held.stderr)
+        self.assertEqual(data.read_bytes(), before)
+        self.assertFalse((host / "wrangler.log").exists())
+        published = self._check(host, self._window_env(host))
+        self.assertNotEqual(published.returncode, 0)
+        (host / ".publish_window_hold").unlink()
+        # No deployment yet, so both records gone is an abort. Daily publish may refresh.
+        self.assertFalse((host / ".sections_deployed").exists())
+
+    def test_commit_then_release_restores_morning_without_serving_replay(self):
+        host = self._installed_host()
+        artifacts = self._artifacts(host)
+        env = self._window_env(host)
+        self.assertEqual(self._arm(host, artifacts).returncode, 0)
+        direct = self._publish(host, env)
+        self.assertEqual(direct.returncode, 0, direct.stderr + direct.stdout)
+        self.assertIn("BUTTONDOWN_SKIP=0", direct.stdout)
+        self.assertFalse((host / "bd.log").exists())
+        data = host / "data" / f"{DATE}.json"
+        frozen_bytes = data.read_bytes()
+        frozen_ns = data.stat().st_mtime_ns
+        calls = len((host / "wrangler.log").read_text().splitlines())
+        early = self._publish(host, env)
+        self.assertEqual(early.returncode, 0, early.stderr + early.stdout)
+        self.assertIn("no-op", early.stdout)
+        self.assertEqual(data.stat().st_mtime_ns, frozen_ns)
+        self.assertEqual(len((host / "wrangler.log").read_text().splitlines()), calls)
+        self.assertFalse((host / "bd.log").exists())
+        released = run([
+            "python3", str(PKG / "publish_window.py"), "release-daily", "--host", str(host),
+        ], env=env, check=False)
+        self.assertEqual(released.returncode, 0, released.stderr + released.stdout)
+        replay = self._check(host, env)
+        self.assertEqual(replay.returncode, 0, replay.stderr + replay.stdout)
+        self.assertIn("script+artifact identity", replay.stdout)
+        self.assertEqual(data.read_bytes(), frozen_bytes)
+        self.assertEqual(len((host / "wrangler.log").read_text().splitlines()), calls)
+        self.assertFalse((host / "bd.log").exists())
+        morning_env = self._env(host)
+        morning_env["BUILD_SITE_FLAG"] = str(host / "build-site.flag")
+        morning_env["GENERATOR_FLAG"] = str(host / "generator.flag")
+        morning = self._publish(host, morning_env)
+        self.assertEqual(morning.returncode, 0, morning.stderr + morning.stdout)
+        self.assertNotEqual(data.stat().st_mtime_ns, frozen_ns)
+        self.assertTrue((host / "bd.log").is_file())
+        self.assertTrue((host / "build-site.flag").is_file())
+        self.assertTrue((host / "generator.flag").is_file())
+        self.assertFalse((host / ".publish_window_pin").exists())
+        self.assertFalse((host / ".publish_window_hold").exists())
+        self.assertEqual((host / ".sections_deployed").read_text().strip(), self._head(host))
+        after = data.stat().st_mtime_ns
+        calls = len((host / "wrangler.log").read_text().splitlines())
+        later = self._check(host, self._env(host))
+        self.assertEqual(later.returncode, 0, later.stderr + later.stdout)
+        self.assertIn("unchanged", later.stdout)
+        self.assertNotIn("script+artifact", later.stdout)
+        self.assertEqual(data.stat().st_mtime_ns, after)
+        self.assertEqual(len((host / "wrangler.log").read_text().splitlines()), calls)
+
+    def test_marker_without_pin_refuses_refresh_until_resume(self):
+        host = self._installed_host()
+        artifacts = self._artifacts(host)
+        env = self._window_env(host)
+        self.assertEqual(self._arm(host, artifacts).returncode, 0)
+        self.assertEqual(self._check(host, env).returncode, 0)
+        (host / ".publish_window_pin").unlink()
+        (host / ".publish_window_hold").unlink()
+        data = (host / "data" / f"{DATE}.json").read_bytes()
+        calls = len((host / "wrangler.log").read_text().splitlines())
+        blocked = self._check(host, env)
+        self.assertEqual(blocked.returncode, 3, blocked.stderr + blocked.stdout)
+        self.assertIn("pin is gone", blocked.stdout + blocked.stderr)
+        self.assertEqual((host / "data" / f"{DATE}.json").read_bytes(), data)
+        self.assertEqual(len((host / "wrangler.log").read_text().splitlines()), calls)
+        bad = self.tmp / "wrong-artifacts"
+        self._artifacts(host, bad)
+        (bad / "news/latest.json").write_bytes(b'{"headline":"nope"}\n')
+        refused = run([
+            "python3", str(PKG / "publish_window.py"), "resume",
+            "--host", str(host), "--artifacts", str(bad), "--until", "2099-01-01T00:00:00+08:00",
+        ], check=False)
+        self.assertNotEqual(refused.returncode, 0, refused.stderr)
+        self.assertFalse((host / ".publish_window_pin").exists())
+        resumed = run([
+            "python3", str(PKG / "publish_window.py"), "resume",
+            "--host", str(host), "--artifacts", str(artifacts), "--until", "2099-01-01T00:00:00+08:00",
+        ], check=False)
+        self.assertEqual(resumed.returncode, 0, resumed.stderr + resumed.stdout)
+        replay = self._check(host, env)
+        self.assertEqual(replay.returncode, 0, replay.stderr + replay.stdout)
+        self.assertIn("script+artifact identity", replay.stdout)
+        self.assertEqual(len((host / "wrangler.log").read_text().splitlines()), calls)
+
+    def test_ls_remote_failure_is_fail_closed_only_during_the_window(self):
+        host = self._installed_host()
+        (host / "sections_repo.json").write_text(json.dumps({"url": str(self.tmp / "missing.git"), "branch": "main"}))
+        warned = self._check(host, self._env(host))
+        self.assertEqual(warned.returncode, 0, warned.stderr + warned.stdout)
+        self.assertIn("WARN: ls-remote failed", warned.stdout)
+        self.assertFalse((host / "wrangler.log").exists())
+        self.assertFalse((host / ".sections_deployed").exists())
+        host = self._installed_host()
+        artifacts = self._artifacts(host)
+        self.assertEqual(self._arm(host, artifacts).returncode, 0)
+        (host / "sections_repo.json").write_text(json.dumps({"url": str(self.tmp / "missing.git"), "branch": "main"}))
+        stopped = self._check(host, self._window_env(host))
+        self.assertEqual(stopped.returncode, 3, stopped.stderr + stopped.stdout)
+        self.assertIn("FAIL-CLOSED: ls-remote failed during window", stopped.stdout)
+        self.assertFalse((host / ".sections_deployed").exists())
+        self.assertFalse((host / "wrangler.log").exists())
+
+    def test_abort_returns_the_morning_path_and_frozen_env_cannot_skip_it(self):
+        host = self._installed_host()
+        artifacts = self._artifacts(host)
+        self.assertEqual(self._arm(host, artifacts).returncode, 0)
+        pin = json.loads((host / ".publish_window_pin").read_text())
+        pin["until"] = "2000-01-01T00:00:00+00:00"
+        (host / ".publish_window_pin").write_text(json.dumps(pin))
+        expired = self._publish(host, self._env(host))
+        self.assertEqual(expired.returncode, 3, expired.stderr + expired.stdout)
+        self.assertIn("expired", expired.stderr)
         self.assertFalse((host / "wrangler.log").exists())
         self.assertFalse((host / "bd.log").exists())
-        self.assertFalse((host / ".sections_deployed").exists())
-        out = frozen / "out"
-        self.assertTrue((out / "news/latest.json").is_file())
-        sys_path_manifest = self._manifest(out)
-        frozen_data_mtime = (frozen / "data" / f"{DATE}.json").stat().st_mtime_ns
-        second = self._publish(host, env, dated=frozen / "site" / DATE)
-        self.assertEqual(second.returncode, 0, second.stderr + second.stdout)
-        diff = self._diff(sys_path_manifest, self._manifest(out))
-        self.assertEqual(diff["content"], [])
-        self.assertEqual(diff["lastmod"], [])
-        self.assertTrue(any(item["path"].endswith("latest.json") for item in diff["mtime"]))
-        self.assertEqual((frozen / "data" / f"{DATE}.json").stat().st_mtime_ns, frozen_data_mtime)
-        self.assertEqual(sha256(frozen / "data" / f"{DATE}.json"), sha256(host / "data" / f"{DATE}.json"))
-
-    def test_pin_drift_stops_and_restore_then_deploys(self):
-        host = self._installed_host()
-        pin = host / ".publish_window_pin"
         self.assertEqual(run([
-            "python3", str(PKG / "publish_window.py"), "write",
-            "--host", str(host), "--until", "2099-01-01T00:00:00+08:00", "--out", str(pin),
+            "python3", str(PKG / "publish_window.py"), "abort", "--host", str(host),
         ], check=False).returncode, 0)
-        data = host / "data" / f"{DATE}.json"
-        data.write_text(data.read_text().replace("host headline", "drifted"))
-        stopped = self._publish(host, self._env(host))
-        self.assertEqual(stopped.returncode, 3, stopped.stdout + stopped.stderr)
-        self.assertIn("STOP: drift", stopped.stderr)
-        self.assertFalse((host / "wrangler.log").exists())
-        self.assertFalse((host / ".sections_deployed").exists())
-        pin.unlink()
-        restored = self._publish(host, self._env(host))
-        self.assertEqual(restored.returncode, 0, restored.stderr + restored.stdout)
-        self.assertTrue((host / ".sections_deployed").is_file())
+        self.assertFalse((host / ".publish_window_pin").exists())
+        leaked = self._publish(host, self._env(host) | {"ADRRR_PUBLISH_MODE": "frozen", "ADRRR_FROZEN_ROOT": str(artifacts)})
+        self.assertEqual(leaked.returncode, 3, leaked.stderr + leaked.stdout)
+        self.assertIn("not a morning run", leaked.stdout + leaked.stderr)
+        self.assertFalse((host / "bd.log").exists())
+        self.assertEqual((host / "data" / f"{DATE}.json").read_bytes().count(b"host headline"), 1)
+        morning = self._publish(host, self._env(host))
+        self.assertEqual(morning.returncode, 0, morning.stderr + morning.stdout)
         self.assertTrue((host / "bd.log").is_file())
+        self.assertTrue((host / ".sections_deployed").is_file())
+        self.assertNotIn("identity ", (host / ".sections_deployed").read_text())
 
     def test_replay_pending_failure_then_success_then_unchanged(self):
         host = self._installed_host()
@@ -310,7 +541,7 @@ class PublishWindowTest(unittest.TestCase):
         self.assertIn("unchanged", third.stdout)
         self.assertEqual(len((host / "wrangler.log").read_text().splitlines()), calls)
 
-    def test_check_sections_strips_frozen_mode_and_remote_drift_does_not_reset(self):
+    def test_check_sections_strips_frozen_env_and_pin_still_publishes_artifacts(self):
         host = self._installed_host()
         frozen = self.tmp / "not-used"
         self._copy_content(host, frozen)
@@ -321,32 +552,22 @@ class PublishWindowTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
         self.assertTrue((host / "wrangler.log").is_file())
         self.assertFalse((frozen / "out").exists())
+        self.assertFalse((host / "bd.log").exists())
         host = self._installed_host()
-        pin = host / ".publish_window_pin"
-        self.assertEqual(run([
-            "python3", str(PKG / "publish_window.py"), "write",
-            "--host", str(host), "--until", "2099-01-01T00:00:00+08:00", "--out", str(pin),
-        ], check=False).returncode, 0)
-        frozen = self.tmp / "frozen-drift"
-        self._copy_content(host, frozen)
-        bare = host / "origin.git"
-        src = host / "sections-src"
-        (src / "extra.txt").write_text("next\n")
-        run(["git", "-C", str(src), "add", "extra.txt"])
-        run(["git", "-C", str(src), "commit", "-m", "advance"])
-        run(["git", "-C", str(src), "push", "-q", "origin", "HEAD:main"])
-        run(["git", "-C", str(src), "reset", "--hard", "HEAD~1"])
-        head = self._head(host)
-        public = sha256(host / "deploy/news/latest.json")
-        env = self._env(host)
-        env.update({"ADRRR_PUBLISH_MODE": "frozen", "ADRRR_FROZEN_ROOT": str(frozen)})
-        drifted = self._publish(host, env, dated=frozen / "site" / DATE)
-        self.assertEqual(drifted.returncode, 3, drifted.stdout + drifted.stderr)
-        self.assertIn("drifted from pinned", drifted.stdout)
-        self.assertEqual(self._head(host), head)
-        self.assertFalse((host / "deploy.next").exists())
-        self.assertEqual(sha256(host / "deploy/news/latest.json"), public)
-        self.assertTrue(bare.is_dir())
+        artifacts = self._artifacts(host)
+        data = (host / "data" / f"{DATE}.json").read_bytes()
+        env = self._window_env(host)
+        env["ADRRR_PUBLISH_MODE"] = "frozen"
+        env["ADRRR_FROZEN_ROOT"] = str(frozen)
+        env["BUILD_SITE_BOOM"] = "1"
+        self.assertEqual(self._arm(host, artifacts).returncode, 0)
+        armed = self._check(host, env)
+        self.assertEqual(armed.returncode, 0, armed.stderr + armed.stdout)
+        self.assertIn("WINDOW: deployed and read back", armed.stdout)
+        self.assertIn("BUTTONDOWN_SKIP=1", armed.stdout)
+        self.assertEqual((host / "data" / f"{DATE}.json").read_bytes(), data)
+        self.assertFalse((frozen / "out").exists())
+        self.assertFalse((host / "bd.log").exists())
 
     def _story(self, title):
         return json.dumps({
@@ -383,7 +604,16 @@ class PublishWindowTest(unittest.TestCase):
         (host / "cloudflare_config.json").write_text(json.dumps({"account_id": "acct", "project": "adrnnng"}))
         (host / ".cf_token").write_text("fixture-token\n")
         (host / ".buttondown_token").write_text("fixture-token\n")
-        (host / "build_site.py").write_text("def archive_html(days):\n    return '<html>archive</html>\\n'\n")
+        (host / "build_site.py").write_text(textwrap.dedent("""\
+            def archive_html(days):
+                import os
+                flag = os.environ.get("BUILD_SITE_FLAG")
+                if flag:
+                    open(flag, "a").write("called\\n")
+                if os.environ.get("BUILD_SITE_BOOM") == "1":
+                    raise SystemExit("build_site should not run during a window publish")
+                return "<html>archive</html>\\n"
+        """))
         src = host / "sections-src"
         bare = host / "origin.git"
         run(["git", "init", "--bare", "-b", "main", str(bare)])
@@ -396,7 +626,12 @@ class PublishWindowTest(unittest.TestCase):
         (src / "functions/hello.js").write_text("export function onRequest(){return new Response('ok')}\n")
         scripts = src / "scripts"
         scripts.mkdir()
-        (scripts / "home-preview.mjs").write_text("process.exit(0)\n")
+        (scripts / "home-preview.mjs").write_text(textwrap.dedent("""\
+            import { appendFileSync } from 'node:fs';
+            if (process.env.GENERATOR_FLAG) appendFileSync(process.env.GENERATOR_FLAG, 'home\\n');
+            if (process.env.GENERATOR_BOOM === '1') process.exit(97);
+            process.exit(0);
+        """))
         (scripts / "seo-meta.mjs").write_text("if (process.env.FAIL_SEO === '1') process.exit(1)\n")
         (scripts / "news-feed.mjs").write_text(textwrap.dedent("""
             import { writeFileSync } from 'node:fs';
@@ -429,7 +664,15 @@ class PublishWindowTest(unittest.TestCase):
             if [ -d "$cwd/functions" ] && [ "$mode" != "nofunc" ]; then
               echo "Uploading Functions bundle"
             fi
-            echo "Deployment complete"
+            if [ "$mode" = "noid" ]; then echo "Deployment complete"; exit 0; fi
+            id=$(python3 -c 'import secrets; print("d"+secrets.token_hex(8))')
+            if [ -n "${WRANGLER_PUBLIC:-}" ]; then
+              dest="${WRANGLER_PUBLIC}/${id}"
+              mkdir -p "$dest"
+              cp -a "$cwd"/. "$dest"/
+              if [ "$mode" = "lie" ]; then printf 'TAMPER\\n' >> "$dest/news/latest.json"; fi
+            fi
+            echo "Deployment complete! Take a peek over at https://${id}.fixture.pages.dev"
             exit 0
         """))
         (wrangler / "wrangler").chmod((wrangler / "wrangler").stat().st_mode | stat.S_IEXEC)
@@ -453,6 +696,77 @@ class PublishWindowTest(unittest.TestCase):
             "WRANGLER_LOG": str(host / "wrangler.log"),
             "WRANGLER_MODE": "ok",
         }
+
+    def _window_env(self, host):
+        public = host / "public-bytes"
+        public.mkdir(parents=True, exist_ok=True)
+        env = self._env(host)
+        env["WRANGLER_PUBLIC"] = str(public)
+        env["ADRRR_READBACK_ORIGIN"] = self._serve(public)
+        return env
+
+    def _serve(self, public: Path) -> str:
+        root = public.resolve()
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                path = unquote(self.path.split("?", 1)[0]).lstrip("/")
+                self.server.requests.append(path)
+                rel = path.split("/", 1)[1] if "/" in path else ""
+                name = rel.rsplit("/", 1)[-1] if rel else ""
+                if rel.startswith("functions/") or name in ("_redirects", "_headers") or name.startswith("."):
+                    self.send_error(404)
+                    return
+                file_path = (root / path).resolve()
+                try:
+                    file_path.relative_to(root)
+                except ValueError:
+                    self.send_error(404)
+                    return
+                if not file_path.is_file():
+                    self.send_error(404)
+                    return
+                data = file_path.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(data)))
+                self.send_header("Content-Type", "application/octet-stream")
+                self.end_headers()
+                self.wfile.write(data)
+
+            def log_message(self, fmt, *args):
+                return
+
+        httpd = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        httpd.requests = []
+        thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+        thread.start()
+        self.addCleanup(httpd.shutdown)
+        self.addCleanup(httpd.server_close)
+        self.server = httpd
+        return f"http://127.0.0.1:{httpd.server_address[1]}"
+
+    def _artifacts(self, host: Path, dest: Path | None = None) -> Path:
+        art = dest or (self.tmp / ("art-" + hashlib.sha256(os.urandom(8)).hexdigest()[:8]))
+        (art / "functions").mkdir(parents=True, exist_ok=True)
+        shutil.copy(host / "sections-src/functions/hello.js", art / "functions/hello.js")
+        (art / "index.html").write_text("<html>approved-home</html>\n")
+        (art / "_redirects").write_text("/latest /news/20261125/ 302\n")
+        (art / "_headers").write_text("/news/latest.json\n  X-Robots-Tag: noindex\n")
+        (art / "favicon.ico").write_bytes(b"ico")
+        day = art / "news" / "20261125"
+        day.mkdir(parents=True)
+        (day / "index.html").write_text("<html>approved-day</html>\n")
+        (art / "news/index.html").write_text("<html>approved-archive</html>\n")
+        (art / "news/latest.json").write_text('{"headline":"approved"}\n')
+        (art / "news/feed.xml").write_text("<feed>approved</feed>\n")
+        return art
+
+    def _arm(self, host: Path, artifacts: Path):
+        return run([
+            "python3", str(PKG / "publish_window.py"), "arm",
+            "--host", str(host), "--artifacts", str(artifacts),
+            "--until", "2099-01-01T00:00:00+08:00",
+        ], check=False)
 
     def _publish(self, host, env, dated=None):
         target = dated or (host / "site" / DATE)
