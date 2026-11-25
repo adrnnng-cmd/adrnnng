@@ -33,3 +33,15 @@ jobs:
         run: npm run verify:backtest
       - name: Registry, pages and links
         run: npm run check
+
+  window-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: strace
+        run: sudo apt-get update && sudo apt-get install -y strace
+      - name: Publish-window suite
+        run: bash scripts/host-window/run-tests.sh

@@ -7,8 +7,13 @@ URL=$(python3 -c "import json;print(json.load(open('$D/sections_repo.json')).get
 BR=$(python3 -c "import json;print(json.load(open('$D/sections_repo.json')).get('branch','main'))")
 PIN=$D/.publish_window_pin
 HOLD=$D/.publish_window_hold
+BOOT=$D/.publish_window_bootstrap
 WINDOW=0
 if [ -s "$PIN" ] || [ -s "$HOLD" ]; then WINDOW=1; fi
+if [ -s "$BOOT" ]; then
+  BOOT_STATE=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("state",""))' "$BOOT" 2>/dev/null || true)
+  if [ "$BOOT_STATE" = "prearm" ]; then WINDOW=1; fi
+fi
 if [ -z "$URL" ]; then
   if [ "$WINDOW" = "1" ]; then echo "FAIL-CLOSED: no sections repo during window"; exit 3; fi
   echo "no sections repo configured"; exit 0
@@ -23,6 +28,16 @@ if [ "$WINDOW" = "1" ]; then
   # This entry never falls through to the morning assembler.
   ROUTE=$(python3 "$D/tools/publish_window.py" route --host "$D" --entry 1) || exit $?
   if [ "$ROUTE" = "noop" ]; then echo "unchanged ($REMOTE; script+artifact identity)"; exit 0; fi
+  if [ "$ROUTE" = "held" ]; then echo "FAIL-CLOSED: hold is in force; not assembling"; exit 3; fi
+  if [ "$ROUTE" = "restore" ]; then
+    LATEST=$(ls -d $D/site/????-??-?? 2>/dev/null | sort | tail -1)
+    [ -z "$LATEST" ] && LATEST="$D/site/1970-01-01"
+    echo "window: one rollback; not uploading the new tree"
+    env -u ADRRR_PUBLISH_MODE -u ADRRR_FROZEN_ROOT \
+      NETLIFY_MIRROR=0 BUTTONDOWN_SKIP=1 ADRRR_WINDOW_ENTRY=1 ADRRR_HOST_ROOT="$D" \
+      bash $D/publish.sh "$LATEST"
+    exit $?
+  fi
   if [ "$ROUTE" != "window" ]; then echo "FAIL-CLOSED: window entry route $ROUTE"; exit 3; fi
   LATEST=$(ls -d $D/site/????-??-?? 2>/dev/null | sort | tail -1)
   [ -z "$LATEST" ] && LATEST="$D/site/1970-01-01"

@@ -1,10 +1,16 @@
 # Frozen artifact publication
 
+## Drift, 2026-11-25 13:03 HKT
+
+`e8bd0b27ba23cb9dd5e8eba6c4e0847a7c823b05`, `589f30cf`, and the old `668` artifact are not current release baselines. Do not arm, sync, roll back, or write a marker from them. Do not restore an old artifact. The next artifact and rollback baseline has to be a new production snapshot taken after the publish below. This checkout does not have that snapshot, and it does not install or publish.
+
+Remote `main` is `f78a925383e6418159f8a72ad3c929a282d2670c`, parent `e8bd0b27`, subject `backtest: price refresh 2026-11-25`, committer `backtest-prices[bot]` at `2026-11-25T04:59:46Z`. The change is `backtest/data/prices/` only. That SHA is the git tip to preserve. It is not, by itself, an artifact or rollback snapshot. PRs 33, 34, and 35 are open and unmerged. Their heads are not in `main`.
+
 The live entry is `bash /workspace/digest/check_sections.sh`. It compares `git ls-remote` with the first line of `.sections_deployed` and, on a change, runs `publish.sh` with `BUTTONDOWN_SKIP=1`. There is no separate marker program. `publish.sh` is the only writer of `.sections_deployed`.
 
-This package is not installed. Do not run it against `/workspace/digest` from this checkout. `install.sh` and `rollback.sh` refuse that path unless `ADRRR_INSTALL_CONFIRM=1`. `arm` writes only the pin and the hold; it does not deploy.
+This package is not installed. Do not run it against `/workspace/digest` from this checkout. `install.sh` and `rollback.sh` refuse that path unless `ADRRR_INSTALL_CONFIRM=1`. Nothing here merges `main`, arms the live host, or publishes.
 
-Deleting `.publish_window_pin` is not how this window goes live. While the pin is armed or committed, `check_sections.sh` uploads the pinned artifact tree or fails closed. It does not reassemble, refresh images, or send mail. The morning assembler returns only after `release-daily`, and only for a direct `publish.sh`. A webhook replay stays on the frozen transaction until that morning run clears the pin.
+Deleting `.publish_window_pin` is not how this window goes live, and `abort` does not delete it. Install writes a prearm hold before the patched scripts are renamed. While that hold is in force, every caller of the patched `publish.sh` and `check_sections.sh` fail-closes. The morning assembler returns only after a verified window publish, `release-daily`, and the morning `publish.sh` that consumes the hold.
 
 ## Snapshot the patches are based on
 
@@ -19,65 +25,86 @@ Sanitized bytes match the original manifest. No literal secrets, and no config, 
 
 `validate_wrap_urls.py` is not modified. `build_site.py` was not in the snapshot and the window path does not import it.
 
-Marker observed in the snapshot, not copied and not written by it: `/workspace/digest/.sections_deployed` = `e8bd0b27ba23cb9dd5e8eba6c4e0847a7c823b05`, mtime **2026-11-25 11:51:52 HKT**. The SHA matches the earlier morning value. The mtime does not. Do not treat that marker as an unchanged 08:48 baseline, and do not treat it as proof that Functions uploaded. This patch does not clear it.
+An earlier host read showed `/workspace/digest/.sections_deployed` = `e8bd0b27ba23cb9dd5e8eba6c4e0847a7c823b05` at 2026-11-25 11:51:52 HKT. That value is invalidated as a release baseline. This patch does not clear, rewrite, or restore a marker.
 
 ## Patched hashes
 
 | file | patched sha256 |
 | --- | --- |
-| `patched/publish.sh` | `94fb245a31283fdd43ab8d6f29d347c2e1ec087e33d6840c94c8e18422ef537c` |
-| `patched/check_sections.sh` | `274c03ba9f541a9e00f5ffc37dbcb3ef5e8608ef20f893d8df549b0594557c19` |
+| `patched/publish.sh` | `eb9111f2ffff22ad236583af351a4eec2c16c956d4792fd80adbc8d262883b39` |
+| `patched/check_sections.sh` | `9ea3b8a7ea1c7e5717afb9a5ac859a59a32544ac66e16fec4748319871f8a004` |
 | `patched/tools/latest_json.py` | `59c3b90c8905a0461ec7adf37993f1b0136dd2bd3d495f69a67f68606f91a848` |
 | `patched/tools/og_images.py` | `236f0bc028d2adce9776076fc3e8bbde28628402d665ba73e4b188eddc976adb` |
-| `publish_window.py` | `9ff6e677a484af2e8a3fa858d3672a05b6542031fb7e11c03bbc83009090a587` |
+| `publish_window.py` | `67d6243c8724f1cbbca6d4ac2f201df96bc465798276f25c7267b1ca552965d1` |
 
-## Bootstrap, before any merge
+## Install writes the hold first
 
-1. Under the publish lock, `install.sh` checks each live file against the snapshot hash. Any other hash stops the install and writes nothing. A hash that already matches the patched file is left in place.
-2. Previous bytes are copied to `.publish_window_backup/<stamp>/`, then each file is renamed into place. Installed files: `publish.sh`, `check_sections.sh`, `tools/latest_json.py`, `tools/og_images.py`, `tools/publish_window.py`.
-3. Re-hash. They must equal the patched table. `rollback.sh` restores that stamp only when the live bytes are still the patched bytes or already the backup, and only when `.publish_window_pin` and `.publish_window_hold` are both absent. Abort or finish the window first. A later edit stops the rollback.
-4. Leave `ADRRR_PUBLISH_MODE` and `ADRRR_FROZEN_ROOT` unset. Unset mode, with no pin, still uses `/workspace/digest`, still rewrites the data JSON, still upgrades a soft hero, and still sends the morning mail. `check_sections.sh` still forces `BUTTONDOWN_SKIP=1` and strips those two variables on every invocation.
-5. Do not merge while step 3 has not passed. A repo commit does not change the scripts the host executes.
+`install.sh` takes `$D/.publish.lock` and then:
 
-## Arm the artifact tree
+1. Refuses any live file that is neither the snapshot hash nor the patched hash. That refusal happens before any rename.
+2. Writes `.publish_window_bootstrap`, `.publish_window_pin`, and `.publish_window_hold` with `state: prearm`, recording the current `sections-src` HEAD as `baseline_sha` and `HEAD^{tree}` as `baseline_tree`. This write is before the script rename.
+3. Copies the previous bytes to `.publish_window_backup/<stamp>/` and renames the patched scripts into place: `publish.sh`, `check_sections.sh`, `tools/latest_json.py`, `tools/og_images.py`, `tools/publish_window.py`.
 
-`build_site.py` is not in the snapshot. Do not run it for this publication. The approved input is a directory outside `/workspace/digest` that already contains the exact tree Wrangler should upload, including `functions/` byte-for-byte equal to `sections-src/functions`, plus the public pages (`index.html`, `news/...`, `favicon.ico`). `_redirects` and `_headers` belong in that tree too. Symlinks are refused.
+An in-flight `publish.sh` that already holds the lock finishes the old program. The install waits for that lock, so the rename is not mid-publish. A caller that starts after the rename blocks on the same lock and then runs the new program, which sees the hold. The residual is a process that already passed the old program's lock check before the install waited; the install does not start until that process releases the lock.
 
-`sections-src` must already be checked out at the commit remote `main` will be. Arm records that HEAD. It does not fetch or reset. A later merge commit with a different SHA fail-closes. Fast-forward `main` to this SHA, or arm again after that exact commit is checked out and the artifact tree still matches it.
+`abort` always refuses. It does not delete the pin or the hold, and it does not return the morning assembler. `rollback.sh` also refuses while the pin, the hold, or a prearm bootstrap is present. The backup directory keeps today's snapshot bytes for a later restore, after the morning run has consumed the hold. Copying those bytes back by hand while the hold exists is not a supported exit.
+
+A patched entry with no bootstrap, or with bootstrap `prearm` and no pin, still fail-closes. Absence of the pin is not the daily path.
+
+## Sync the merged tip, then arm
+
+Do this while the hold is `prearm`. The PR head is not the value to pin. GitHub's merge of the approved parents produces a new SHA. `sync` checks out that SHA; it does not assume a fast-forward.
+
+```bash
+python3 /workspace/digest/tools/publish_window.py sync \
+  --host /workspace/digest \
+  --tip "$MERGED_MAIN_SHA"
+```
+
+`sync` refuses a dirty `sections-src` before it fetches or resets. It fetches the remote branch, requires `git ls-remote` to equal `--tip`, and requires the recorded baseline to be an ancestor of that tip (`git merge-base --is-ancestor`), so a merge commit with two parents is accepted. It then `git reset --hard` and `git clean -fdx` inside `sections-src` only. It rechecks that remote, local HEAD, and the tip are the same SHA, records `HEAD^{tree}`, and leaves the state at `prearm`. It does not arm and it does not publish.
+
+`arm` then requires all of the following, and refuses otherwise:
+
+- state is still `prearm` and `sync` has recorded a tip
+- `sections-src` porcelain is empty
+- remote SHA, local HEAD, and the synced tip are equal
+- `HEAD^{tree}` equals the synced tree
+- the artifact tree is outside the digest, contains public files, and its `functions/` bytes equal `sections-src/functions`
+- `--rollback` is a second tree, also outside the digest, with its own public files
 
 ```bash
 python3 /workspace/digest/tools/publish_window.py arm \
   --host /workspace/digest \
   --artifacts "$APPROVED_TREE" \
+  --rollback "$PREVIOUS_PUBLIC_TREE" \
+  --rollback-deployment "$PREVIOUS_PRODUCTION_DEPLOYMENT_UUID" \
   --until 2026-11-26T08:00:00+08:00
 ```
 
-This writes `.publish_window_pin` and `.publish_window_hold`. Both must stay. The pin stores the sections SHA, the script and functions hashes, every artifact hash, and the public subset used for readback. `until` is a deadline. When it passes, the entry fail-closes. It does not fall through to the morning assembler.
+`--rollback-deployment` is optional. When it is present it must be a deployment UUID. The pin stores every file in both trees: `functions/`, `_headers`, `_redirects`, and dotfiles are `inventory-only`. Ordinary pages are `http-verified`. `until` is a deadline. When it passes, the entry fail-closes. It does not fall through to the morning assembler.
 
-## What an invocation does
+`build_site.py` is not in the snapshot. Do not run it for this publication. The approved input is the directory that already contains the exact tree Wrangler should upload.
 
-Use the real entry. Pending and replayed calls are the same command:
+## One upload, then one restore
+
+Use the real entry:
 
 ```bash
 bash /workspace/digest/check_sections.sh
 ```
 
-The direct equivalent, still outside the morning path, is `publish.sh` with no `ADRRR_WINDOW_ENTRY`. While the pin is armed, both upload the pinned tree.
+`check_sections.sh` during prearm, after a failed restore, or after a verified restore exits 3. It does not assemble. `ls-remote` failure exits 3 while the bootstrap is `prearm` or a pin exists. After the morning consume has set the bootstrap to `released` and removed the pin, that same failure prints `WARN: ls-remote failed` and exits 0.
 
-`check_sections.sh` during the window:
+On the armed route, `publish.sh` under the publish lock:
 
-- `ls-remote` failure exits 3. It does not warn-and-exit 0. Without a pin or hold, that failure still prints `WARN: ls-remote failed` and exits 0, which is the previous daily behavior.
-- Remote SHA other than the pinned SHA exits 3. The checkout is not fetched or reset.
-- Script, functions, or artifact drift exits 3.
-- Otherwise it runs `publish.sh` with `BUTTONDOWN_SKIP=1` and `ADRRR_WINDOW_ENTRY=1`. A leaked `ADRRR_PUBLISH_MODE=frozen` is stripped and does not select a build-only path.
+1. Re-checks the pin, the hold, the scripts, the artifact bytes, the local HEAD, and `ls-remote`. No `build_site.py`, no `latest_json.py`, no image refresh, no generator, no `deploy/` swap, no data or cache write.
+2. Copies the pinned files, including inventory-only files, into a temp stage.
+3. Sets the pin to `upload-attempted` and `restore_required` before Wrangler runs. A crash after that mark cannot be aborted into the morning path.
+4. Runs the same Wrangler command as the morning path.
+5. Requires Wrangler exit 0, `Deployment complete`, a deployment-specific `https://<id>.<project>.pages.dev` URL, and `Uploading Functions bundle` when `functions/` is in the stage.
+6. GETs every public artifact path from that deployment URL and compares SHA-256. `ADRRR_READBACK_ORIGIN` is a test transport only.
 
-`publish.sh` on the window route, under the existing publish lock:
-
-1. Re-checks the pin, the hold, the scripts, the artifact bytes, the local HEAD, and `ls-remote`. No `build_site.py`, no `latest_json.py`, no image refresh, no generator, no git fetch, no `deploy/` swap, no data or cache write.
-2. Copies the pinned files into a temp stage and runs the same Wrangler command as the morning path.
-3. Requires Wrangler exit 0, the text `Deployment complete`, a deployment-specific `https://<id>.<project>.pages.dev` URL, and `Uploading Functions bundle` when `functions/` is in the stage. The complete-line alone does not commit.
-4. GETs every public artifact path from that deployment URL and compares SHA-256. `ADRRR_READBACK_ORIGIN` is a test transport only. Leave it unset on the host.
-5. Only then writes `.sections_deployed`:
+Only a matching readback writes `.sections_deployed`:
 
 ```
 <sections sha>
@@ -85,9 +112,19 @@ identity <script_identity> <artifact_identity> <deployment_id>
 url https://<id>.<project>.pages.dev
 ```
 
-The window path does not send mail, even if `BUTTONDOWN_SKIP` is unset. The webhook still passes `BUTTONDOWN_SKIP=1`, so a bug that reached the morning mail block would still skip.
+The window path does not send mail, even if `BUTTONDOWN_SKIP` is unset. The webhook still passes `BUTTONDOWN_SKIP=1`.
 
-A second invocation whose scripts, artifact bytes, and public bytes still match is a no-op: no upload, no mail, no data rewrite. The no-op key is the sections SHA plus the script identity plus the artifact identity plus the read-back bytes. The SHA alone is not enough. If the public bytes differ and the artifact tree is still intact, the entry uploads that same tree again and replaces the marker only after the new deployment reads back. A readback transport failure exits non-zero and does not upload.
+If that new deployment is not verified, the same invocation restores the previous public bytes once:
+
+- With `ADRRR_PAGES_ROLLBACK_LIVE=1` and a rollback deployment UUID, it POSTs the documented Pages endpoint `POST /accounts/{account_id}/pages/projects/{project_name}/deployments/{deployment_id}/rollback` ([Cloudflare API](https://developers.cloudflare.com/api/resources/pages/subresources/projects/subresources/deployments/methods/rollback/)). Wrangler has no `pages deployment rollback` command. API success is not treated as proof.
+- Otherwise it uploads the pinned rollback tree with the same Wrangler command. The tests use this path, or a local command stub that is given the documented URL. They do not call `api.cloudflare.com`.
+- It then GETs the rollback tree's public files and checks the staged inventory locally, including `functions/`, `_headers`, `_redirects`, and dotfiles.
+
+A verified restore sets `restore-verified`, writes no marker, and leaves the hold. The command still exits non-zero because the new tree was not published. The next `check_sections.sh` does not upload again. An explicit `retry-publish` is the only way back to one more upload of the new tree.
+
+A failed restore sets `restore-failed`, writes no marker, prints `EMERGENCY`, and does not loop. The only continuation is `restore --explicit`. That command is capped. Neither path writes a fake marker.
+
+A second invocation whose scripts, artifact bytes, and public bytes still match a committed deployment is a no-op. The no-op key is the sections SHA plus the script identity plus the artifact identity plus the read-back bytes. If the public bytes differ after that commit, the entry fail-closes and does not upload again. A readback transport failure exits non-zero and does not upload.
 
 ## Return to the morning run
 
@@ -97,13 +134,15 @@ After the marker identity is in place and a replay reads back clean:
 python3 /workspace/digest/tools/publish_window.py release-daily --host /workspace/digest
 ```
 
-This does not publish. The next direct `./publish.sh <dated-folder>` is the morning path again: assemble, data JSON rewrite, soft-hero upgrade, mail on the existing weekday rules. `check_sections.sh` between release and that morning run still no-ops or re-uploads the pinned artifacts. It does not assemble. When the morning deploy is verified, `publish.sh` rewrites the marker as the SHA only and deletes the pin and the hold. Later webhook calls with the same SHA take the old unchanged exit and do not refresh.
+This does not publish. The next direct `./publish.sh <dated-folder>` is the morning path again: assemble, data JSON rewrite, soft-hero upgrade, mail on the existing weekday rules. `check_sections.sh` between release and that morning run still no-ops on the frozen transaction. It does not assemble. When the morning deploy is verified, `publish.sh` rewrites the marker as the SHA only, sets the bootstrap to `released`, and deletes the pin and the hold. Later webhook calls with the same SHA take the old unchanged exit and do not refresh.
 
-`abort` deletes the pin and the hold only before a deployment identity is on the marker. That is the supported way to leave an armed window without publishing. After a commit, abort is refused. If both files are removed and the identity marker remains, `check_sections.sh` exits 3. Restore them with `resume --host ... --artifacts <the same tree> --until <future>` and then release, or leave the entry fail-closed. Do not hand-delete the pin in order to refresh.
+`ADRRR_PUBLISH_MODE=frozen` on that authorized morning `publish.sh` exits 3. It does not build a side tree and it does not refresh.
+
+If both pin and hold are removed while the marker still has an identity line, `check_sections.sh` exits 3. Restore them with `resume --host ... --artifacts <the same tree> --until <future>`. If both are removed before any marker identity while the bootstrap is still `prearm`, the entry stays fail-closed. That is not an abort and it is not the daily path.
 
 ## Daily behavior that stays
 
-With no pin, no hold, and a SHA-only marker:
+With bootstrap `released`, no pin, no hold, and a SHA-only marker:
 
 - `check_sections.sh` still exits 0 on `ls-remote` failure, on an empty repo URL, on a missing report folder, and when the remote SHA equals the marker.
 - A changed SHA still runs `publish.sh` with `NETLIFY_MIRROR=0` and `BUTTONDOWN_SKIP=1`.
@@ -113,20 +152,30 @@ With no pin, no hold, and a SHA-only marker:
 - IndexNow and Buttondown failures after a verified morning marker still warn.
 - The opt-in Netlify mirror still ends in `|| true` and stays off unless `NETLIFY_MIRROR=1`.
 - The wrap-URL gate and the sections SHA mismatch still exit before assemble.
-- `ADRRR_PUBLISH_MODE=frozen` on a direct morning `publish.sh`, with no armed window, exits 3. It does not build a side tree and it does not refresh.
+
+## Repository order
+
+PR 34 is the portrait contract. PR 33 is the five Movers names. This package is the publication mechanism. They stay separate reviews. The head that contains all three, with this package's comparison base on the Movers-on-portrait branch, is the tip whose existing `check` job is the remote gate. A local combination is not that gate. The `window-tests` job runs this suite on its own and does not change the `check` job.
+
+## Tests
+
+From the repo root, with no `ADRRR_HOST_ROOT` pointed at the live digest:
+
+```bash
+bash scripts/host-window/run-tests.sh
+```
+
+The script runs `python3 -m unittest scripts.tests.test_publish_window -v` under `strace` and exits non-zero if the trace opens `/workspace/digest` or connects outside loopback. It does not hide or move a production digest. The tests themselves pass `ADRRR_HOST_ROOT` only to their temp directories.
 
 ## Not proven
 
-- The platform may or may not retry a non-zero `check_sections.sh`. The 30-minute cadence is the script's usage comment, not a captured cron. The installed scripts do not need that retry: the next local invocation sees the pin.
-- `build_site.py` is still required by the morning assembler and was not in the snapshot. The window path does not execute it. If the approved artifact directory is missing or was never assembled, arm or the window route fails closed. This package cannot build that tree.
-- HTTP readback proves the pinned public file bytes on the deployment-specific URL. It does not list unexpected extra files. `functions/`, `_redirects`, and `_headers` are pinned and staged, but Pages does not serve them as ordinary URLs, so they are not part of the GET. Functions still require the Wrangler bundle line. That line is not a byte-for-byte readback of the worker.
-- Wrangler can make a deployment the production alias before readback runs. A failed readback does not roll that alias back. The marker stays unwritten, and a later invocation uploads the pinned bytes again.
-- The deployment URL pattern is `https://<id>.<name>.pages.dev` with an id of at least 8 characters. A Wrangler build whose success text does not include that URL fail-closes the window. This was not executed against the live Wrangler.
-- Readback on every committed replay GETs each public file. A transport error fail-closes without uploading. A hash mismatch uploads the pinned tree again.
-- Remote `main` must already be the pinned SHA. This path will not fast-forward the checkout to a GitHub merge commit.
-- Hand-deleting both pin and hold before any marker identity is an abort, and the next pin-less invocation is the daily path. After a commit, the identity marker blocks that fall-through until `resume`.
-- Rolling the scripts back by hand, while an identity marker is still installed, returns the baseline comparator. Baseline `check_sections.sh` reads the whole marker file, so it will not treat that file as the SHA and can assemble. Use `rollback.sh`, which refuses to run while the pin or hold exists.
+- The platform may or may not retry a non-zero `check_sections.sh`. The 30-minute cadence is the script's usage comment, not a captured cron. The installed scripts do not need that retry: the next local invocation sees the hold.
+- `build_site.py` is still required by the morning assembler and was not in the snapshot. The window path does not execute it. If the approved artifact directory is missing, arm or the window route fails closed. This package cannot build that tree.
+- HTTP readback proves the pinned public file bytes on the deployment-specific URL. It does not prove `functions/`, `_headers`, `_redirects`, or dotfiles, and it cannot see extra files that Wrangler stored but the pin did not list. Those paths are in the artifact identity and in the staged upload. Functions still require the Wrangler bundle line. That line is not a byte-for-byte readback of the worker.
+- The documented Pages rollback is the POST above. Tests never set `ADRRR_PAGES_ROLLBACK_LIVE=1` and never call Cloudflare. The fixture proves a stubbed upload whose readback was corrupted, followed by one restore of the previous public bytes and a readback of those bytes. It does not prove a live alias move.
+- The deployment URL pattern is `https://<id>.<name>.pages.dev` with an id of at least 8 characters. A Wrangler build whose success text does not include that URL fail-closes. This was not executed against the live Wrangler.
+- Full host-tree rehearsal, including the real webhook consumer and the live rollback alias, is still an operator step after this package. This checkout did not install, arm, pause, merge, or publish on the live host.
 - `publish.sh.bak-*` copies were not in the snapshot and are not updated.
 - The morning path does not GET the deployment after Wrangler. Its marker is still the log gate above, not a manifest readback. That was left in place so the daily run does not gain a new success condition.
-- The existing marker was not re-checked for a Functions bundle. Its mtime moved at 11:51:52 while the SHA stayed `e8bd0b27`.
-- No live host file was installed, and nothing was merged or deployed.
+- Pages deployment `ec186425` was reported by the operator. It is not in this repository, and this checkout did not read the live host. The GitHub notify job logged HTTP 200 for a ping of `f78a925`; that log is not the Pages deployment id.
+- `589f30cf` is not a commit object in this clone. `668` is not a git SHA. Both stay invalidated as release baselines. No old artifact bytes are stored here.

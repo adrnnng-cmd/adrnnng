@@ -5,7 +5,7 @@
 # Ownership (2026-10-20, approved by Adrian): repo adrnnng-cmd/adrnnng (main) owns everything except news/
 # (/, section folders, shared assets, _redirects except /latest). We own news/ and /latest.
 # Every morning run assembles ONE full tree -> single wrangler deploy.
-# An armed window pin does not assemble: it uploads the pinned artifact tree.
+# A prearm hold fail-closes every caller. An armed pin uploads the pinned tree once.
 set -euo pipefail
 # Unset ADRRR_HOST_ROOT is the live digest. The lock wait default stays 1200s.
 D=${ADRRR_HOST_ROOT:-/workspace/digest}
@@ -18,6 +18,16 @@ ROUTE=$(python3 "$D/tools/publish_window.py" route --host "$D" --entry "${ADRRR_
 if [ "$ROUTE" = "noop" ]; then
   echo "WINDOW: pinned source and artifact already match the verified deployment; no-op"
   exit 0
+fi
+if [ "$ROUTE" = "held" ]; then
+  echo "FAIL-CLOSED: hold is in force; refusing assemble, refresh, upload, and mail"
+  exit 3
+fi
+if [ "$ROUTE" = "restore" ]; then
+  echo "WINDOW: completing one rollback of the previous public bytes; not uploading the new tree"
+  python3 "$D/tools/publish_window.py" restore --host "$D"
+  echo "FAIL-CLOSED: hold remains; marker not written"
+  exit 3
 fi
 if [ "${ADRRR_PUBLISH_MODE:-}" = "frozen" ] && [ "$ROUTE" = "daily" ]; then
   echo "FAIL-CLOSED: ADRRR_PUBLISH_MODE=frozen is not a morning run and there is no armed window"
@@ -41,6 +51,10 @@ if [ "$ROUTE" = "window" ]; then
     echo "DRY_RUN=1: pinned artifacts staged, not uploading"
     rm -rf "$STAGE"
     exit 0
+  fi
+  if ! python3 "$D/tools/publish_window.py" begin-upload --host "$D"; then
+    rm -rf "$STAGE"
+    exit 3
   fi
   set +e
   CF_OUT=$( cd "$D/tools/cfwrangler" && ./node_modules/.bin/wrangler pages deploy . --project-name "$CF_PROJECT" --branch main --commit-dirty=true --cwd "$STAGE" 2>&1 )
