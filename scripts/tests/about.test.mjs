@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { applyHeaders } from '../headers.mjs';
 import { buildSitemaps, extractLocs, isNoindexHtml } from '../sitemap.mjs';
+import { publicLinkAnchors } from '../../assets/js/chrome-html.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const read = (rel) => readFileSync(join(root, rel), 'utf8');
@@ -30,6 +31,14 @@ test('About body in static source is exactly the approved text', () => {
   const html = read('about/index.html');
   assert.equal(bodyParagraphs(html).join(''), APPROVED_BODY);
   assert.doesNotMatch(html, /更正|corrections?/i);
+});
+
+test('About links line follows the approved body and uses the shared footer anchors', () => {
+  const html = read('about/index.html');
+  const between = html.slice(html.indexOf('</article>'), html.indexOf('</main>'));
+  assert.equal(between.replace(/\s+/g, ' ').trim(), `</article> <p class="about-links">${publicLinkAnchors()}</p>`);
+  const article = /<article class="about-body"[^>]*>([\s\S]*?)<\/article>/.exec(html);
+  assert.doesNotMatch(article[1], /buttondown|youtube|substack/i);
 });
 
 test('About page metadata, canonical and brand', () => {
@@ -126,6 +135,9 @@ const PROBE = `(() => {
     h1: document.querySelector('h1')?.textContent,
     logoAlt: document.querySelector('.mast .mark')?.alt,
     bodyRight: Math.max(...[...document.querySelectorAll('.about-body p')].map((p) => r(p).right)),
+    linksRight: r(document.querySelector('.about-links'))?.right ?? 0,
+    aboutLinks: [...document.querySelectorAll('.about-links a')].map((a) => a.textContent + '>' + a.getAttribute('href')),
+    footerPublic: [...document.querySelectorAll('.site-footer .site-links a')].map((a) => a.textContent + '>' + a.getAttribute('href')),
     footerLinks: [...document.querySelectorAll('.site-footer .row span:last-child a')].map((a) => a.textContent + '>' + a.getAttribute('href')),
     aboutAnchors: [...document.querySelectorAll('.site-footer a[href="/about/"]')].map((a) => a.textContent),
     navLinks: [...document.querySelectorAll('.mast-r a')].map((a) => a.textContent + '>' + a.getAttribute('href')),
@@ -169,7 +181,7 @@ test('About renders at phone and desktop widths without overflow, with the foote
     let s = null;
     for (let i = 0; i < 40; i++) {
       s = (await send('Runtime.evaluate', { expression: PROBE, returnByValue: true })).result.value;
-      if (s?.aboutAnchors.length) break;
+      if (s?.aboutAnchors.length && s?.footerPublic.length === 3 && s?.aboutLinks.length === 3) break;
       await new Promise((r) => setTimeout(r, 250));
     }
     assert.deepEqual(s.aboutAnchors, ['About'], `${width} footer About anchor`);
@@ -177,6 +189,10 @@ test('About renders at phone and desktop widths without overflow, with the foote
     assert.equal(s.logoAlt, 'News Chart');
     assert.ok(s.scroll <= s.client, `${width} scroll ${s.scroll} client ${s.client}`);
     assert.ok(s.bodyRight <= s.client, `${width} body text escapes viewport`);
+    assert.ok(s.linksRight <= s.client, `${width} links line escapes viewport`);
+    const publicLine = ['Newsletter>https://buttondown.com/news-chart', 'YouTube>https://www.youtube.com/@news-chart', 'Substack>https://newschart.substack.com/'];
+    assert.deepEqual(s.aboutLinks, publicLine, `${width} About links line`);
+    assert.deepEqual(s.footerPublic, publicLine, `${width} footer public links`);
     assert.deepEqual(s.footerLinks, ['Backtest>/backtest/', 'Movers>/movers/', 'Politician Tracker>/politician-tracker/', 'Morning Report>/news/']);
     assert.ok(!s.navLinks.some((l) => l.includes('/about/')), 'no About in top nav');
     assert.equal(s.newsletter, false);

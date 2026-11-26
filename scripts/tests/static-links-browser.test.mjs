@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { extname, join, dirname, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
+import { PUBLIC_LINKS } from '../../assets/js/chrome-html.js';
 
 // Real Chrome against the committed files: with scripting off (what a crawler without JS sees), with scripting on
 // (no duplicate, no disappearing link, no overflow, same layout), and with browser caches from before this change.
@@ -14,7 +15,8 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const OLD = join(root, 'scripts/tests/fixtures/pre-static');
 const SHOT_DIR = process.env.STATIC_SHOT_DIR || '';
 const CANONICAL = ['/backtest/', '/movers/', '/politician-tracker/', '/news/'];
-const FOOTER = [...CANONICAL, '/about/'];
+const PUBLIC = PUBLIC_LINKS.map((link) => link.href);
+const FOOTER = [...CANONICAL, ...PUBLIC, '/about/'];
 
 const types = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
@@ -301,6 +303,7 @@ test('an empty shared shell still receives the same scripted header and footer, 
   assert.deepEqual(dupes(s.header), []);
   assert.deepEqual(s.footer, CANONICAL);
   assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('[data-site-footer] .fine a')].map((a) => a.getAttribute('href'))`), ['/about/']);
+  assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('[data-site-footer] .site-links a')].map((a) => a.textContent + '>' + a.getAttribute('href') + '>' + a.getAttribute('target') + '>' + a.getAttribute('rel'))`), PUBLIC_LINKS.map((link) => `${link.label}>${link.href}>_blank>noopener noreferrer`));
   assert.deepEqual(s.current, ['/backtest/']);
   assert.equal(s.toggles, 1);
   await page.close();
