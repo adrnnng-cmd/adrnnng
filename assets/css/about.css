@@ -11,8 +11,12 @@
 }
 .about-body p + p, .about-links { margin-top: 1.1em; }
 .about-links { max-width: 34em; padding-bottom: 24px; }
-.about-links a { text-decoration: none; }
-.about-links a:hover { text-decoration: underline; }
+.about-links a,
+.about-links a:hover {
+  color: var(--link);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
 @media (max-width: 640px) {
   .about { padding-top: 36px; }
   .about-body p, .about-links { font-size: 17px; line-height: 1.85; }

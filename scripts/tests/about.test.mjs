@@ -130,6 +130,11 @@ function cdp(ws) {
 const PROBE = `(() => {
   const doc = document.documentElement;
   const r = (el) => el && el.getBoundingClientRect();
+  const look = (el) => {
+    if (!el) return null;
+    const s = getComputedStyle(el);
+    return { color: s.color, deco: s.textDecorationLine, offset: s.textUnderlineOffset };
+  };
   return {
     scroll: doc.scrollWidth, client: doc.clientWidth,
     h1: document.querySelector('h1')?.textContent,
@@ -138,6 +143,10 @@ const PROBE = `(() => {
     linksRight: r(document.querySelector('.about-links'))?.right ?? 0,
     aboutLinks: [...document.querySelectorAll('.about-links a')].map((a) => a.textContent + '>' + a.getAttribute('href')),
     footerPublic: [...document.querySelectorAll('.site-footer .site-links a')].map((a) => a.textContent + '>' + a.getAttribute('href')),
+    aboutLook: look(document.querySelector('.about-links a')),
+    footerPublicLook: look(document.querySelector('.site-footer .site-links a')),
+    footerNavLook: look(document.querySelector('.site-footer .row a')),
+    footerAboutLook: look(document.querySelector('.site-footer .fine a')),
     footerLinks: [...document.querySelectorAll('.site-footer .row span:last-child a')].map((a) => a.textContent + '>' + a.getAttribute('href')),
     aboutAnchors: [...document.querySelectorAll('.site-footer a[href="/about/"]')].map((a) => a.textContent),
     navLinks: [...document.querySelectorAll('.mast-r a')].map((a) => a.textContent + '>' + a.getAttribute('href')),
@@ -191,8 +200,15 @@ test('About renders at phone and desktop widths without overflow, with the foote
     assert.ok(s.bodyRight <= s.client, `${width} body text escapes viewport`);
     assert.ok(s.linksRight <= s.client, `${width} links line escapes viewport`);
     const publicLine = ['Newsletter>https://buttondown.com/news-chart', 'YouTube>https://www.youtube.com/@news-chart', 'Substack>https://newschart.substack.com/'];
+    const linkLook = { color: 'rgb(26, 63, 209)', deco: 'underline', offset: '3px' };
     assert.deepEqual(s.aboutLinks, publicLine, `${width} About links line`);
     assert.deepEqual(s.footerPublic, publicLine, `${width} footer public links`);
+    assert.deepEqual(s.aboutLook, linkLook, `${width} About public links look like links`);
+    assert.deepEqual(s.footerPublicLook, linkLook, `${width} footer public links look like links`);
+    assert.equal(s.footerNavLook.color, 'rgb(51, 51, 51)', `${width} section nav keeps its color`);
+    assert.equal(s.footerNavLook.deco, 'none', `${width} section nav is not underlined at rest`);
+    assert.equal(s.footerAboutLook.color, 'rgb(51, 51, 51)', `${width} footer About keeps its color`);
+    assert.equal(s.footerAboutLook.deco, 'none', `${width} footer About is not underlined at rest`);
     assert.deepEqual(s.footerLinks, ['Backtest>/backtest/', 'Movers>/movers/', 'Politician Tracker>/politician-tracker/', 'Morning Report>/news/']);
     assert.ok(!s.navLinks.some((l) => l.includes('/about/')), 'no About in top nav');
     assert.equal(s.newsletter, false);
