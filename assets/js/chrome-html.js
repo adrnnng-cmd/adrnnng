@@ -33,6 +33,17 @@ export function headerInner(reg, { path = '', home = false, date = '', toggle = 
   ].filter(Boolean).join('\n');
 }
 
+/** Outbound destinations. The site footer and the About links line both use these anchors. */
+export const PUBLIC_LINKS = [
+  { label: 'Newsletter', href: 'https://buttondown.com/news-chart' },
+  { label: 'YouTube', href: 'https://www.youtube.com/@news-chart' },
+  { label: 'Substack', href: 'https://newschart.substack.com/' },
+];
+
+export function publicLinkAnchors() {
+  return PUBLIC_LINKS.map((link) => `<a href="${esc(link.href)}" target="_blank" rel="noopener noreferrer">${esc(link.label)}</a>`).join(' · ');
+}
+
 export function footerInner(reg) {
   const live = reg.tools.filter((t) => t.href);
   return [
@@ -41,6 +52,7 @@ export function footerInner(reg) {
     `    <span>${esc(reg.site.owner)} · Hong Kong · ${esc(reg.site.name)}</span>`,
     `    <span>${live.map((t) => `<a href="${esc(t.href)}">${esc(t.title)}</a>`).join(' · ')}</span>`,
     '  </div>',
+    `  <div class="site-links">${publicLinkAnchors()}</div>`,
     '  <div class="fine">Research and education only. Not investment advice. Backtests are hypothetical and do not predict future results. <a href="/about/">About</a></div>',
     '</div>',
   ].join('\n');

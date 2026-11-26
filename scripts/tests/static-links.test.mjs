@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-import { doorsInner, footerInner, headerInner } from '../../assets/js/chrome-html.js';
+import { doorsInner, footerInner, headerInner, PUBLIC_LINKS, publicLinkAnchors } from '../../assets/js/chrome-html.js';
 import { pages, plan, staleFiles, staticChromeError, writeAll } from '../static-chrome.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -49,8 +49,15 @@ test('every door card has its visible name and a description in the source, not 
 test('links are the canonical production paths: relative, no preview host, no legacy /hk-movers/', () => {
   const html = read('index.html');
   const chrome = [part(html, HEADER), part(html, FOOTER), part(html, DOORS)].join('\n');
-  assert.doesNotMatch(chrome, /hk-movers|localhost|127\.0\.0\.1|pages\.dev|workers\.dev|demo|preview|https?:\/\/(?!buttondown)/i);
-  for (const href of hrefs(chrome)) assert.match(href, /^\/(?:[a-z-]+\/)?$/, href);
+  const publicHrefs = new Set(PUBLIC_LINKS.map((link) => link.href));
+  const internal = chrome.replace(publicLinkAnchors(), '');
+  assert.doesNotMatch(internal, /hk-movers|localhost|127\.0\.0\.1|pages\.dev|workers\.dev|demo|preview|https?:\/\/(?!buttondown)/i);
+  for (const href of hrefs(chrome)) {
+    if (publicHrefs.has(href)) continue;
+    assert.match(href, /^\/(?:[a-z-]+\/)?$/, href);
+  }
+  assert.match(part(html, FOOTER), new RegExp(publicLinkAnchors().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.deepEqual(PUBLIC_LINKS.map((link) => link.label), ['Newsletter', 'YouTube', 'Substack']);
 });
 
 test('pages outside the homepage stay the live empty chrome shells', () => {

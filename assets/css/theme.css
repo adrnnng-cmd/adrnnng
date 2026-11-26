@@ -143,10 +143,16 @@ p { margin: 0; }
 }
 .site-footer a, .foot a { color: var(--text-2); text-decoration: none; }
 .site-footer a:hover, .foot a:hover { text-decoration: underline; }
+.site-footer .site-links a,
+.site-footer .site-links a:hover {
+  color: var(--link);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
 .site-footer .colophon { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: baseline; }
 .site-footer .colophon .brand-en { font-size: 16px; color: var(--text); }
 .site-footer nav { display: flex; flex-wrap: wrap; gap: 8px 14px; }
-.site-footer .fine { width: 100%; }
+.site-footer .fine, .site-footer .site-links { width: 100%; }
 
 /* ---------- Buttons ---------- */
 .btn {
