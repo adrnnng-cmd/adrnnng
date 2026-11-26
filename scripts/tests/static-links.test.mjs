@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-import { doorsInner, footerInner, headerInner, PUBLIC_LINKS, publicLinkAnchors } from '../../assets/js/chrome-html.js';
+import { doorsInner, footerInner, headerInner, PUBLIC_LINKS, publicLinkAnchors, TOP_NAV } from '../../assets/js/chrome-html.js';
 import { pages, plan, staleFiles, staticChromeError, writeAll } from '../static-chrome.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -31,8 +31,17 @@ test('home page source carries real links to /backtest/, /movers/, /politician-t
     assert.ok(hrefs(part(html, FOOTER)).includes(href), `footer links ${href}`);
   }
   assert.deepEqual(hrefs(doors), CANONICAL, 'one card per section, in the cover order');
-  assert.ok(hrefs(part(html, HEADER)).includes('/news/'), 'the header Morning Report link');
-  assert.match(part(html, HEADER), /<a class="logo" href="\/"/);
+  assert.deepEqual(TOP_NAV.map((item) => item.href), ['/news/', '/movers/', '/politician-tracker/', '/backtest/']);
+  assert.deepEqual(TOP_NAV.map((item) => item.label), ['晨報', '港股異動', '政治人物持股動向', '策略回測']);
+  const header = part(html, HEADER);
+  assert.deepEqual(hrefs(header).filter((href) => href !== '/'), TOP_NAV.map((item) => item.href), 'top menu order');
+  for (const item of TOP_NAV) assert.match(header, new RegExp(`<a href="${item.href}">${item.label}</a>`));
+  assert.match(header, /<a class="logo" href="\/" aria-label="News Chart home"><img class="mark" src="\/assets\/brand\/news-chart-white\.svg"/);
+  assert.match(header, /<button class="nav-toggle" aria-label="Menu" aria-expanded="false"><span><\/span><\/button>/);
+  assert.doesNotMatch(header, /class="box"|target="_blank"|Morning Report|港股異動與板塊熱力圖/);
+  assert.match(headerInner(registry, { path: '/news/20261126/' }), /<a href="\/news\/" aria-current="page">晨報<\/a>/);
+  assert.match(headerInner(registry, { path: '/movers/' }), /<a href="\/movers\/" aria-current="page">港股異動<\/a>/);
+  assert.doesNotMatch(headerInner(registry, { path: '/' }), /aria-current/);
 });
 
 test('every door card has its visible name and a description in the source, not only links', () => {
@@ -118,7 +127,10 @@ test('the generator keeps everything outside the three regions byte for byte', (
     writeAll(tmp);
     const strip = (html) => html.replace(HEADER, '$1$3').replace(FOOTER, '$1$3').replace(DOORS, '$1$3');
     for (const p of plan(tmp)) assert.equal(strip(readFileSync(join(tmp, p.file), 'utf8')), strip(read(p.file)), p.file);
-    assert.match(readFileSync(join(tmp, 'index.html'), 'utf8'), /<a class="box" href="\/news\/">Morning Brief<\/a>/, 'the registry title flows into the static header');
+    const stamped = readFileSync(join(tmp, 'index.html'), 'utf8');
+    assert.match(part(stamped, HEADER), /<a href="\/news\/">晨報<\/a>/, 'the top menu label stays the shared contract');
+    assert.doesNotMatch(part(stamped, HEADER), /Morning Brief|class="box"/);
+    assert.match(part(stamped, FOOTER), />Morning Brief</, 'the registry title still flows into the footer');
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }
@@ -149,8 +161,12 @@ test('npm run new-tool leaves the new section in every static header, footer and
 
 test('the browser module and the generator draw the same markup from one function', () => {
   const home = read('index.html');
+  const norm = (text) => text.replace(/^/gm, '    ').trim();
   assert.equal(part(home, FOOTER).trim(), footerInner(registry).replace(/^/gm, '    ').trim());
-  assert.equal(part(home, HEADER).trim(), headerInner(registry, { path: '/', home: true }).replace(/^/gm, '    ').trim());
+  assert.equal(part(home, HEADER).trim(), norm(headerInner(registry, { path: '/' })));
+  assert.equal(part(read('movers/index.html'), HEADER).trim(), norm(headerInner(registry, { path: '/movers/' })));
+  assert.equal(part(read('about/index.html'), HEADER).trim(), norm(headerInner(registry, { path: '/about/' })));
+  assert.equal(part(read('backtest/index.html'), HEADER).trim(), norm(headerInner(registry, { path: '/backtest/' })));
   assert.equal(part(home, DOORS).trim(), doorsInner(registry).trim());
   const site = read('assets/js/site.js');
   const homeJs = read('assets/js/home.js');

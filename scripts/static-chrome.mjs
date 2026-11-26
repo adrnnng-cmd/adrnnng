@@ -1,8 +1,9 @@
 // Writes the homepage header, footer and four door cards into index.html as real links.
 //
-// The approved static pages are the homepage, the News Analyst pages (outside this repo) and the Politician
-// Tracker (its own renderer). /backtest/, /movers/, /thanks/, /about/, 404 and the tool template stay the
-// bytes on live main. site.js still fills those empty shells in the browser, as it does on main.
+// The top menu itself is headerInner() in assets/js/chrome-html.js (TOP_NAV). /movers/, /about/ and
+// /backtest/ commit that same header by hand; their footers stay empty shells that site.js fills.
+// /thanks/, 404 and the tool template stay empty shells. The Politician Tracker renderer emits the same
+// header. /news/ is not in this repo.
 //
 //   node scripts/static-chrome.mjs           rewrite index.html in place
 //   node scripts/static-chrome.mjs --check   exit 1 when index.html is stale (npm run check does this too)

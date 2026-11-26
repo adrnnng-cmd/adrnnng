@@ -259,7 +259,8 @@ test('scripting on: links stay where they are, none is duplicated or removed, la
     assert.deepEqual(s.footer, FOOTER, name);
     assert.deepEqual(dupes(s.header), [], `${name}: no duplicate header link`);
     assert.equal(s.toggles, 1, 'one Menu button');
-    assert.equal(s.boxes, 1, 'one Morning Report box');
+    assert.equal(s.boxes, 0, 'the four menu links are plain text');
+    assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('[data-site-header] .mast-r a')].map((a) => a.textContent + '>' + a.getAttribute('href') + '>' + (a.getAttribute('target') || ''))`), ['晨報>/news/>', '港股異動>/movers/>', '政治人物持股動向>/politician-tracker/>', '策略回測>/backtest/>']);
     assert.deepEqual(s.names, ['Backtest', 'Movers', 'Politician Tracker', 'Morning Report']);
     assert.deepEqual(s.bodies, [1, 1, 1, 1], 'one body per card');
     assert.equal(s.overflow, 0, `${name}: no horizontal scroll`);
