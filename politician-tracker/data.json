@@ -1,6 +1,6 @@
 {
- "generated_at": "2026-11-25T13:23:05+08:00",
- "window_start": "2026-07-28",
+ "generated_at": "2026-11-26T12:55:53+08:00",
+ "window_start": "2026-07-29",
  "stale": false,
  "sources": [
   {
@@ -18,13 +18,13 @@
   {
    "name": "Senate eFD filings",
    "ok": true,
-   "count": 52,
+   "count": 53,
    "note": ""
   },
   {
    "name": "Senate eFD transactions",
    "ok": true,
-   "count": 525,
+   "count": 528,
    "note": ""
   },
   {
@@ -36,13 +36,13 @@
   {
    "name": "Quiver VIP pages",
    "ok": true,
-   "count": 35326,
+   "count": 5959,
    "note": "Lisa McClain: GET https://www.quiverquant.com/congresstrading/politician/Lisa%20McClain-M001136 failed: HTTP Error 429: Too Many Requests; Cleo Fields: GET http"
   },
   {
    "name": "House Clerk index 2026",
    "ok": true,
-   "count": 481,
+   "count": 483,
    "note": ""
   }
  ],
@@ -1754,7 +1754,7 @@
    "chamber": "House",
    "ticker": "MSFT",
    "company": "Microsoft Corporation - Common Stock",
-   "tx": "Buy",
+   "tx": "Sell",
    "amount": "$250K–$500K",
    "trade_date": "2026-08-14",
    "filed_date": "2026-09-14",
@@ -1764,7 +1764,7 @@
    "owner": "",
    "asset_type": "Options",
    "comment": "",
-   "filing_id": "House-G000583-3598",
+   "filing_id": "House-G000583-3600",
    "source_url": "https://disclosures-clerk.house.gov/public_disc/ptr-pdfs/2026/20035455.pdf",
    "source_label": "House PTR",
    "alt_url": "https://www.quiverquant.com/congresstrading/politician/Josh%20Gottheimer-G000583",
@@ -1781,7 +1781,7 @@
    "ticker": "MSFT",
    "company": "Microsoft Corporation - Common Stock",
    "tx": "Sell",
-   "amount": "$250K–$500K",
+   "amount": "$500K–$1M",
    "trade_date": "2026-08-14",
    "filed_date": "2026-09-14",
    "party": "D",
@@ -1790,7 +1790,7 @@
    "owner": "",
    "asset_type": "Options",
    "comment": "",
-   "filing_id": "House-G000583-3600",
+   "filing_id": "House-G000583-3601",
    "source_url": "https://disclosures-clerk.house.gov/public_disc/ptr-pdfs/2026/20035455.pdf",
    "source_label": "House PTR",
    "alt_url": "https://www.quiverquant.com/congresstrading/politician/Josh%20Gottheimer-G000583",
@@ -1832,8 +1832,8 @@
    "chamber": "House",
    "ticker": "MSFT",
    "company": "Microsoft Corporation - Common Stock",
-   "tx": "Sell",
-   "amount": "$500K–$1M",
+   "tx": "Buy",
+   "amount": "$250K–$500K",
    "trade_date": "2026-08-14",
    "filed_date": "2026-09-14",
    "party": "D",
@@ -1842,7 +1842,7 @@
    "owner": "",
    "asset_type": "Options",
    "comment": "",
-   "filing_id": "House-G000583-3601",
+   "filing_id": "House-G000583-3598",
    "source_url": "https://disclosures-clerk.house.gov/public_disc/ptr-pdfs/2026/20035455.pdf",
    "source_label": "House PTR",
    "alt_url": "https://www.quiverquant.com/congresstrading/politician/Josh%20Gottheimer-G000583",
