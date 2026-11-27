@@ -109,7 +109,7 @@ test('domain files, price data, and News Analyst stampers stay on the old contra
 
   assert.equal(PRODUCT_NAME, 'News Chart');
   assert.equal(HOME_TITLE, '港股美股盤前早報｜News Chart');
-  assert.equal(HOME_DESCRIPTION, '每日港美股晨報，爭取每朝 9 點前更新。News Chart by ADRRR — 訂閱電郵，追蹤盤前重點、政治人物持股與回測工具。');
+  assert.equal(HOME_DESCRIPTION, '港股美股早報，每朝 9 點前。News Chart by ADRRR — 訂閱電郵，追蹤盤前重點、政治人物持股與回測工具。');
   assert.match(ARCHIVE_TITLE, /— News Chart$/);
   assert.match(ARCHIVE_DESCRIPTION, /^News Chart /);
   assert.equal(RSS_TITLE, 'News Chart Morning Report');
