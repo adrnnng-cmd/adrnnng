@@ -186,7 +186,7 @@ on the site yet.
 | bar paths | `/backtest/data/hsi/` | `v1/1m/manifest.json`, `v1/1m/YYYY.bin`, optional `v1/1d/HSImain.csv` |
 | result paths | `/backtest/data/hsi/` | `v1/results/{1\|5\|30\|60}m-{10\|11\|12\|13\|14}/all.json.gz` |
 
-`_routes.json` sends only `/backtest/data/hsi/*` through a Function. The rest of the site stays static.
+`_routes.json` includes `/*` so `functions/_middleware.js` can 301 `utm_*` and other click ids on `news-chart.com` to the same path. `/latest`, `/backtesting`, `/hsi-lab`, and the `/hk-movers` page aliases stay excluded, so `_redirects` still owns them. A request with no tracking parameters calls `next()`, and the static page or the HSI Function answers as before.
 Minute objects are `v1/1m/YYYY.bin` (magic `HSI1`). Every equity and index on the page has daily bars
 in the site files. HSI futures daily, weekly, and monthly use `v1/1d/HSImain.csv` when that file is
 published. 1m, 5m, 30m, and 1h stay disabled for every other ticker, and choosing them locks the
@@ -432,7 +432,7 @@ scripts/hk-movers/schema.json                 JSON Schema of the document
 
 | Item | Value |
 | --- | --- |
-| Route | `GET /movers/data/latest` (canonical) and `GET /hk-movers/data/latest` (old path, same document, same KV key); both are listed in `_routes.json`, everything else stays static |
+| Route | `GET /movers/data/latest` (canonical) and `GET /hk-movers/data/latest` (old path, same document, same KV key). `/*` invokes Functions and neither path is excluded. `_redirects` still owns `/hk-movers`, `/hk-movers/`, and `/hk-movers/data/sample.json` |
 | Old page URL | `_redirects` sends `/hk-movers`, `/hk-movers/` and `/hk-movers/data/sample.json` to the `/movers/` equivalents with 301. The old data route is deliberately not redirected: it stays a live Function, so the collector, cached pages and anything polling it keep working without depending on how Pages orders redirects and Functions. Redirects do not carry a `?query` on their own in the documented behaviour, so verify `?view=hstech` on the preview before relying on it. |
 | KV key | `hk-movers:latest.json` |
 | Binding | `env.HK_MOVERS`, else `env.HSI_BARS` (already bound). Add a dedicated `HK_MOVERS` binding later and the Function switches with no code change. |

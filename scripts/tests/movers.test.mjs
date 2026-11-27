@@ -388,9 +388,11 @@ test('Function answers 404 JSON without a demo source, 405 for writes, and no bo
 
 // -------------------------------------------------------------------- wiring
 
-test('_routes.json sends only the Function path through Functions', () => {
+test('_routes.json invokes Functions site-wide and still covers the movers snapshot', () => {
   const routes = JSON.parse(read('_routes.json'));
-  assert.deepEqual(routes.include, ['/backtest/data/hsi/*', '/movers/data/latest', '/hk-movers/data/latest']);
+  assert.deepEqual(routes.include, ['/*']);
+  assert.equal(routes.exclude.includes('/movers/data/latest'), false);
+  assert.equal(routes.exclude.includes('/hk-movers/data/latest'), false);
 });
 
 test('registry, sitemap, headers and llms.txt know the page', () => {

@@ -93,11 +93,13 @@ test('onRequest reads the HSI_BARS binding', async () => {
   assert.equal(kv.calls[0].key, 'v1/1m/2026.bin');
 });
 
-test('routes invoke a function only for the hsi bar paths and the movers snapshot (new and old path)', () => {
+test('routes invoke functions site-wide, including the hsi bar paths, and do not exclude them', () => {
   const routes = JSON.parse(readFileSync(join(root, '_routes.json'), 'utf8'));
   assert.equal(routes.version, 1);
-  assert.deepEqual(routes.include, ['/backtest/data/hsi/*', '/movers/data/latest', '/hk-movers/data/latest']);
-  assert.deepEqual(routes.exclude, []);
+  assert.deepEqual(routes.include, ['/*']);
+  assert.equal(routes.exclude.some((rule) => rule.startsWith('/backtest/data/hsi')), false);
+  assert.equal(routes.exclude.includes('/movers/data/latest'), false);
+  assert.equal(routes.exclude.includes('/hk-movers/data/latest'), false);
 });
 
 test('the pages function does not name a data vendor', () => {
