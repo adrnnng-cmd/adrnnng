@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import {
   ARCHIVE_DESCRIPTION,
+  HOME_DESCRIPTION,
   HOME_H1,
   HOME_TITLE,
   applyHomePreview,
@@ -93,6 +94,10 @@ test('digest serp_hook wins, including an explicit empty string', async () => {
   const after = await readFile(join(site, 'news', '20261026', 'index.html'));
   assert.equal(after.equals(before), true);
   const home = await readFile(join(site, 'index.html'), 'utf8');
+  assert.match(home, new RegExp(`name="description" content="${HOME_DESCRIPTION}"`));
+  assert.match(home, new RegExp(`property="og:description" content="${HOME_DESCRIPTION}"`));
+  assert.match(home, new RegExp(`name="twitter:description" content="${HOME_DESCRIPTION}"`));
+  assert.doesNotMatch(home, /爭取/);
   assert.match(home, new RegExp(`<h1 id="report-lead"><a href="/news/20261026/">${HOME_H1}</a></h1>`));
   assert.match(home, /id="report-link" href="\/news\/20261026\/"/);
   assert.match(home, /Lead headline for the fixture edition/);
@@ -125,7 +130,10 @@ test('committed home, backtest, and redirects are crawlable', async () => {
   const redirects = await read('_redirects');
   assert.match(home, /<html lang="zh-Hant-HK">/);
   assert.match(home, /<title>港股美股盤前早報｜News Chart<\/title>/);
-  assert.match(home, /每日港美股晨報，爭取每朝 9 點前更新。News Chart by ADRRR — 訂閱電郵，追蹤盤前重點、政治人物持股與回測工具。/);
+  assert.match(home, new RegExp(`name="description" content="${HOME_DESCRIPTION}"`));
+  assert.match(home, new RegExp(`property="og:description" content="${HOME_DESCRIPTION}"`));
+  assert.match(home, new RegExp(`name="twitter:description" content="${HOME_DESCRIPTION}"`));
+  assert.doesNotMatch(home, /爭取/);
   assert.equal(HOME_TITLE, '港股美股盤前早報｜News Chart');
   assert.match(home, /<h1 id="report-lead"><a href="\/news\/\d{8}\/">港股美股盤前早報<\/a><\/h1>/);
   const dek = /<p class="dek" id="report-dek">([^<]+)<\/p>/.exec(home);
