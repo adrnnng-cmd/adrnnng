@@ -235,7 +235,10 @@ test('redirects: the old page goes to /movers/ once, nothing loops, the data fun
   assert.equal(rules.some(([from]) => from.startsWith('/hk-movers/data/latest')), false, 'the live feed is not redirected');
   assert.equal(rules.some(([from]) => /\*/.test(from) && from.startsWith('/hk-movers')), false, 'no splat that could capture the feed');
   const routes = JSON.parse(read('_routes.json'));
-  assert.ok(routes.include.includes('/movers/data/latest') && routes.include.includes('/hk-movers/data/latest'));
+  assert.ok(routes.include.includes('/*'));
+  assert.equal(routes.exclude.includes('/movers/data/latest'), false);
+  assert.equal(routes.exclude.includes('/hk-movers/data/latest'), false);
+  assert.equal(routes.exclude.includes('/hk-movers/data/sample.json'), true);
 });
 
 test('canonical /movers/ everywhere users or crawlers look; the old URL only in the redirect and compat files', () => {

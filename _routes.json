@@ -1,5 +1,15 @@
 {
   "version": 1,
-  "include": ["/backtest/data/hsi/*", "/movers/data/latest", "/hk-movers/data/latest"],
-  "exclude": []
+  "include": ["/*"],
+  "exclude": [
+    "/latest",
+    "/latest/*",
+    "/backtesting",
+    "/backtesting/*",
+    "/hsi-lab",
+    "/hsi-lab/",
+    "/hk-movers",
+    "/hk-movers/",
+    "/hk-movers/data/sample.json"
+  ]
 }
