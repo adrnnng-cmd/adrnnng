@@ -35,9 +35,9 @@ test('current pages use the News Chart wordmark and keep the live host', () => {
   assert.match(home, /title="News Chart Morning Report"/);
   assert.match(home, /embed-subscribe\/adrrr/);
   assert.match(home, /https:\/\/buttondown\.com\/adrrr/);
-  assert.match(home, /2026年11月26日（四）/);
-  assert.match(home, /href="\/news\/20261126\/"/);
-  assert.match(home, /華府擬對華加徵最高20%關稅/);
+  assert.match(home, /2026年11月27日（五）/);
+  assert.match(home, /href="\/news\/20261127\/"/);
+  assert.match(home, /亞洲股市連升兩日，布蘭特原油站上96美元/);
   assert.doesNotMatch(home, /港美股新聞、圖表與市場工具/);
   assert.doesNotMatch(home, /adrrr-wordmark/);
   assert.match(home, /news-chart\.com/);
