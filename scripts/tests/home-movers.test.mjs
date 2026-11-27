@@ -290,7 +290,7 @@ test('home doors lay out 2x2 at 1280 and one column at 390 with no overflow, cli
   assert.equal(head.h1, '港股異動 Movers');
   assert.equal(head.sub, '港股異動與板塊熱力圖');
   assert.deepEqual(head.footer, ['Backtest>/backtest/', 'Movers>/movers/', 'Politician Tracker>/politician-tracker/', 'Morning Report>/news/']);
-  assert.ok(head.nav.includes('Movers>/movers/') && !head.nav.some((n) => n.startsWith('港股異動')));
+  assert.deepEqual(head.nav, ['晨報>/news/', '港股異動>/movers/', '政治人物持股動向>/politician-tracker/', '策略回測>/backtest/']);
   await shot(sub, 'movers-subpage-1280.png', 'top');
   await sub.close();
 
@@ -304,7 +304,7 @@ test('home doors lay out 2x2 at 1280 and one column at 390 with no overflow, cli
   assert.ok(menu.scroll <= menu.client, 'subpage has no horizontal overflow at 390');
   await mob.evaluate(`document.querySelector('.nav-toggle').click()`);
   const links = await mob.evaluate(`[...document.querySelectorAll('.mast-r a')].map((a) => a.textContent.trim() + '>' + a.getAttribute('href') + '>' + (getComputedStyle(a).display !== 'none'))`);
-  assert.ok(links.includes('Movers>/movers/>true'), links.join(' | '));
+  assert.deepEqual(links, ['晨報>/news/>true', '港股異動>/movers/>true', '政治人物持股動向>/politician-tracker/>true', '策略回測>/backtest/>true']);
   await settle(300);
   await shot(mob, 'movers-subpage-390-menu.png', 'top');
   await mob.close();

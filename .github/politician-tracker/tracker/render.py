@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import json
 import statistics
 from datetime import date, datetime, timedelta
 from html import escape
-from pathlib import Path
 
 from .model import band_min, display_ticker, parse_date
 
@@ -41,18 +39,22 @@ body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:16p
 a{color:inherit}
 .wrap{max-width:1200px;margin:0 auto;padding:0 20px}
 .num,.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
-.mast{background:#000;color:#fff}
+.mast{background:#000;color:#fff;border-bottom:0}
 .mast-in{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:60px;padding-top:10px;padding-bottom:10px}
-.logo{text-decoration:none;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;min-width:0}
+.logo{text-decoration:none;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;min-width:0;color:#fff;flex-shrink:0}
 .logo .en{font-family:var(--serif);font-weight:700;font-size:26px;letter-spacing:.02em;line-height:1}
-.logo img{height:17px;width:auto;display:block}
+.logo img{display:block;height:17px;width:auto}
 .logo .zh{font-size:13px;font-weight:500;color:#bdbdbd;letter-spacing:.08em}
 .mast-r{display:flex;align-items:center;gap:16px;font-size:12px;color:#cfcfcf;white-space:nowrap}
 .mast-r .d{font-family:var(--mono);letter-spacing:.04em}
-.mast-r a{color:#fff;text-decoration:none;font-weight:600;border:1px solid #555;padding:4px 10px;border-radius:2px}
-.mast-r a:hover{border-color:#fff}
-.mast-r a.nv{border:0;padding:4px 0;font-weight:500;color:#cfcfcf}.mast-r a.nv:hover{color:#fff;text-decoration:underline}
-@media(max-width:560px){.mast-r .d{display:none}.logo .zh{display:none}.mast-r{gap:12px}}
+.mast-r a{color:#fff;text-decoration:none;font-weight:500}
+.mast-r a:hover{text-decoration:underline;text-underline-offset:4px}
+.mast-r a[aria-current=page]{font-weight:600;color:#fff}
+.nav-toggle{display:none;background:none;border:1px solid #555;border-radius:2px;width:40px;height:36px;cursor:pointer}
+.nav-toggle span,.nav-toggle span::before,.nav-toggle span::after{display:block;width:16px;height:1.5px;background:#fff;margin:0 auto;position:relative;content:''}
+.nav-toggle span::before{position:absolute;top:-5px}
+.nav-toggle span::after{position:absolute;top:5px}
+@media(max-width:760px){.nav-toggle{display:block}.logo .zh{display:none}.mast-r{display:none;position:absolute;left:0;right:0;top:100%;flex-direction:column;align-items:stretch;gap:0;white-space:normal;background:#000;padding:8px 16px 14px;border-top:1px solid #333}.mast[data-open=true] .mast-r{display:flex}.mast-r a{padding:10px 0;border-bottom:1px solid #222}.mast{position:relative}}
 .edition{padding:26px 0 18px;border-bottom:1px solid var(--rule)}
 .kicker{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase}
 .kicker .sep{color:var(--mut2);margin:0 6px}
@@ -320,19 +322,21 @@ def _stats(trades: list[dict], today: date) -> list[tuple[str, str, str, str]]:
     ]
 
 
-TOOLS_REGISTRY = Path(__file__).resolve().parents[3] / "assets" / "tools.json"
+# Same list as TOP_NAV in assets/js/chrome-html.js. Short Chinese labels, this order.
+TOP_NAV = (
+    ("/news/", "晨報"),
+    ("/movers/", "港股異動"),
+    ("/politician-tracker/", "政治人物持股動向"),
+    ("/backtest/", "策略回測"),
+)
 
 
-def _site_nav(site: dict) -> str:
-    """Links to the other tools in the site registry (assets/tools.json), when this builder runs
-    inside the site repo. Outside it the masthead keeps only the Morning Report link."""
-    try:
-        tools = json.loads(TOOLS_REGISTRY.read_text("utf-8"))["tools"]
-    except (OSError, ValueError, KeyError):
-        return ""
-    skip = {f"/{site['path']}/", site.get("archive_url")}
-    links = [t for t in tools if t.get("nav") and t.get("href") and t["href"] not in skip]
-    return "".join(f'<a class="nv" href="{_e(t["href"])}">{_e(t["title"])}</a>' for t in links)
+def _top_nav(path: str) -> str:
+    parts = []
+    for href, label in TOP_NAV:
+        current = ' aria-current="page"' if path == href or path.startswith(href) else ""
+        parts.append(f'<a href="{href}"{current}>{label}</a>')
+    return "".join(parts)
 
 
 def render_page(cfg: dict, payload: dict, now: datetime) -> str:
@@ -464,9 +468,10 @@ def render_page(cfg: dict, payload: dict, now: datetime) -> str:
 <link rel="stylesheet" href="/assets/css/newsletter.css">
 <style>{CSS}</style></head>
 <body data-today="{today.isoformat()}">
-<header class="mast"><div class="wrap mast-in">
-<a class="logo" href="{_e(site.get('home_url', '/'))}"><img src="/assets/brand/news-chart-white.svg" alt="News Chart" height="17"><span class="zh">政治人物持股動向</span></a>
-<div class="mast-r"><span class="d">{today:%Y-%m-%d} · {weekday}</span>{_site_nav(site)}<a href="{_e(site['archive_url'])}">Morning Report →</a></div>
+<header class="mast" data-site-header><div class="wrap mast-in">
+<a class="logo" href="/" aria-label="News Chart home"><img class="mark" src="/assets/brand/news-chart-white.svg" alt="News Chart" height="17"></a>
+<button class="nav-toggle" aria-label="Menu" aria-expanded="false"><span></span></button>
+<div class="mast-r"><span class="d">{today:%Y-%m-%d} · {weekday}</span>{_top_nav("/" + site["path"] + "/")}</div>
 </div></header>
 <main class="wrap">
 <section class="edition">
@@ -501,6 +506,7 @@ def render_page(cfg: dict, payload: dict, now: datetime) -> str:
 {NEWSLETTER_CARD}
 <footer class="foot"><div class="row"><span>非投資建議。 Not investment advice.</span><span><a href="/backtest/">Backtest</a> · <a href="/movers/">Movers</a> · <a href="/politician-tracker/">Politician Tracker</a> · <a href="{_e(site['archive_url'])}">Morning Report</a> · <a href="/about/">About</a> · <a href="/{_e(site['path'])}/data.json">data.json</a></span></div></footer>
 </main>
+<script type="module" src="/assets/js/site.js"></script>
 <script>{JS}</script>
 </body></html>
 """

@@ -14,23 +14,32 @@ export function isActive(href, path) {
   return path === href || path.startsWith(href);
 }
 
-/** Inner HTML of <header data-site-header>. `toggle` is added by the browser only (it needs a click handler). */
-export function headerInner(reg, { path = '', home = false, date = '', toggle = false } = {}) {
-  const items = reg.tools.filter((t) => t.nav && t.href);
-  const news = items.find((t) => t.id === 'news');
-  const rest = items.filter((t) => t.id !== 'news');
-  const link = (t, cls = '') => `<a${cls ? ` class="${cls}"` : ''} href="${esc(t.href)}"${isActive(t.href, path) ? ' aria-current="page"' : ''}>${esc(t.title)}</a>`;
+/**
+ * Shared top menu. Labels, order, and hrefs are fixed so /news/ can match this
+ * markup without reading tools.json titles. Footer links still use registry titles.
+ * `home` and `toggle` are accepted and ignored: every page shows all four links,
+ * and the Menu button is in the markup (site.js only binds the click).
+ */
+export const TOP_NAV = [
+  { href: '/news/', label: '晨報' },
+  { href: '/movers/', label: '港股異動' },
+  { href: '/politician-tracker/', label: '政治人物持股動向' },
+  { href: '/backtest/', label: '策略回測' },
+];
+
+/** Inner HTML of <header data-site-header>. */
+export function headerInner(reg, { path = '', date = '' } = {}) {
+  const link = (item) => `<a href="${esc(item.href)}"${isActive(item.href, path) ? ' aria-current="page"' : ''}>${esc(item.label)}</a>`;
   return [
     '<div class="wrap mast-in">',
     `  <a class="logo" href="/" aria-label="${esc(reg.site.name)} home"><img class="mark" src="/assets/brand/news-chart-white.svg" alt="${esc(reg.site.name)}" height="17"></a>`,
-    toggle ? '  <button class="nav-toggle" aria-label="Menu" aria-expanded="false"><span></span></button>' : '',
+    '  <button class="nav-toggle" aria-label="Menu" aria-expanded="false"><span></span></button>',
     '  <div class="mast-r">',
     `    <span class="d">${date ? `${esc(date)} · HKT` : ''}</span>`,
-    ...(home ? [] : rest.map((t) => `    ${link(t)}`)),
-    news ? `    ${link(news, 'box')}` : '',
+    ...TOP_NAV.map((item) => `    ${link(item)}`),
     '  </div>',
     '</div>',
-  ].filter(Boolean).join('\n');
+  ].join('\n');
 }
 
 /** Outbound destinations. The site footer and the About links line both use these anchors. */

@@ -115,9 +115,17 @@ The homepage header, the homepage footer and the four homepage cards (`/backtest
 has to draw first. View-source of the homepage, a crawler without JavaScript and a visitor with scripting
 off all find them, and they work as plain navigation.
 
-`/backtest/`, `/movers/`, `/thanks/`, `/about/` and `404.html` are left as they are on live main. Their
-committed header and footer stay empty shells (About keeps its own fine-line link). `site.js` still fills
-those shells in the browser.
+`/`, `/movers/`, `/about/`, `/backtest/` and `/politician-tracker/` share one top menu, from
+`headerInner()` in `assets/js/chrome-html.js` (`TOP_NAV`). The logo is `/assets/brand/news-chart-white.svg`,
+`href="/"`, `aria-label="News Chart home"`, same tab. The menu is plain text links, in order: 晨報 `/news/`,
+港股異動 `/movers/`, 政治人物持股動向 `/politician-tracker/`, 策略回測 `/backtest/`. The current section gets
+`aria-current="page"`. There is no `class="box"` and the homepage does not hide items. At `max-width: 760px`,
+`.nav-toggle` shows and `.mast-r` stays hidden until the header has `data-open="true"`; `site.js` toggles
+that attribute and `aria-expanded`. `/news/` is owned by News Analyst and should emit this same header.
+
+`/thanks/`, `404.html` and the tool template keep empty header and footer shells. `site.js` still fills
+those shells in the browser. `/movers/`, `/about/` and `/backtest/` commit the shared header; their footers
+stay empty shells (About keeps its own fine-line link) and `site.js` fills the footer.
 
 - One source of truth for the homepage markup: `assets/tools.json`. `assets/js/chrome-html.js` turns it
   into markup with pure string functions. The browser (`site.js`, `home.js`) and the Node generator use
@@ -125,10 +133,11 @@ those shells in the browser.
 - `node scripts/static-chrome.mjs` writes `<header data-site-header>`, `<footer data-site-footer>` and
   `<nav id="tools">` in `index.html` only. `--check` exits 1 when that page is stale; `npm run check` runs it.
   After editing `assets/tools.json`, run `npm run static-chrome` and commit `index.html`.
-- JavaScript is a progressive enhancement on the homepage. When the HTML links match the registry, the
-  scripts keep the anchors and only add the date, the phone Menu button and the data-dependent card bodies
-  (Politician Tracker filing, Morning Report caption). If the HTML and registry disagree, or the HTML is an
-  old copy with empty regions, they rebuild the regions from the registry.
+- JavaScript is a progressive enhancement on the homepage. When the header links match `TOP_NAV`, the
+  scripts keep the anchors and only add the date and the data-dependent card bodies (Politician Tracker
+  filing, Morning Report caption). The Menu button is already in the header. If the HTML and the menu
+  disagree, or the HTML is an old copy with empty regions, they rebuild the header from `TOP_NAV` and the
+  footer from the registry.
 - `scripts/home-preview.mjs`, `seo-meta.mjs`, `news-feed.mjs` and `build-sitemap.mjs` (assemble time)
   do not touch these regions; `scripts/tests/static-links.test.mjs` runs them on a copy to prove it.
 - On a phone with scripting off the header nav is collapsed by the stylesheet (its Menu button needs
@@ -140,8 +149,11 @@ those shells in the browser.
   and does not rebuild dated editions. A future generator can add the four canonical links and a fine-line
   About anchor under the existing footer row, without importing `site.js` or `chrome-html.js`. Editions
   already published stay byte-identical.
-- `politician-tracker/index.html` keeps its own page. Its footer adds the four section links, About, and
-  the existing `data.json` link. The disclaimer line stays. The tracker renderer writes that same footer.
+- `politician-tracker/index.html` keeps its own page styles. Its header is the shared mast (`data-site-header`,
+  the same logo and four links, `site.js` for the Menu button). The page does not load `theme.css`, because
+  that file also styles `.foot`; the mast rules are copied into the tracker stylesheet. Its footer adds the
+  four section links, About, and the existing `data.json` link. The disclaimer line stays. The tracker
+  renderer writes that same header and footer.
 
 ## Backtest
 
